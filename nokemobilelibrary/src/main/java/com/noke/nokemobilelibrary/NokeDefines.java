@@ -138,7 +138,82 @@ public class NokeDefines {
     public static final String RELOAD_LOCK_TABLE                   ="NokeBluetoothService.RELOAD_LOCK_TABLE";
     public static final String RELOAD_FOB_TABLE                    ="NokeBluetoothService.RELOAD_FOB_TABLE";
 
+    final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
+    public static String bytesToHex(byte[] bytes) {
+        if(bytes != null) {
+            char[] hexChars = new char[bytes.length * 2];
+            for (int j = 0; j < bytes.length; j++) {
+                int v = bytes[j] & 0xFF;
+                hexChars[j * 2] = hexArray[v >>> 4];
+                hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+            }
+            return new String(hexChars);
+        }
+        else
+        {
+            return "";
+        }
+    }
 
+    public static byte[] hexToBytes(String hexstring) {
+        hexstring=hexstring.toUpperCase();
+        int len=hexstring.length()/2;
+        int hexstringlen=len*2;
+        byte[] bytes = new byte[len];
+        for(int x=0;x<len;x++){
+            for(int y=0;y<hexArray.length;y++)
+            {
+                if(hexArray[y]==hexstring.charAt(2*x)){
+//                    bytes[len-1-x]+=(byte)(y<<4);
+                    bytes[x]+=(byte)(y<<4);
+                }
+                if(hexArray[y]==hexstring.charAt(2*x+1)){
+//                    bytes[len-1-x]+=(byte)y;
+                    bytes[x]+=(byte)y;
+                }
+            }
+        }
+        return bytes;
+    }
 
+    public static String bytesToHex(byte[] bytes, int start, int len) {
+        if(bytes.length<start+len)
+            return "bytesToHex: Invalid length";
+
+        char[] hexChars = new char[len * 2];
+        for (int j = 0; j < len; j++) {
+            int v = bytes[j+start] & 0xFF;
+            hexChars[j * 2] = hexArray[v >>> 4];
+            hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+        }
+        return new String(hexChars);
+    }
+
+    public static int copyArray(byte[] dataOut, byte[] dataIn, int size) {
+        if(dataOut.length<size)
+            return -1;
+        if(dataIn.length<size)
+            return -1;
+
+        for (int x = 0; x < size; x++)
+            dataOut[x] = dataIn[x];
+
+        return 0;
+    }
+    public static int copyArray(byte[] dataOut,int outStartByte, byte[] dataIn, int inStartByte, int size) {
+        if(dataOut.length<size+outStartByte)
+            return -1;
+        if(dataIn.length<size+inStartByte)
+            return -1;
+
+        for (int x = 0; x < size; x++)
+            dataOut[x+outStartByte] = dataIn[x+inStartByte];
+
+        return 0;
+    }
+    public static void clearArray(byte[] data, int size){
+        for (int x = 0; x < size; x++)
+            data[x] = 0;
+    }
 
 }
