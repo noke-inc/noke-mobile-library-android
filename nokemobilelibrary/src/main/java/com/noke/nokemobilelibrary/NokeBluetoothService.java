@@ -27,7 +27,6 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
-import android.support.annotation.Nullable;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
@@ -37,6 +36,7 @@ import java.util.LinkedHashMap;
 
 /**
  * Created by Spencer on 1/17/18.
+ * Service for handling all bluetooth communication with the lock
  */
 
 public class NokeBluetoothService extends Service {
@@ -51,7 +51,6 @@ public class NokeBluetoothService extends Service {
     private BluetoothAdapter.LeScanCallback mOldBluetoothScanCallback;
     private boolean mReceiverRegistered;
     private boolean mScanning;
-
 
     //SDK Settings
     private int bluetoothDelayDefault;
@@ -74,8 +73,7 @@ public class NokeBluetoothService extends Service {
     }
 
     @Override
-    public void onCreate()
-    {
+    public void onCreate() {
         super.onCreate();
         IntentFilter btFilter = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
         registerReceiver(bluetoothBroadcastReceiver, btFilter);
@@ -120,28 +118,26 @@ public class NokeBluetoothService extends Service {
         }
 
         mBluetoothAdapter = mBluetoothManager.getAdapter();
-        if(mBluetoothAdapter == null){
-            return false;
-        }
-
-        return true;
+        return mBluetoothAdapter != null;
     }
 
     public void startBLE(){
         try {
-
             LocationManager lm = (LocationManager) getApplicationContext().getSystemService(Context.LOCATION_SERVICE);
             boolean gps_enabled = false;
             boolean network_enabled = false;
-
             try {
-                gps_enabled = lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
+                if (lm != null) {
+                    gps_enabled = lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
+                }
             } catch (Exception e) {
                 Log.e(TAG, "gps_enabled error");
             }
 
             try {
-                network_enabled = lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+                if (lm != null) {
+                    network_enabled = lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+                }
             } catch (Exception e) {
                 Log.e(TAG, "network_enabled error");
             }
@@ -163,17 +159,17 @@ public class NokeBluetoothService extends Service {
                 }
             } else {
                 mBluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
-                mBluetoothAdapter = mBluetoothManager.getAdapter();
+                if (mBluetoothManager != null) {
+                    mBluetoothAdapter = mBluetoothManager.getAdapter();
+                }
                 if (mBluetoothAdapter == null || !mBluetoothAdapter.isEnabled()) {
                     Log.d(TAG, "UNABLE TO OBTAIN A BLUETOOTH ADAPTER");
                     //TODO Handle cases when bluetooth is turned off
                 } else {
-                    Log.d(TAG, "START BACKGROUND BLE SCAN");
                     initiateBackgroundBLEScan();
                 }
             }
-        }catch (NullPointerException e)
-        {
+        }catch (NullPointerException e) {
             Log.e(TAG, "NULL POINTER EXCEPTION");
         }
     }
@@ -181,11 +177,9 @@ public class NokeBluetoothService extends Service {
     boolean scanLoopOn = false;
     boolean scanLoopOff = false;
     boolean backgroundScanning = false;
-    public void initiateBackgroundBLEScan()
-    {
-        if(!backgroundScanning)
-        {
-            Log.d(TAG, "INIT BACKGROUND SCAN");
+
+    public void initiateBackgroundBLEScan() {
+        if(!backgroundScanning) {
             backgroundScanning = true;
             startBackgroundBLEScan();
         }
@@ -313,7 +307,7 @@ public class NokeBluetoothService extends Service {
                         NokeDevice noke = new NokeDevice(bluetoothDevice.getName(), bluetoothDevice.getAddress());
                         noke.bluetoothDevice = bluetoothDevice;
 
-                        byte[] broadcastData = {(byte) 0x00, (byte) 0x00, (byte) 0x00};
+                        byte[] broadcastData;
                         String nameVersion;
 
                         if (bluetoothDevice.getName().contains("FOB") && !bluetoothDevice.getName().contains("NFOB")) {
@@ -501,7 +495,6 @@ public class NokeBluetoothService extends Service {
                             broadcastUpdate(errorIntentAction);
 
                             noke.connectionState = NokeDefines.STATE_DISCONNECTED;
-                            return;
                         }
                     });
                 }
@@ -712,7 +705,6 @@ public class NokeBluetoothService extends Service {
      */
     public void readStateCharacteristic(NokeDevice noke){
         if (mBluetoothAdapter == null || noke.gatt == null){
-            //Log.w(TAG, "BluetoothAdapter not initialized");
             return;
         }
 
@@ -814,15 +806,43 @@ public class NokeBluetoothService extends Service {
             return;
         }
 
-        //mGattManager.queue(new GattCharacteristicWriteOperation(noke.bluetoothDevice, RxService.getUuid(), RxChar.getUuid(), noke.TxToLockPackets.get(0).Data));
-        RxChar.setValue(noke.TxToLockPackets.get(0).Data);
+        RxChar.setValue(NokeDefines.hexToBytes(noke.commands.get(0)));
         boolean status = noke.gatt.writeCharacteristic(RxChar);
         Log.d(TAG, "write TXchar - status =" + status);
-
     }
 
+    /**
+     * Disconnects an existing connection or cancel a pending connection. The disconnection result
+     * is reported asynchronously through the
+     * {@code BluetoothGattCallback#onConnectionStateChange(android.bluetooth.BluetoothGatt, int, int)}
+     * callback.
+     */
+    public void disconnect(final NokeDevice noke) {
+        if (mBluetoothAdapter == null || noke.gatt == null) {
+            //Log.w(TAG, "BluetoothAdapter not initialized");
+            return;
+        }
 
+        Handler handler = new Handler(Looper.getMainLooper());
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
 
+                if(noke.gatt != null) {
+                    //mGattManager.queue(new GattDisconnectOperation(noke.bluetoothDevice));
+                    noke.gatt.disconnect();
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    //mGattManager.queue(new GattCloseOperation(noke.bluetoothDevice));
+                    noke.gatt.close();
+                    noke.gatt = null;
+                }
+            }
+        });
+    }
 
     private boolean isServiceRunningInForeground() {
 
@@ -836,33 +856,31 @@ public class NokeBluetoothService extends Service {
         public void onReceive(Context context, Intent intent)
         {
             final String action = intent.getAction();
-            if(action.equals(BluetoothAdapter.ACTION_STATE_CHANGED))
-            {
-                final int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
-                switch(state)
-                {
-                    case BluetoothAdapter.STATE_OFF:
-                        //Log.d(TAG, "BLUETOOTH STATE OFF");
-                        mScanning = false;
-                        broadcastUpdate(NokeDefines.BLUETOOTH_DISABLED);
-                        break;
-                    case BluetoothAdapter.STATE_TURNING_OFF:
-                        //Log.d(TAG, "BLUETOOTH STATE TURNING OFF");
-                        break;
-                    case BluetoothAdapter.STATE_ON:
-                        //Log.d(TAG, "BLUETOOTH STATE ON");
-                        broadcastUpdate(NokeDefines.BLUETOOTH_ENABLED);
-                        startBLE();
-                        break;
-                    case BluetoothAdapter.STATE_TURNING_ON:
-                        //Log.d(TAG, "BLUETOOTH STATE TURNING ON");
-                        break;
+            if(action != null) {
+                if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
+                    final int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
+                    switch (state) {
+                        case BluetoothAdapter.STATE_OFF:
+                            //Log.d(TAG, "BLUETOOTH STATE OFF");
+                            mScanning = false;
+                            broadcastUpdate(NokeDefines.BLUETOOTH_DISABLED);
+                            break;
+                        case BluetoothAdapter.STATE_TURNING_OFF:
+                            //Log.d(TAG, "BLUETOOTH STATE TURNING OFF");
+                            break;
+                        case BluetoothAdapter.STATE_ON:
+                            //Log.d(TAG, "BLUETOOTH STATE ON");
+                            broadcastUpdate(NokeDefines.BLUETOOTH_ENABLED);
+                            startBLE();
+                            break;
+                        case BluetoothAdapter.STATE_TURNING_ON:
+                            //Log.d(TAG, "BLUETOOTH STATE TURNING ON");
+                            break;
+                    }
+                } else if (action.equals(NokeDefines.NOTIFICATION_UNLOCK)) {
+                    String mac = intent.getStringExtra(NokeDefines.MAC_ADDRESS);
+                    broadcastUpdate(NokeDefines.UNLOCK_NOKE, mac);
                 }
-            }
-            else if(action.equals(NokeDefines.NOTIFICATION_UNLOCK))
-            {
-                String mac = intent.getStringExtra(NokeDefines.MAC_ADDRESS);
-                broadcastUpdate(NokeDefines.UNLOCK_NOKE, mac);
             }
         }
     };

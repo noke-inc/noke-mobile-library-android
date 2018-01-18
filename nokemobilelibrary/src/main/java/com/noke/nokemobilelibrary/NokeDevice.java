@@ -10,6 +10,7 @@ import java.util.ArrayList;
 
 /**
  * Created by Spencer on 1/17/18.
+ * Class that contains methods and properties of Noke Devices
  */
 
 public class NokeDevice {
@@ -20,7 +21,7 @@ public class NokeDevice {
     String version;
     String battery;
 
-    public transient byte session[]=new byte[20];
+    public transient String session;
 
     BluetoothDevice bluetoothDevice;
     public transient BluetoothGatt gatt;
@@ -75,7 +76,7 @@ public class NokeDevice {
 
     void setSession(byte[] statusIn) {
         if(statusIn.length>=20) {
-            System.arraycopy(statusIn, 0, session, 0, 20);
+            session = NokeDefines.bytesToHex(statusIn);
         }
     }
 
