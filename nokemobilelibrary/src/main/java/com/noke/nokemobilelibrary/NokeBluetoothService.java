@@ -52,6 +52,8 @@ public class NokeBluetoothService extends Service {
     private boolean mReceiverRegistered;
     private boolean mScanning;
 
+    private NokeServiceListener mGlobalNokeListener;
+
     //SDK Settings
     private int bluetoothDelayDefault;
     private int bluetoothDelayBackgroundDefault;
@@ -80,6 +82,10 @@ public class NokeBluetoothService extends Service {
         mReceiverRegistered = true;
         setBluetoothDelayDefault(250);
         setBluetoothDelayBackgroundDefault(2000);
+    }
+
+    public void registerNokeListener(Context context, NokeServiceListener listener){
+        this.mGlobalNokeListener = listener;
     }
 
     @Override
@@ -144,17 +150,13 @@ public class NokeBluetoothService extends Service {
 
             int permissionCheck = ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_COARSE_LOCATION);
             if (!gps_enabled && !network_enabled) {
-                Log.d(TAG, "ENABLE LOCATION PERMISSIONS");
-                broadcastUpdate(NokeDefines.ENABLE_LOCATION_SERVICES);
+                mGlobalNokeListener.onError(null, NokeDefines.ERROR_LOCATION_SERVICES_DISABLED);
             } else if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
-                Log.d(TAG, "LOCATION PERMISSION NEEDED");
-                broadcastUpdate(NokeDefines.LOCATION_PERMISSION_NEEDED);
+                mGlobalNokeListener.onError(null, NokeDefines.ERROR_LOCATION_SERVICES_DISABLED);
             } else if (mBluetoothAdapter != null) {
                 if (!mBluetoothAdapter.isEnabled()) {
-                    Log.d(TAG, "BLUETOOTH ADAPTER IS NOT ENABLED");
-                    broadcastUpdate(NokeDefines.BLUETOOTH_DISABLED);
+                    mGlobalNokeListener.onError(null, NokeDefines.ERROR_BLUETOOTH_DISABLED);
                 } else {
-                    Log.d(TAG, "START BACKGROUND BLE SCAN");
                     initiateBackgroundBLEScan();
                 }
             } else {
@@ -163,7 +165,6 @@ public class NokeBluetoothService extends Service {
                     mBluetoothAdapter = mBluetoothManager.getAdapter();
                 }
                 if (mBluetoothAdapter == null || !mBluetoothAdapter.isEnabled()) {
-                    Log.d(TAG, "UNABLE TO OBTAIN A BLUETOOTH ADAPTER");
                     //TODO Handle cases when bluetooth is turned off
                 } else {
                     initiateBackgroundBLEScan();
@@ -329,7 +330,7 @@ public class NokeBluetoothService extends Service {
                                 nokeDevices.put(noke.mac, noke);
                             }
 
-                            broadcastUpdate(NokeDefines.FOUND_NOKE, broadcastData, noke.mac);
+                            mGlobalNokeListener.onNokeDiscovered(noke);
                         }
                     }
                 }
@@ -489,12 +490,9 @@ public class NokeBluetoothService extends Service {
                             noke.gatt.disconnect();
                             noke.gatt.close();
                             noke.gatt = null;
-
-                            String errorIntentAction;
-                            errorIntentAction = NokeDefines.BLUETOOTH_GATT_ERROR;
-                            broadcastUpdate(errorIntentAction);
-
                             noke.connectionState = NokeDefines.STATE_DISCONNECTED;
+                            mGlobalNokeListener.onError(noke, NokeDefines.ERROR_BLUETOOTH_GATT);
+
                         }
                     });
                 }
@@ -524,10 +522,10 @@ public class NokeBluetoothService extends Service {
                 }
             }
             else if (newState == BluetoothProfile.STATE_CONNECTED) {
-                intentAction = NokeDefines.NOKE_CONNECTING;
+
                 noke.connectionAttempts = 0;
                 noke.connectionState = NokeDefines.STATE_CONNECTED;
-                broadcastUpdate(intentAction);
+                mGlobalNokeListener.onNokeConnecting(noke);
 
                 Handler handler = new Handler(Looper.getMainLooper());
                 handler.post(new Runnable() {
@@ -576,8 +574,7 @@ public class NokeBluetoothService extends Service {
                 {
                     if (noke.connectionAttempts == 0) {
                         refreshDeviceCache(noke.gatt, true);
-                        intentAction = NokeDefines.NOKE_DISCONNECTED;
-                        broadcastUpdate(intentAction, noke.mac);
+                        mGlobalNokeListener.onNokeDisconnected(noke);
                     }
                 }
             }
@@ -612,7 +609,6 @@ public class NokeBluetoothService extends Service {
             NokeDevice noke = nokeDevices.get(gatt.getDevice().getAddress());
             if (status == BluetoothGatt.GATT_SUCCESS)
             {
-                broadcastUpdate(NokeDefines.ACTION_GATT_SERVICES_DISCOVERED, gatt.getDevice().getAddress());
                 if(gatt.getDevice().getName().contains("NOKE_FW") || gatt.getDevice().getName().contains("NFOB_FW") || gatt.getDevice().getName().contains("N3P_FW")) {
                     enableFirmwareTXNotification(noke);
                 }
@@ -634,28 +630,21 @@ public class NokeBluetoothService extends Service {
                     noke.setSession(characteristic.getValue());
                     enableTXNotification(noke);
                 }
-                else {
-                    broadcastUpdate(NokeDefines.ACTION_DATA_AVAILABLE, characteristic);
-                }
             }
         }
 
         @Override
         public void onCharacteristicChanged(BluetoothGatt gatt,
                                             BluetoothGattCharacteristic characteristic) {
-            broadcastUpdate(NokeDefines.ACTION_DATA_AVAILABLE, characteristic);
+
             Log.w(TAG, "On Characteristic Changed: " + NokeDefines.bytesToHex(characteristic.getValue()));
-
-
             NokeDevice noke = nokeDevices.get(gatt.getDevice().getAddress());
             byte[] data=characteristic.getValue();
 
             byte destination = data[0];
             if (destination == NokeDefines.SERVER_Dest) {
-
                 byte resultdata[] = new byte[20];
                 NokeDefines.copyArray(resultdata, 0, data, 0, 20);
-                broadcastUpdate(NokeDefines.RECEIVED_SERVER_DATA, resultdata, noke.mac);
             } else if (destination == NokeDefines.APP_Dest) {
                     if (noke.commands.size() > 0) {
                         noke.commands.remove(0);
@@ -665,13 +654,10 @@ public class NokeBluetoothService extends Service {
                     }
 
                     byte resulttype = data[1];
-                    broadcastUpdate(NokeDefines.RECEIVED_APP_DATA, data, noke.mac);
-
                     if (resulttype == NokeDefines.SHUTDOWN_ResultType) {
                         disconnect(noke);
                     }
                 }
-
         }
 
 
@@ -681,11 +667,11 @@ public class NokeBluetoothService extends Service {
             Log.w(TAG, "On Descriptor Write: " + descriptor.toString() + " Status: " + status);
             if(gatt.getDevice().getName().contains("NOKE_FW") || gatt.getDevice().getName().contains("NFOB_FW") || gatt.getDevice().getName().contains("N3P_FW"))
             {
-                broadcastUpdate(NokeDefines.UPDATE_FIRMWARE, gatt.getDevice().getAddress());
+                mGlobalNokeListener.onNokeConnected(nokeDevices.get(gatt.getDevice().getAddress()));
             }
             else
             {
-                broadcastUpdate(NokeDefines.NOKE_CONNECTED, gatt.getDevice().getAddress());
+                mGlobalNokeListener.onNokeConnected(nokeDevices.get(gatt.getDevice().getAddress()));
             }
         }
 
@@ -715,15 +701,14 @@ public class NokeBluetoothService extends Service {
         }
 
         if (RxService == null){
-            broadcastUpdate(NokeDefines.INVALID_NOKE_DEVICE);
+            mGlobalNokeListener.onError(noke, NokeDefines.ERROR_INVALID_NOKE_DEVICE);
             return;
         }
         BluetoothGattCharacteristic StateChar = RxService.getCharacteristic(NokeDefines.STATE_CHAR_UUID);
         if (StateChar == null) {
-            broadcastUpdate(NokeDefines.INVALID_NOKE_DEVICE);
+            mGlobalNokeListener.onError(noke, NokeDefines.ERROR_INVALID_NOKE_DEVICE);
             return;
         }
-
         noke.gatt.readCharacteristic(StateChar);
     }
 
@@ -737,18 +722,18 @@ public class NokeBluetoothService extends Service {
     {
 
         if (noke.gatt == null) {
-            broadcastUpdate(NokeDefines.INVALID_NOKE_DEVICE);
+            mGlobalNokeListener.onError(noke, NokeDefines.ERROR_INVALID_NOKE_DEVICE);
             return;
         }
 
         BluetoothGattService RxService = noke.gatt.getService(NokeDefines.RX_SERVICE_UUID);
         if (RxService == null) {
-            broadcastUpdate(NokeDefines.INVALID_NOKE_DEVICE);
+            mGlobalNokeListener.onError(noke, NokeDefines.ERROR_INVALID_NOKE_DEVICE);
             return;
         }
         BluetoothGattCharacteristic TxChar = RxService.getCharacteristic(NokeDefines.TX_CHAR_UUID);
         if (TxChar == null) {
-            broadcastUpdate(NokeDefines.INVALID_NOKE_DEVICE);
+            mGlobalNokeListener.onError(noke, NokeDefines.ERROR_INVALID_NOKE_DEVICE);
             return;
         }
         noke.gatt.setCharacteristicNotification(TxChar, true);
@@ -762,18 +747,18 @@ public class NokeBluetoothService extends Service {
     public void enableFirmwareTXNotification(NokeDevice noke)
     {
         if (noke.gatt == null) {
-            broadcastUpdate(NokeDefines.INVALID_NOKE_DEVICE);
+            mGlobalNokeListener.onError(noke, NokeDefines.ERROR_INVALID_NOKE_DEVICE);
             return;
         }
 
         BluetoothGattService RxService = noke.gatt.getService(NokeDefines.FIRMWARE_RX_SERVICE_UUID);
         if (RxService == null) {
-            broadcastUpdate(NokeDefines.INVALID_NOKE_DEVICE);
+            mGlobalNokeListener.onError(noke, NokeDefines.ERROR_INVALID_NOKE_DEVICE);
             return;
         }
         BluetoothGattCharacteristic TxChar = RxService.getCharacteristic(NokeDefines.FIRMWARE_TX_CHAR_UUID);
         if (TxChar == null) {
-            broadcastUpdate(NokeDefines.INVALID_NOKE_DEVICE);
+            mGlobalNokeListener.onError(noke, NokeDefines.ERROR_INVALID_NOKE_DEVICE);
             return;
         }
         noke.gatt.setCharacteristicNotification(TxChar, true);
@@ -797,12 +782,12 @@ public class NokeBluetoothService extends Service {
         }
 
         if (RxService == null) {
-            broadcastUpdate(NokeDefines.INVALID_NOKE_DEVICE);
+            mGlobalNokeListener.onError(noke, NokeDefines.ERROR_INVALID_NOKE_DEVICE);
             return;
         }
         BluetoothGattCharacteristic RxChar = RxService.getCharacteristic(NokeDefines.RX_CHAR_UUID);
         if (RxChar == null) {
-            broadcastUpdate(NokeDefines.INVALID_NOKE_DEVICE);
+            mGlobalNokeListener.onError(noke, NokeDefines.ERROR_INVALID_NOKE_DEVICE);
             return;
         }
 
@@ -861,62 +846,19 @@ public class NokeBluetoothService extends Service {
                     final int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
                     switch (state) {
                         case BluetoothAdapter.STATE_OFF:
-                            //Log.d(TAG, "BLUETOOTH STATE OFF");
                             mScanning = false;
-                            broadcastUpdate(NokeDefines.BLUETOOTH_DISABLED);
                             break;
                         case BluetoothAdapter.STATE_TURNING_OFF:
-                            //Log.d(TAG, "BLUETOOTH STATE TURNING OFF");
                             break;
                         case BluetoothAdapter.STATE_ON:
-                            //Log.d(TAG, "BLUETOOTH STATE ON");
-                            broadcastUpdate(NokeDefines.BLUETOOTH_ENABLED);
                             startBLE();
                             break;
                         case BluetoothAdapter.STATE_TURNING_ON:
-                            //Log.d(TAG, "BLUETOOTH STATE TURNING ON");
                             break;
                     }
-                } else if (action.equals(NokeDefines.NOTIFICATION_UNLOCK)) {
-                    String mac = intent.getStringExtra(NokeDefines.MAC_ADDRESS);
-                    broadcastUpdate(NokeDefines.UNLOCK_NOKE, mac);
+                    mGlobalNokeListener.onBluetoothStatusChanged(state);
                 }
             }
         }
     };
-
-
-    //BROADCAST UPDATE METHODS
-    private void broadcastUpdate(final String action) {
-        final Intent intent = new Intent(action);
-        LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
-    }
-
-    private void broadcastUpdate(final String action,
-                                 final BluetoothGattCharacteristic characteristic) {
-        final Intent intent = new Intent(action);
-
-        // This is handling for the notification on TX Character of Noke service
-        if (NokeDefines.TX_CHAR_UUID.equals(characteristic.getUuid()))
-        {
-            intent.putExtra(NokeDefines.EXTRA_DATA, characteristic.getValue());
-        }
-        LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
-    }
-
-    private void broadcastUpdate(final String action, final String address)
-    {
-        final Intent intent = new Intent(action);
-        intent.putExtra(NokeDefines.MAC_ADDRESS, address);
-        LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
-    }
-
-    public void broadcastUpdate(final String action, byte[] data, final String address)
-    {
-        final Intent intent = new Intent(action);
-        intent.putExtra(NokeDefines.EXTRA_DATA, data);
-        intent.putExtra(NokeDefines.MAC_ADDRESS, address);
-        LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
-        //showMessage("Intent: " + action);
-    }
 }

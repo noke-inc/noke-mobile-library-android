@@ -216,4 +216,12 @@ public class NokeDefines {
             data[x] = 0;
     }
 
+    //NOKE ERRORS
+    public static final int ERROR_LOCATION_PERMISSIONS_NEEDED = 0;
+    public static final int ERROR_LOCATION_SERVICES_DISABLED = 1;
+    public static final int ERROR_BLUETOOTH_DISABLED = 2;
+    public static final int ERROR_BLUETOOTH_GATT = 3;
+    public static final int ERROR_INVALID_NOKE_DEVICE = 4;
+
+
 }
