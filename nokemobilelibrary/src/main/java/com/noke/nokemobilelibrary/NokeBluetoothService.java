@@ -68,10 +68,9 @@ public class NokeBluetoothService extends Service {
     }
 
     private final IBinder mBinder = new LocalBinder();
-
     @Override
     public IBinder onBind(Intent intent) {
-        return null;
+        return mBinder;
     }
 
     @Override
@@ -304,33 +303,35 @@ public class NokeBluetoothService extends Service {
             {
                 if(bluetoothDevice.getName() != null)
                 {
-                    if (bluetoothDevice.getName().contains("NOKE")) {
+                    if (bluetoothDevice.getName().contains("NOKE"))
+                    {
                         NokeDevice noke = new NokeDevice(bluetoothDevice.getName(), bluetoothDevice.getAddress());
                         noke.bluetoothDevice = bluetoothDevice;
 
-                        byte[] broadcastData;
-                        String nameVersion;
+                        if(nokeDevices.get(noke.mac) != null){
+                            byte[] broadcastData;
+                            String nameVersion;
 
-                        if (bluetoothDevice.getName().contains("FOB") && !bluetoothDevice.getName().contains("NFOB")) {
-                            nameVersion = bluetoothDevice.getName().substring(3, 5);
-                        } else {
-                            nameVersion = bluetoothDevice.getName().substring(4, 6);
-                        }
-
-                        if (!nameVersion.equals("06") && !nameVersion.equals("04")) {
-                            Log.d(TAG, "SCAN RECORD: " + NokeDefines.bytesToHex(scanRecord));
-                            byte[] getdata = getManufacturerData(scanRecord);
-                            broadcastData = new byte[]{getdata[2], getdata[3], getdata[4]};
-                            String version = noke.getVersion(broadcastData, bluetoothDevice.getName());
-                            int setupflag = (int) broadcastData[0];
-                            noke.version = version;
-                            noke.bluetoothDevice = bluetoothDevice;
-
-                            if(nokeDevices.get(noke.mac) == null){
-                                nokeDevices.put(noke.mac, noke);
+                            if (bluetoothDevice.getName().contains("FOB") && !bluetoothDevice.getName().contains("NFOB")) {
+                                nameVersion = bluetoothDevice.getName().substring(3, 5);
+                            } else {
+                                nameVersion = bluetoothDevice.getName().substring(4, 6);
                             }
 
-                            mGlobalNokeListener.onNokeDiscovered(noke);
+                            if (!nameVersion.equals("06") && !nameVersion.equals("04")) {
+                                byte[] getdata = getManufacturerData(scanRecord);
+                                broadcastData = new byte[]{getdata[2], getdata[3], getdata[4]};
+                                String version = noke.getVersion(broadcastData, bluetoothDevice.getName());
+                                int setupflag = (int) broadcastData[0];
+                                noke.version = version;
+                                noke.bluetoothDevice = bluetoothDevice;
+
+                                if(nokeDevices.get(noke.mac) == null){
+                                    nokeDevices.put(noke.mac, noke);
+                                }
+
+                                mGlobalNokeListener.onNokeDiscovered(noke);
+                            }
                         }
                     }
                 }

@@ -27,6 +27,11 @@ public class NokeServiceListenerAdapter implements NokeServiceListener{
     }
 
     @Override
+    public void onBluetoothStatusChanged(int bluetoothStatus) {
+        //empty default implementation
+    }
+
+    @Override
     public void onError(NokeDevice noke, int error) {
         //empty default implementation
     }
