@@ -178,7 +178,7 @@ public class NokeBluetoothService extends Service {
     boolean scanLoopOff = false;
     boolean backgroundScanning = false;
 
-    public void initiateBackgroundBLEScan() {
+    private void initiateBackgroundBLEScan() {
         if(!backgroundScanning) {
             backgroundScanning = true;
             startBackgroundBLEScan();
@@ -186,7 +186,7 @@ public class NokeBluetoothService extends Service {
     }
 
     int bluetoothDelay = 10;
-    public void startBackgroundBLEScan() {
+    private void startBackgroundBLEScan() {
         startLeScanning();
         final Handler refreshScan = new Handler();
         final int scanDelay = 4000;
@@ -212,7 +212,7 @@ public class NokeBluetoothService extends Service {
         bluetoothDelayBackgroundDefault = delay;
     }
 
-    public void stopBackgroundBLEScan(){
+    private void stopBackgroundBLEScan(){
         stopLeScanning();
         if(backgroundScanning){
             final Handler refreshScan = new Handler();
@@ -233,7 +233,7 @@ public class NokeBluetoothService extends Service {
      * Starts BLE scanning.
      */
     @SuppressWarnings("deprecation")
-    public void startLeScanning()
+    private void startLeScanning()
     {
         if(!mScanning) {
             mScanning = true;
@@ -259,7 +259,7 @@ public class NokeBluetoothService extends Service {
      * Stops BLE scanning.
      */
     @SuppressWarnings("deprecation")
-    public void stopLeScanning()
+    private void stopLeScanning()
     {
         mScanning = false;
         if (mBluetoothAdapter != null) {
@@ -280,7 +280,7 @@ public class NokeBluetoothService extends Service {
      * Initializes Bluetooth Scanning Callback for Lollipop and higher OS
      */
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-    public void initNewBluetoothCallback()
+    private void initNewBluetoothCallback()
     {
         mNewBluetoothScanCallback = new ScanCallback() {
             @Override
@@ -294,7 +294,7 @@ public class NokeBluetoothService extends Service {
     /**
      * Initializes Bluetooth Scanning Callback for KitKat OS
      */
-    public void initOldBluetoothCallback()
+    private void initOldBluetoothCallback()
     {
         mOldBluetoothScanCallback = new BluetoothAdapter.LeScanCallback()
         {
@@ -339,7 +339,7 @@ public class NokeBluetoothService extends Service {
         };
     }
 
-    public byte[] getManufacturerData(byte[] scanRecord){
+    private byte[] getManufacturerData(byte[] scanRecord){
         int i = 0;
         do {
             int length = scanRecord[i];
@@ -373,7 +373,7 @@ public class NokeBluetoothService extends Service {
      * @param rssi RSSI value obtained from the scanner.  Can be used for adjusting connecting range.
      */
 
-    public void connectToDevice(BluetoothDevice device, int rssi)
+    private void connectToDevice(BluetoothDevice device, int rssi)
     {
         if(device != null) {
             NokeDevice noke = nokeDevices.get(device.getAddress());
@@ -447,7 +447,7 @@ public class NokeBluetoothService extends Service {
      * {@code BluetoothGattCallback#onConnectionStateChange(android.bluetooth.BluetoothGatt, int, int)}
      * callback.
      */
-    public boolean connectToGatt(final NokeDevice noke)
+    private boolean connectToGatt(final NokeDevice noke)
     {
         if (mBluetoothAdapter == null || noke == null) {
             return false;
@@ -651,7 +651,7 @@ public class NokeBluetoothService extends Service {
 
                     byte resulttype = data[1];
                     if (resulttype == NokeDefines.SHUTDOWN_ResultType) {
-                        disconnect(noke);
+                        disconnectNoke(noke);
                     }
                 }
         }
@@ -685,7 +685,7 @@ public class NokeBluetoothService extends Service {
      *
      * @param noke The device to read the state characteristic from.
      */
-    public void readStateCharacteristic(NokeDevice noke){
+    private void readStateCharacteristic(NokeDevice noke){
         if (mBluetoothAdapter == null || noke.gatt == null){
             return;
         }
@@ -714,7 +714,7 @@ public class NokeBluetoothService extends Service {
      * @param noke Noke device
      */
 
-    public void enableTXNotification(NokeDevice noke)
+    private void enableTXNotification(NokeDevice noke)
     {
 
         if (noke.gatt == null) {
@@ -740,7 +740,7 @@ public class NokeBluetoothService extends Service {
     }
 
 
-    public void enableFirmwareTXNotification(NokeDevice noke)
+    private void enableFirmwareTXNotification(NokeDevice noke)
     {
         if (noke.gatt == null) {
             mGlobalNokeListener.onError(noke, NokeDefines.ERROR_INVALID_NOKE_DEVICE);
@@ -769,7 +769,7 @@ public class NokeBluetoothService extends Service {
      * @param noke Noke device
      */
 
-    public void writeRXCharacteristic(NokeDevice noke)
+    private void writeRXCharacteristic(NokeDevice noke)
     {
         BluetoothGattService RxService = noke.gatt.getService(NokeDefines.RX_SERVICE_UUID);
         if (noke.gatt == null)
@@ -798,7 +798,7 @@ public class NokeBluetoothService extends Service {
      * {@code BluetoothGattCallback#onConnectionStateChange(android.bluetooth.BluetoothGatt, int, int)}
      * callback.
      */
-    public void disconnect(final NokeDevice noke) {
+    public void disconnectNoke(final NokeDevice noke) {
         if (mBluetoothAdapter == null || noke.gatt == null) {
             return;
         }
