@@ -2,8 +2,6 @@ package com.noke.nokeapidemo;
 
 import android.Manifest;
 import android.annotation.TargetApi;
-import android.app.AlertDialog;
-import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -15,7 +13,6 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.support.annotation.NonNull;
-import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -27,7 +24,6 @@ import com.noke.nokemobilelibrary.NokeDefines;
 import com.noke.nokemobilelibrary.NokeDevice;
 import com.noke.nokemobilelibrary.NokeServiceListener;
 
-import java.util.LinkedHashMap;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -45,7 +41,7 @@ public class MainActivity extends AppCompatActivity {
 
         initiateNokeService();
 
-        scanButton = (Button) findViewById(R.id.scan_button);
+        scanButton = findViewById(R.id.scan_button);
         scanButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -59,7 +55,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void initiateNokeService(){
-        Log.d(TAG, "INITIALIZING SERVICE");
         Intent nokeServiceIntent = new Intent(this, NokeBluetoothService.class);
         bindService(nokeServiceIntent, mServiceConnection, Context.BIND_AUTO_CREATE);
     }
@@ -87,23 +82,28 @@ public class MainActivity extends AppCompatActivity {
     private NokeServiceListener mNokeServiceListener = new NokeServiceListener() {
         @Override
         public void onNokeDiscovered(NokeDevice noke) {
-            Log.d(TAG, "NOKE DISCOVERED: " + noke.getName());
+            Log.w(TAG, "NOKE DISCOVERED: " + noke.getName());
+            mService.connectToNoke(noke);
         }
 
         @Override
         public void onNokeConnecting(NokeDevice noke) {
-
+            Log.w(TAG, "NOKE CONNECTING: " + noke.getName());
         }
 
         @Override
         public void onNokeConnected(NokeDevice noke) {
+            Log.w(TAG, "NOKE CONNECTED: " + noke.getName());
+        }
 
-
+        @Override
+        public void onNokeUnlocked(NokeDevice noke) {
+            Log.w(TAG, "NOKE UNLOCKED: " + noke.getName());
         }
 
         @Override
         public void onNokeDisconnected(NokeDevice noke) {
-
+            Log.w(TAG, "NOKE DISCONNECTED: " + noke.getName());
         }
 
         @Override
@@ -150,9 +150,7 @@ public class MainActivity extends AppCompatActivity {
                     break;
                 case NokeDefines.ERROR_BLUETOOTH_GATT:
                     break;
-
             }
-
         }
     };
 

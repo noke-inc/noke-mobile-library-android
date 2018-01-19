@@ -361,6 +361,11 @@ public class NokeBluetoothService extends Service {
         return new byte[]{0,0,0,0,0};
     }
 
+
+    public void connectToNoke(NokeDevice noke){
+        connectToDevice(noke.bluetoothDevice, noke.rssi);
+    }
+
     /**
      * Attempts to match MAC address to device in nokeDevices list.  If device is found, stop scanning and
      * call connectToGatt to start service disovery and connect to device.
