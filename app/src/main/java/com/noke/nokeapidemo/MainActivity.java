@@ -45,7 +45,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 if(mService != null) {
-                    mService.startBLE();
+                    mService.startScanningForNokeDevices();
                 }else{
                     Log.e(TAG, "SERVICE HAS NOT BEEN INITIALIZED");
                 }
@@ -161,7 +161,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "GRANT RESULTS: " + grantResults[0]);
                 if (grantResults[0] == PackageManager.PERMISSION_GRANTED)
                 {
-                    mService.startBLE();
+                    mService.startScanningForNokeDevices();
                 } else {
                     final android.support.v7.app.AlertDialog.Builder builder = new android.support.v7.app.AlertDialog.Builder(this);
                     builder.setTitle(getString(R.string.functionality_limited));

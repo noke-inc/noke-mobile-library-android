@@ -126,7 +126,7 @@ public class NokeBluetoothService extends Service {
         return mBluetoothAdapter != null;
     }
 
-    public void startBLE(){
+    public void startScanningForNokeDevices(){
         try {
             LocationManager lm = (LocationManager) getApplicationContext().getSystemService(Context.LOCATION_SERVICE);
             boolean gps_enabled = false;
@@ -845,7 +845,6 @@ public class NokeBluetoothService extends Service {
                         case BluetoothAdapter.STATE_TURNING_OFF:
                             break;
                         case BluetoothAdapter.STATE_ON:
-                            startBLE();
                             break;
                         case BluetoothAdapter.STATE_TURNING_ON:
                             break;
