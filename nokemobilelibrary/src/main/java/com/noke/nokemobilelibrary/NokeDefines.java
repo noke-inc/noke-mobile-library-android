@@ -222,6 +222,9 @@ public class NokeDefines {
     public static final int ERROR_BLUETOOTH_DISABLED = 2;
     public static final int ERROR_BLUETOOTH_GATT = 3;
     public static final int ERROR_INVALID_NOKE_DEVICE = 4;
+    public static final int ERROR_GPS_ENABLED = 5;
+    public static final int ERROR_NETWORK_ENABLED = 6;
+    public static final int ERROR_BLUETOOTH_SCANNING = 7;
 
 
 }

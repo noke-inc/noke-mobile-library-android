@@ -136,7 +136,7 @@ public class NokeBluetoothService extends Service {
                     gps_enabled = lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
                 }
             } catch (Exception e) {
-                Log.e(TAG, "gps_enabled error");
+                mGlobalNokeListener.onError(null, NokeDefines.ERROR_GPS_ENABLED);
             }
 
             try {
@@ -144,7 +144,7 @@ public class NokeBluetoothService extends Service {
                     network_enabled = lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
                 }
             } catch (Exception e) {
-                Log.e(TAG, "network_enabled error");
+                mGlobalNokeListener.onError(null, NokeDefines.ERROR_NETWORK_ENABLED);
             }
 
             int permissionCheck = ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_COARSE_LOCATION);
@@ -170,7 +170,7 @@ public class NokeBluetoothService extends Service {
                 }
             }
         }catch (NullPointerException e) {
-            Log.e(TAG, "NULL POINTER EXCEPTION");
+            mGlobalNokeListener.onError(null, NokeDefines.ERROR_BLUETOOTH_SCANNING);
         }
     }
 
@@ -250,7 +250,7 @@ public class NokeBluetoothService extends Service {
             }
             else
             {
-                Log.e(TAG, "ERROR STARTING SCANNING");
+                mGlobalNokeListener.onError(null, NokeDefines.ERROR_BLUETOOTH_SCANNING);
             }
         }
     }
@@ -484,9 +484,7 @@ public class NokeBluetoothService extends Service {
         public void onConnectionStateChange(final BluetoothGatt gatt, int status, int newState) {
 
             final NokeDevice noke = nokeDevices.get(gatt.getDevice().getAddress());
-            String intentAction;
             if(status == NokeDefines.GATT_ERROR) {
-                Log.e(TAG, "GATT ERROR");
                 if(noke.connectionAttempts > 4) {
                     Handler handler = new Handler(Looper.getMainLooper());
                     handler.post(new Runnable() {
@@ -538,13 +536,11 @@ public class NokeBluetoothService extends Service {
                     @Override
                     public void run() {
 
-                        if(noke.gatt != null)
-                        {
+                        if(noke.gatt != null) {
                             Log.i(TAG, "Gatt not null. Attempting to start service discovery:" +
                                     noke.gatt.discoverServices());
                         }
-                        else
-                        {
+                        else {
                             noke.gatt = gatt;
                             Log.i(TAG, "Gatt was null. Attempting to start service discovery:" +
                                     noke.gatt.discoverServices());
@@ -560,15 +556,10 @@ public class NokeBluetoothService extends Service {
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
-                            Log.e(TAG, "FAULTY CONNECTION. TRY AGAIN.");
                             if(noke.gatt != null) {
-                                //mGattManager.queue(new GattDisconnectOperation(noke.bluetoothDevice));
                                 noke.gatt.disconnect();
-
                             }
-                            if(noke.gatt != null)
-                            {
-                                //mGattManager.queue(new GattCloseOperation(noke.bluetoothDevice));
+                            if(noke.gatt != null) {
                                 noke.gatt.close();
                                 noke.gatt = null;
                             }
@@ -576,8 +567,7 @@ public class NokeBluetoothService extends Service {
                         }
                     });
                 }
-                else
-                {
+                else {
                     if (noke.connectionAttempts == 0) {
                         refreshDeviceCache(noke.gatt, true);
                         mGlobalNokeListener.onNokeDisconnected(noke);
@@ -810,7 +800,6 @@ public class NokeBluetoothService extends Service {
      */
     public void disconnect(final NokeDevice noke) {
         if (mBluetoothAdapter == null || noke.gatt == null) {
-            //Log.w(TAG, "BluetoothAdapter not initialized");
             return;
         }
 
@@ -820,14 +809,12 @@ public class NokeBluetoothService extends Service {
             public void run() {
 
                 if(noke.gatt != null) {
-                    //mGattManager.queue(new GattDisconnectOperation(noke.bluetoothDevice));
                     noke.gatt.disconnect();
                     try {
                         Thread.sleep(100);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
-                    //mGattManager.queue(new GattCloseOperation(noke.bluetoothDevice));
                     noke.gatt.close();
                     noke.gatt = null;
                 }
@@ -840,6 +827,7 @@ public class NokeBluetoothService extends Service {
         ActivityManager.RunningAppProcessInfo myProcess = new ActivityManager.RunningAppProcessInfo();
         ActivityManager.getMyMemoryState(myProcess);
         return myProcess.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND;
+
     }
 
     private final BroadcastReceiver bluetoothBroadcastReceiver = new BroadcastReceiver() {
@@ -867,4 +855,6 @@ public class NokeBluetoothService extends Service {
             }
         }
     };
+
+
 }
