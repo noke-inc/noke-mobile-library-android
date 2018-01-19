@@ -20,6 +20,8 @@ import android.util.Log;
 import android.widget.Button;
 
 import com.noke.nokemobilelibrary.NokeBluetoothService;
+import com.noke.nokemobilelibrary.NokeDevice;
+import com.noke.nokemobilelibrary.NokeServiceListener;
 
 import java.util.LinkedHashMap;
 
@@ -41,13 +43,14 @@ public class MainActivity extends AppCompatActivity {
     private void initiateNokeService(){
         Intent nokeServiceIntent = new Intent(this, NokeBluetoothService.class);
         bindService(nokeServiceIntent, mServiceConnection, Context.BIND_AUTO_CREATE);
-        LocalBroadcastManager.getInstance(this).registerReceiver(NokeStatusChangeReceiver, nokeUpdateIntentFilter());
     }
 
     private ServiceConnection mServiceConnection = new ServiceConnection() {
+
         public void onServiceConnected(ComponentName className, IBinder rawBinder) {
-            mService = ((NokeBackgroundService.LocalBinder) rawBinder).getService();
-            Log.d(TAG, "onServiceConnected mService= " + mService);
+            mService = ((NokeBluetoothService.LocalBinder) rawBinder).getService();
+            mService.registerNokeListener(MainActivity.this, mNokeServiceListener);
+
             if (!mService.initialize()) {
                 Log.e(TAG, "Unable to initialize Bluetooth");
             }
@@ -58,201 +61,35 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
-    private final BroadcastReceiver NokeStatusChangeReceiver = new BroadcastReceiver() {
+    private NokeServiceListener mNokeServiceListener = new NokeServiceListener() {
+        @Override
+        public void onNokeDiscovered(NokeDevice noke) {
 
-        public void onReceive(Context context, Intent intent) {
-            String action = intent.getAction();
+        }
 
-            //*********************//
-            if (action.equals(NokeDefines.NOKE_CONNECTING)) {
-                Log.d(TAG, "NOKE_CONNECT_MSG");
-                btnConnect.setText(R.string.connecting);
-            }
+        @Override
+        public void onNokeConnecting(NokeDevice noke) {
 
-            //*********************//
-            if (action.equals(NokeDefines.NOKE_DISCONNECTED)) {
+        }
 
-                serverPacketCount = 0;
+        @Override
+        public void onNokeConnected(NokeDevice noke) {
 
-                Log.d(TAG, "NOKE_DISCONNECT_MSG");
-                btnConnect.setText(R.string.connect);
+        }
 
-                nokeDevices.remove(mDevice.mac);
-                textDetails.setText("");
-                mService.cancelScanning();
+        @Override
+        public void onNokeDisconnected(NokeDevice noke) {
 
-                disableButtons();
+        }
 
-            }
+        @Override
+        public void onBluetoothStatusChanged(int bluetoothStatus) {
 
-            if (action.equals(NokeDefines.NOKE_CONNECTED))
-            {
+        }
 
-                mService.cancelScanning();
+        @Override
+        public void onError(NokeDevice noke, int error) {
 
-                serverPacketCount = 0;
-
-                String mac = intent.getStringExtra(NokeDefines.MAC_ADDRESS);
-                mDevice = mService.nokeDevices.get(mac);
-                textDetails.setText(mDevice.name + " Version: " + mDevice.versionString);
-
-                btnConnect.setText(R.string.disconnect);
-
-                if(mDevice.name.contains("2F_"))
-                {
-                    enableFobButtons();
-                }
-                else
-                {
-                    Log.d(TAG, "NOKE CONNECTED!!!");
-                    enableButtons();
-                }
-
-                //Auto Unlock after connecting
-                if(autoUnlock)
-                {
-                    //mDevice.unlockLock();
-                }
-            }
-
-            //*********************//
-            if (action.equals(NokeDefines.INVALID_NOKE_DEVICE)){
-                showMessage("Not a valid Noke device. Disconnecting");
-                //mService.disconnect();
-            }
-
-            if (action.equals(NokeDefines.LOCATION_PERMISSION_NEEDED))
-            {
-                //Log.d(TAG, "LOCATION PERMISSION NEEDED!!!");
-                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
-                {
-                    Handler handler = new Handler(Looper.getMainLooper());
-                    handler.post(new Runnable() {
-                        @Override @TargetApi(23)
-                        public void run() {
-                            android.support.v7.app.AlertDialog alertDialog = new android.support.v7.app.AlertDialog.Builder(MainActivity.this).create();
-                            alertDialog.setTitle(getString(R.string.location_access_required));
-                            alertDialog.setMessage(getString(R.string.location_permission_request_message));
-                            alertDialog.setButton(android.support.v7.app.AlertDialog.BUTTON_NEUTRAL, "OK",
-                                    new DialogInterface.OnClickListener() {
-                                        public void onClick(DialogInterface dialog, int which) {
-                                            dialog.dismiss();
-                                        }
-                                    });
-                            alertDialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
-                                @Override
-                                public void onDismiss(DialogInterface dialog)
-                                {
-                                    requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, PERMISSION_REQUEST_COARSE_LOCATION);
-
-                                }
-                            });
-                            alertDialog.show();
-                        }
-                    });
-                }
-            }
-
-            //This allows you to handle 133 Errors.  Restart scanning, retry connecting, etc.
-            if (action.equals(NokeDefines.BLUETOOTH_GATT_ERROR)){
-                showMessage("Bluetooth Gatt Error 133.  Please try reconnecting");
-
-                btnConnect.setText(R.string.connect);
-            }
-
-            if (action.equals(NokeDefines.RECEIVED_SERVER_DATA))
-            {
-                serverPacketCount++;
-
-                String mac = intent.getStringExtra(NokeDefines.MAC_ADDRESS);
-                Device noke = mService.nokeDevices.get(mac);
-
-                byte[] data = intent.getByteArrayExtra(NokeDefines.EXTRA_DATA);
-                Log.w(TAG, "DATA RECEIVED: " + NokeDefines.bytesToHex(data) + " PACKET COUNT: " + serverPacketCount);
-
-                serverSdk.RxDataFromLock(mac,data,noke.Status);
-
-                //client.addDataToArray(NokeDefines.bytesToHex(data));//USED FOR INTERNAL TESTING
-
-            }
-
-            if (action.equals(NokeDefines.RECEIVED_APP_DATA))
-            {
-                String mac = intent.getStringExtra(NokeDefines.MAC_ADDRESS);
-                Device noke = mService.nokeDevices.get(mac);
-
-                byte[] data = intent.getByteArrayExtra(NokeDefines.EXTRA_DATA);
-
-                Log.w(TAG, "APP DATA RECEIVED: " + NokeDefines.bytesToHex(data));
-
-                byte resulttype = data[1];
-
-                if(noke.TxToLockPackets.size()==0) {
-                    //client.sendData(NokeDefines.bytesToHex(noke.Status), noke);
-                }
-
-                switch (resulttype)
-                {
-                    case NokeDefines.SUCCESS_ResultType:
-                        showMessage("Command Success");
-                        break;
-                    case NokeDefines.INVALIDKEY_ResultType:
-                        showMessage("Invalid Key");
-                        break;
-                    case NokeDefines.INVALIDCMD_ResultType:
-                        showMessage("Invalid Command");
-                        break;
-                    case NokeDefines.INVALIDPERMISSION_ResultType:
-                        showMessage("Invalid Permission");
-                        break;
-                    case NokeDefines.SHUTDOWN_ResultType:
-                        showMessage("Shutdown");
-                        byte shutdowntype = data[3];
-                        if(shutdowntype == NokeDefines.MANUAL_ShutdownType)
-                        {
-                            Log.d(TAG, "MANUAL SHUTDOWN");
-                        }
-                        else if(shutdowntype == NokeDefines.TIMEOUT_ShutdownType)
-                        {
-                            Log.d(TAG, "TIMEOUT SHUTDOWN");
-                        }
-
-                        if(!addLockMac.equals(""))
-                        {
-                            AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
-                            builder.setTitle("Add Fob");
-
-                            builder.setMessage("Key has been added successfully.  Click next to scan for fob.  Once connected, click the Fobs button to add the lock to your fob");
-                            builder.setPositiveButton("Next", new DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog, int which)
-                                {
-                                    mService.startBLE();
-                                    btnConnect.setText(R.string.stop_scan);
-                                }
-                            });
-                            builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog, int which) {
-
-                                    addLockMac = "";
-                                    dialog.cancel();
-                                }
-                            });
-
-                            builder.show();
-                        }
-
-
-                        break;
-                    case NokeDefines.INVALIDDATA_ResultType:
-                        showMessage("Invalid Data");
-                        break;
-                    case NokeDefines.INVALID_ResultType:
-                        showMessage("Invalid");
-                        break;
-                }
-            }
         }
     };
 }
