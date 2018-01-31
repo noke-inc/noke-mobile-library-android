@@ -150,6 +150,13 @@ public class NokeDefines {
     public static final int NOKE_LOCK_STATE_UNLOCKED        = 0;
     public static final int NOKE_LOCK_STATE_LOCKED          = 1;
 
+    //SHARED PREFERENCES
+    public static final String PREFS_NAME                   = "nokeAPILibaryFile";
+    public static final String PREF_DEVICES                 = "nokedevices";
+    public static final String PREF_UPLOADDATA              = "uploaddata";
+
+
+
     final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
     public static String bytesToHex(byte[] bytes) {
         if(bytes != null) {

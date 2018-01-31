@@ -20,6 +20,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.LocationManager;
 import android.os.Binder;
@@ -37,7 +38,9 @@ import org.json.JSONObject;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.Set;
 
 import nokego.Nokego;
 
@@ -247,6 +250,7 @@ public class NokeBluetoothService extends Service {
 
     public void cancelScanning(){
         Log.d(TAG, "CANCEL SCANNING");
+        stopLeScanning();
         backgroundScanning = false;}
 
     /**
@@ -814,6 +818,38 @@ public class NokeBluetoothService extends Service {
                 } catch(Exception e){
                     e.printStackTrace();
                 }
+            }
+        }
+    }
+
+    void cacheUploadData(Context context){
+        Set<String> data = new HashSet<>();
+        for(int i = 0; i <globalUploadQueue.size(); i++){
+            String jsonData = globalUploadQueue.get(i).toString();
+            data.add(jsonData);
+        }
+
+        context.getSharedPreferences(NokeDefines.PREFS_NAME, MODE_PRIVATE).edit()
+                .putStringSet(NokeDefines.PREF_UPLOADDATA, data)
+                .apply();
+    }
+
+    void retrieveUploadData(Context context){
+        SharedPreferences pref = context.getSharedPreferences(NokeDefines.PREFS_NAME, MODE_PRIVATE);
+        Set<String> data = pref.getStringSet(NokeDefines.PREF_UPLOADDATA, null);
+        if(globalUploadQueue == null){
+            globalUploadQueue = new ArrayList<>();
+        }
+
+        if(data != null){
+            for(String entry : data){
+                JSONObject dataEntry = null;
+                try{
+                    dataEntry = new JSONObject(entry);
+                } catch (JSONException e){
+                    e.printStackTrace();
+                }
+                globalUploadQueue.add(dataEntry);
             }
         }
     }
