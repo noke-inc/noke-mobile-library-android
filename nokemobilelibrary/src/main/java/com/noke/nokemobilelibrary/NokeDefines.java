@@ -138,6 +138,18 @@ public class NokeDefines {
     public static final String RELOAD_LOCK_TABLE                   ="NokeBluetoothService.RELOAD_LOCK_TABLE";
     public static final String RELOAD_FOB_TABLE                    ="NokeBluetoothService.RELOAD_FOB_TABLE";
 
+    //Noke Connection States
+    public static final int NOKE_STATE_DISCONNECTED         = 0;
+    public static final int NOKE_STATE_DISCOVERED           = 1;
+    public static final int NOKE_STATE_CONNECTING           = 2;
+    public static final int NOKE_STATE_CONNECTED            = 3;
+    public static final int NOKE_STATE_SYNCING              = 4;
+    public static final int NOKE_STATE_UNLOCKED             = 5;
+
+    //Noke Lock States
+    public static final int NOKE_LOCK_STATE_UNLOCKED        = 0;
+    public static final int NOKE_LOCK_STATE_LOCKED          = 1;
+
     final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
     public static String bytesToHex(byte[] bytes) {
         if(bytes != null) {

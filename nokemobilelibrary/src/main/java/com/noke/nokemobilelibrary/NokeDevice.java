@@ -30,6 +30,7 @@ public class NokeDevice {
     BluetoothDevice bluetoothDevice;
     public transient BluetoothGatt gatt;
     public transient int connectionState;
+    public transient int lockState;
     transient int connectionAttempts;
     transient int rssi;
 

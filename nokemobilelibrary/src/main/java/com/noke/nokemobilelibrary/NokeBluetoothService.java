@@ -31,8 +31,15 @@ import android.support.v4.content.ContextCompat;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+
+import nokego.Nokego;
 
 /**
  * Created by Spencer on 1/17/18.
@@ -43,6 +50,7 @@ public class NokeBluetoothService extends Service {
 
     private final static String TAG = NokeBluetoothService.class.getSimpleName();
     static String unlockURL = "https://lock-api-dev.appspot.com/unlock/";
+    static String uploadURL = "https://lock-api-dev.appspot.com/upload/";
 
     //Bluetooth Scanning
     private BluetoothManager mBluetoothManager;
@@ -52,6 +60,8 @@ public class NokeBluetoothService extends Service {
     private BluetoothAdapter.LeScanCallback mOldBluetoothScanCallback;
     private boolean mReceiverRegistered;
     private boolean mScanning;
+
+    ArrayList<JSONObject> globalUploadQueue;
 
     private NokeServiceListener mGlobalNokeListener;
 
@@ -581,6 +591,7 @@ public class NokeBluetoothService extends Service {
                     if (noke.connectionAttempts == 0) {
                         refreshDeviceCache(noke.gatt, true);
                         mGlobalNokeListener.onNokeDisconnected(noke);
+                        uploadData();
                     }
                 }
             }
@@ -646,24 +657,7 @@ public class NokeBluetoothService extends Service {
             Log.w(TAG, "On Characteristic Changed: " + NokeDefines.bytesToHex(characteristic.getValue()));
             NokeDevice noke = nokeDevices.get(gatt.getDevice().getAddress());
             byte[] data=characteristic.getValue();
-
-            byte destination = data[0];
-            if (destination == NokeDefines.SERVER_Dest) {
-                byte resultdata[] = new byte[20];
-                NokeDefines.copyArray(resultdata, 0, data, 0, 20);
-            } else if (destination == NokeDefines.APP_Dest) {
-                    if (noke.commands.size() > 0) {
-                        noke.commands.remove(0);
-                        if (noke.commands.size() > 0) {
-                            writeRXCharacteristic(noke);
-                        }
-                    }
-
-                    byte resulttype = data[1];
-                    if (resulttype == NokeDefines.SHUTDOWN_ResultType) {
-                        disconnectNoke(noke);
-                    }
-                }
+            onReceivedDataFromLock(data, noke);
         }
 
 
@@ -688,6 +682,142 @@ public class NokeBluetoothService extends Service {
 
         }
     };
+
+    public void onReceivedDataFromLock(byte[] data, NokeDevice noke){
+
+        byte destination = data[0];
+        if (destination == NokeDefines.SERVER_Dest) {
+            if(noke.session != null) {
+                addDataPacketToQueue(NokeDefines.bytesToHex(data), noke.session, noke.mac);
+            }
+        }
+        else if (destination == NokeDefines.APP_Dest) {
+            byte resulttype = data[1];
+            switch (resulttype){
+                case NokeDefines.SUCCESS_ResultType:{
+                    moveToNext(noke);
+                    if(noke.commands.size() == 0){
+                        noke.connectionState = NokeDefines.NOKE_STATE_UNLOCKED;
+                        mGlobalNokeListener.onNokeUnlocked(noke);
+                    }
+                    break;
+                }
+                case NokeDefines.INVALIDKEY_ResultType:{
+                    mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_KEY, "Invalid Key Result");
+                    moveToNext(noke);
+                    break;
+                }
+                case NokeDefines.INVALIDCMD_ResultType:{
+                    mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_CMD, "Invalid Command Result");
+                    moveToNext(noke);
+                    break;
+                }
+                case NokeDefines.INVALIDPERMISSION_ResultType:{
+                    mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_PERMISSION, "Invalid Permission (wrong key) Result");
+                    moveToNext(noke);
+                    break;
+                }
+                case NokeDefines.SHUTDOWN_ResultType:{
+                    moveToNext(noke);
+                    byte lockstate = data[2];
+                    if(lockstate == 0){
+                        noke.lockState = NokeDefines.NOKE_LOCK_STATE_UNLOCKED;
+                    }
+                    else{
+                        noke.lockState = NokeDefines.NOKE_LOCK_STATE_LOCKED;
+                    }
+                    disconnectNoke(noke);
+                    break;
+                }
+                case NokeDefines.INVALIDDATA_ResultType:{
+                    mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_DATA, "Invalid Data Result");
+                    moveToNext(noke);
+                    break;
+                }
+                case NokeDefines.INVALID_ResultType:{
+                    mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_RESULT, "Invalid Result");
+                    moveToNext(noke);
+                    break;
+                }
+                default:{
+                    mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_UNKNOWN, "Invalid packet received");
+                    moveToNext(noke);
+                    break;
+                }
+            }
+
+        }
+    }
+
+    public void moveToNext(NokeDevice noke){
+        if (noke.commands.size() > 0) {
+            noke.commands.remove(0);
+            if (noke.commands.size() > 0) {
+                writeRXCharacteristic(noke);
+            }
+        }
+    }
+
+    public void addDataPacketToQueue(String response, String session, String mac){
+        long unixTime = System.currentTimeMillis()/1000L;
+        if(globalUploadQueue == null){
+            globalUploadQueue = new ArrayList<>();
+        }
+        for(int i = 0; i < globalUploadQueue.size(); i++){
+            JSONObject dataObject = globalUploadQueue.get(i);
+            try{
+                String dataSession = dataObject.getString("session");
+                if(session.equals(dataSession)){
+                    JSONArray responses = dataObject.getJSONArray("responses");
+                    responses.put(response);
+                    //TODO: CACHE UPLOAD QUEUE
+                    return;
+                }
+            } catch(JSONException e){
+                e.printStackTrace();
+            }
+        }
+
+        try{
+            JSONArray responses = new JSONArray();
+            responses.put(response);
+            JSONObject sessionPacket = new JSONObject();
+            sessionPacket.accumulate("session", session);
+            sessionPacket.accumulate("responses", responses);
+            sessionPacket.accumulate("mac", mac);
+            sessionPacket.accumulate("received_time", String.valueOf(unixTime));
+
+            globalUploadQueue.add(sessionPacket);
+
+            //TODO: CACHE UPLOAD QUEUE
+        } catch (JSONException e){
+            e.printStackTrace();
+        }
+    }
+
+    public void uploadData(){
+        if(globalUploadQueue != null) {
+            if (globalUploadQueue.size() > 0) {
+                try {
+                    JSONObject jsonObject = new JSONObject();
+                    JSONArray data = new JSONArray();
+                    for (int i = 0; i < globalUploadQueue.size(); i++) {
+                        data.put(globalUploadQueue.get(i));
+                    }
+
+                    jsonObject.accumulate("data", data);
+
+                    Log.w(TAG, "UPLOAD DATA: " + jsonObject.toString());
+                    NokeGoUploadCallback callback = new NokeGoUploadCallback(this);
+                    Nokego.uploadData(jsonObject.toString(), NokeBluetoothService.uploadURL, callback);
+
+                } catch(Exception e){
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
 
     /**
      * Reads the State Characteristic on Noke Device.  When read this contains Lock State, Battery State,
