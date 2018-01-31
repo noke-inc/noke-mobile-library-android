@@ -101,6 +101,7 @@ public class NokeBluetoothService extends Service {
 
         NokeDevice newNoke = nokeDevices.get(noke.mac);
         if(newNoke == null){
+            noke.mService = this;
             nokeDevices.put(noke.mac, noke);
         }
     }
@@ -770,7 +771,7 @@ public class NokeBluetoothService extends Service {
      * @param noke Noke device
      */
 
-    private void writeRXCharacteristic(NokeDevice noke)
+    void writeRXCharacteristic(NokeDevice noke)
     {
         BluetoothGattService RxService = noke.gatt.getService(NokeDefines.RX_SERVICE_UUID);
         if (noke.gatt == null)

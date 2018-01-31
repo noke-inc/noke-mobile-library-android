@@ -226,5 +226,9 @@ public class NokeDefines {
     public static final int ERROR_NETWORK_ENABLED = 6;
     public static final int ERROR_BLUETOOTH_SCANNING = 7;
 
+    //API ERRORS
+    public static final int ERROR_SUCCESS = 0;
+
+
 
 }

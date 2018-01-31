@@ -10,6 +10,7 @@ import java.util.ArrayList;
 
 import nokego.Nokego;
 
+
 /**
  * Created by Spencer on 1/17/18.
  * Class that contains methods and properties of Noke Devices
