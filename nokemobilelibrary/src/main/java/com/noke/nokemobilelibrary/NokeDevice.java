@@ -23,7 +23,7 @@ public class NokeDevice {
     private String mac;
     private String serial;
     private String version;
-    private String battery;
+    private Integer battery;
     private String trackingKey;
 
     transient String session;
@@ -84,8 +84,8 @@ public class NokeDevice {
     void setSession(byte[] sessionIn) {
         byte[] batteryArray = new byte[]{sessionIn[3], sessionIn[2]};
         String batteryString = NokeDefines.bytesToHex(batteryArray);
-        Log.w("Device", "Battery: " + batteryString);
-
+        battery = Integer.parseInt(batteryString, 16);
+        Log.w("Device", "Battery: " + battery);
 
         if(sessionIn.length>=20) {
             session = NokeDefines.bytesToHex(sessionIn);
@@ -133,11 +133,11 @@ public class NokeDevice {
         this.session = session;
     }
 
-    public String getBattery() {
+    public Integer getBattery() {
         return battery;
     }
 
-    public void setBattery(String battery) {
+    public void setBattery(Integer battery) {
         this.battery = battery;
     }
 
