@@ -4,6 +4,7 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.util.Log;
 
+
 import org.json.JSONArray;
 
 import java.util.ArrayList;
@@ -18,19 +19,20 @@ import nokego.Nokego;
 
 public class NokeDevice {
 
-    String name;
-    String mac;
-    String serial;
-    String version;
-    String battery;
-    String trackingKey;
+    private String name;
+    private String mac;
+    private String serial;
+    private String version;
+    private String battery;
+    private String trackingKey;
 
-    public transient String session;
+    transient String session;
 
     BluetoothDevice bluetoothDevice;
-    public transient BluetoothGatt gatt;
-    public transient int connectionState;
-    public transient int lockState;
+    transient BluetoothGatt gatt;
+
+    transient int connectionState;
+    transient int lockState;
     transient int connectionAttempts;
     transient int rssi;
 
@@ -79,9 +81,14 @@ public class NokeDevice {
         return version;
     }
 
-    void setSession(byte[] statusIn) {
-        if(statusIn.length>=20) {
-            session = NokeDefines.bytesToHex(statusIn);
+    void setSession(byte[] sessionIn) {
+        byte[] batteryArray = new byte[]{sessionIn[3], sessionIn[2]};
+        String batteryString = NokeDefines.bytesToHex(batteryArray);
+        Log.w("Device", "Battery: " + batteryString);
+
+
+        if(sessionIn.length>=20) {
+            session = NokeDefines.bytesToHex(sessionIn);
         }
     }
 

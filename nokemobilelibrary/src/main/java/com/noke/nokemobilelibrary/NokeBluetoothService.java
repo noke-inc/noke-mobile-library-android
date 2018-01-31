@@ -121,10 +121,10 @@ public class NokeBluetoothService extends Service {
             nokeDevices = new LinkedHashMap<>();
         }
 
-        NokeDevice newNoke = nokeDevices.get(noke.mac);
+        NokeDevice newNoke = nokeDevices.get(noke.getMac());
         if(newNoke == null){
             noke.mService = this;
-            nokeDevices.put(noke.mac, noke);
+            nokeDevices.put(noke.getMac(), noke);
         }
     }
 
@@ -335,7 +335,7 @@ public class NokeBluetoothService extends Service {
                         NokeDevice noke = new NokeDevice(bluetoothDevice.getName(), bluetoothDevice.getAddress());
                         noke.bluetoothDevice = bluetoothDevice;
 
-                        if(nokeDevices.get(noke.mac) != null){
+                        if(nokeDevices.get(noke.getMac()) != null){
                             byte[] broadcastData;
                             String nameVersion;
 
@@ -350,11 +350,11 @@ public class NokeBluetoothService extends Service {
                                 broadcastData = new byte[]{getdata[2], getdata[3], getdata[4]};
                                 String version = noke.getVersion(broadcastData, bluetoothDevice.getName());
                                 int setupflag = (int) broadcastData[0];
-                                noke.version = version;
+                                noke.setVersion(version);
                                 noke.bluetoothDevice = bluetoothDevice;
 
-                                if(nokeDevices.get(noke.mac) == null){
-                                    nokeDevices.put(noke.mac, noke);
+                                if(nokeDevices.get(noke.getMac()) == null){
+                                    nokeDevices.put(noke.getMac(), noke);
                                 }
 
                                 mGlobalNokeListener.onNokeDiscovered(noke);
@@ -695,7 +695,7 @@ public class NokeBluetoothService extends Service {
         byte destination = data[0];
         if (destination == NokeDefines.SERVER_Dest) {
             if(noke.session != null) {
-                addDataPacketToQueue(NokeDefines.bytesToHex(data), noke.session, noke.mac);
+                addDataPacketToQueue(NokeDefines.bytesToHex(data), noke.session, noke.getMac());
             }
         }
         else if (destination == NokeDefines.APP_Dest) {
@@ -880,7 +880,7 @@ public class NokeBluetoothService extends Service {
                 for (String entry : locks){
                     Gson gson = new Gson();
                     NokeDevice noke = gson.fromJson(entry, NokeDevice.class);
-                    nokeDevices.put(noke.mac, noke);
+                    nokeDevices.put(noke.getMac(), noke);
                 }
             } catch (final Exception e){
                 Log.e(TAG, "RETRIEVAL ERROR");
