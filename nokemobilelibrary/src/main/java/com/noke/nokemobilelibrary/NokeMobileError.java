@@ -7,7 +7,7 @@ package com.noke.nokemobilelibrary;
 public class NokeMobileError {
 
     //API Errors
-    //public static final int SUCCESS                           = 0; //that's not an error
+    public static final int SUCCESS                             = 0; //that's not an error
     public static final int API_ERROR_INTERNAL_SERVER           = 1;
     public static final int API_ERROR_API_KEY                   = 2;
     public static final int API_ERROR_INPUT                     = 3;

@@ -18,13 +18,13 @@ public class NokeGoUnlockCallback implements nokego.UnlockCallback {
 
     NokeDevice noke;
 
-    public NokeGoUnlockCallback(NokeDevice noke) {
+    NokeGoUnlockCallback(NokeDevice noke) {
         this.noke = noke;
     }
 
     @Override
     public void receivedUnlockError(String s) {
-
+        noke.mService.getNokeListener().onError(noke, NokeMobileError.GO_ERROR_UNLOCK, s);
     }
 
     @Override
@@ -33,8 +33,9 @@ public class NokeGoUnlockCallback implements nokego.UnlockCallback {
         try{
             JSONObject obj = new JSONObject(s);
             int errorCode = obj.getInt("error_code");
+            String message = obj.getString("message");
 
-            if(errorCode == NokeDefines.ERROR_SUCCESS){
+            if(errorCode == NokeMobileError.SUCCESS){
                 JSONObject data = obj.getJSONObject("data");
                 JSONArray array = data.getJSONArray("commands");
                 if(noke.commands != null){
@@ -48,6 +49,8 @@ public class NokeGoUnlockCallback implements nokego.UnlockCallback {
                     noke.commands.add(command);
                 }
                 noke.mService.writeRXCharacteristic(noke);
+            }else{
+                noke.mService.getNokeListener().onError(noke, errorCode, message);
             }
 
         } catch(JSONException e){

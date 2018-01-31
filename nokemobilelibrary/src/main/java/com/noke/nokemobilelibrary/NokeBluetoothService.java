@@ -68,6 +68,8 @@ public class NokeBluetoothService extends Service {
         }
     }
 
+
+
     private final IBinder mBinder = new LocalBinder();
     @Override
     public IBinder onBind(Intent intent) {
@@ -86,6 +88,10 @@ public class NokeBluetoothService extends Service {
 
     public void registerNokeListener(Context context, NokeServiceListener listener){
         this.mGlobalNokeListener = listener;
+    }
+
+    NokeServiceListener getNokeListener(){
+        return mGlobalNokeListener;
     }
 
     @Override
@@ -138,7 +144,7 @@ public class NokeBluetoothService extends Service {
                     gps_enabled = lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
                 }
             } catch (Exception e) {
-                mGlobalNokeListener.onError(null, NokeDefines.ERROR_GPS_ENABLED);
+                mGlobalNokeListener.onError(null, NokeMobileError.ERROR_GPS_ENABLED, "GPS is not enabled");
             }
 
             try {
@@ -146,17 +152,17 @@ public class NokeBluetoothService extends Service {
                     network_enabled = lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
                 }
             } catch (Exception e) {
-                mGlobalNokeListener.onError(null, NokeDefines.ERROR_NETWORK_ENABLED);
+                mGlobalNokeListener.onError(null, NokeMobileError.ERROR_NETWORK_ENABLED, "Network is not enabled");
             }
 
             int permissionCheck = ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_COARSE_LOCATION);
             if (!gps_enabled && !network_enabled) {
-                mGlobalNokeListener.onError(null, NokeDefines.ERROR_LOCATION_SERVICES_DISABLED);
+                mGlobalNokeListener.onError(null, NokeMobileError.ERROR_LOCATION_SERVICES_DISABLED, "Location services are disabled");
             } else if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
-                mGlobalNokeListener.onError(null, NokeDefines.ERROR_LOCATION_SERVICES_DISABLED);
+                mGlobalNokeListener.onError(null, NokeMobileError.ERROR_LOCATION_SERVICES_DISABLED, "Location services are disabled");
             } else if (mBluetoothAdapter != null) {
                 if (!mBluetoothAdapter.isEnabled()) {
-                    mGlobalNokeListener.onError(null, NokeDefines.ERROR_BLUETOOTH_DISABLED);
+                    mGlobalNokeListener.onError(null, NokeMobileError.ERROR_BLUETOOTH_DISABLED, "Bluetooth is disabled");
                 } else {
                     initiateBackgroundBLEScan();
                 }
@@ -172,7 +178,7 @@ public class NokeBluetoothService extends Service {
                 }
             }
         }catch (NullPointerException e) {
-            mGlobalNokeListener.onError(null, NokeDefines.ERROR_BLUETOOTH_SCANNING);
+            mGlobalNokeListener.onError(null, NokeMobileError.ERROR_BLUETOOTH_SCANNING, "Bluetooth scanning is not supported");
         }
     }
 
@@ -229,7 +235,9 @@ public class NokeBluetoothService extends Service {
         }
     }
 
-    public void cancelScanning(){ backgroundScanning = false;}
+    public void cancelScanning(){
+        Log.d(TAG, "CANCEL SCANNING");
+        backgroundScanning = false;}
 
     /**
      * Starts BLE scanning.
@@ -252,7 +260,7 @@ public class NokeBluetoothService extends Service {
             }
             else
             {
-                mGlobalNokeListener.onError(null, NokeDefines.ERROR_BLUETOOTH_SCANNING);
+                mGlobalNokeListener.onError(null, NokeMobileError.ERROR_BLUETOOTH_SCANNING, "Bluetooth scanning is not supported");
             }
         }
     }
@@ -497,7 +505,7 @@ public class NokeBluetoothService extends Service {
                             noke.gatt.close();
                             noke.gatt = null;
                             noke.connectionState = NokeDefines.STATE_DISCONNECTED;
-                            mGlobalNokeListener.onError(noke, NokeDefines.ERROR_BLUETOOTH_GATT);
+                            mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_BLUETOOTH_GATT, "Bluetooth Gatt Error: 133");
 
                         }
                     });
@@ -699,12 +707,12 @@ public class NokeBluetoothService extends Service {
         }
 
         if (RxService == null){
-            mGlobalNokeListener.onError(noke, NokeDefines.ERROR_INVALID_NOKE_DEVICE);
+            mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
             return;
         }
         BluetoothGattCharacteristic StateChar = RxService.getCharacteristic(NokeDefines.STATE_CHAR_UUID);
         if (StateChar == null) {
-            mGlobalNokeListener.onError(noke, NokeDefines.ERROR_INVALID_NOKE_DEVICE);
+            mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
             return;
         }
         noke.gatt.readCharacteristic(StateChar);
@@ -720,18 +728,18 @@ public class NokeBluetoothService extends Service {
     {
 
         if (noke.gatt == null) {
-            mGlobalNokeListener.onError(noke, NokeDefines.ERROR_INVALID_NOKE_DEVICE);
+            mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
             return;
         }
 
         BluetoothGattService RxService = noke.gatt.getService(NokeDefines.RX_SERVICE_UUID);
         if (RxService == null) {
-            mGlobalNokeListener.onError(noke, NokeDefines.ERROR_INVALID_NOKE_DEVICE);
+            mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
             return;
         }
         BluetoothGattCharacteristic TxChar = RxService.getCharacteristic(NokeDefines.TX_CHAR_UUID);
         if (TxChar == null) {
-            mGlobalNokeListener.onError(noke, NokeDefines.ERROR_INVALID_NOKE_DEVICE);
+            mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
             return;
         }
         noke.gatt.setCharacteristicNotification(TxChar, true);
@@ -745,18 +753,18 @@ public class NokeBluetoothService extends Service {
     private void enableFirmwareTXNotification(NokeDevice noke)
     {
         if (noke.gatt == null) {
-            mGlobalNokeListener.onError(noke, NokeDefines.ERROR_INVALID_NOKE_DEVICE);
+            mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
             return;
         }
 
         BluetoothGattService RxService = noke.gatt.getService(NokeDefines.FIRMWARE_RX_SERVICE_UUID);
         if (RxService == null) {
-            mGlobalNokeListener.onError(noke, NokeDefines.ERROR_INVALID_NOKE_DEVICE);
+            mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
             return;
         }
         BluetoothGattCharacteristic TxChar = RxService.getCharacteristic(NokeDefines.FIRMWARE_TX_CHAR_UUID);
         if (TxChar == null) {
-            mGlobalNokeListener.onError(noke, NokeDefines.ERROR_INVALID_NOKE_DEVICE);
+            mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
             return;
         }
         noke.gatt.setCharacteristicNotification(TxChar, true);
@@ -780,12 +788,12 @@ public class NokeBluetoothService extends Service {
         }
 
         if (RxService == null) {
-            mGlobalNokeListener.onError(noke, NokeDefines.ERROR_INVALID_NOKE_DEVICE);
+            mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
             return;
         }
         BluetoothGattCharacteristic RxChar = RxService.getCharacteristic(NokeDefines.RX_CHAR_UUID);
         if (RxChar == null) {
-            mGlobalNokeListener.onError(noke, NokeDefines.ERROR_INVALID_NOKE_DEVICE);
+            mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
             return;
         }
 

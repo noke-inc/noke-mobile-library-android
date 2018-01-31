@@ -37,7 +37,7 @@ public class NokeServiceListenerAdapter implements NokeServiceListener{
     }
 
     @Override
-    public void onError(NokeDevice noke, int error) {
+    public void onError(NokeDevice noke, int error, String message) {
         //empty default implementation
     }
 }
