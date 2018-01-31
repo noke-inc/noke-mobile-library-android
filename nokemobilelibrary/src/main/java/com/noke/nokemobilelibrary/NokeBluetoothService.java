@@ -40,7 +40,10 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
+
+import com.google.gson.Gson;
 
 import nokego.Nokego;
 
@@ -850,6 +853,37 @@ public class NokeBluetoothService extends Service {
                     e.printStackTrace();
                 }
                 globalUploadQueue.add(dataEntry);
+            }
+        }
+    }
+
+    void cacheNokeDevices(Context context){
+        Set<String> setNokeDevices = new HashSet<>();
+        for(Map.Entry<String, NokeDevice> entry : this.nokeDevices.entrySet()){
+            Gson gson = new Gson();
+            String jsonNoke = gson.toJson(entry.getValue());
+            setNokeDevices.add(jsonNoke);
+        }
+
+        context.getSharedPreferences(NokeDefines.PREFS_NAME, MODE_PRIVATE).edit()
+                .putStringSet(NokeDefines.PREF_DEVICES,setNokeDevices)
+                .apply();
+
+    }
+
+    void retrieveNokeDevices(Context context){
+        SharedPreferences pref = context.getSharedPreferences(NokeDefines.PREFS_NAME, MODE_PRIVATE);
+        final Set<String> locks = pref.getStringSet(NokeDefines.PREF_DEVICES, null);
+
+        if(locks != null){
+            try{
+                for (String entry : locks){
+                    Gson gson = new Gson();
+                    NokeDevice noke = gson.fromJson(entry, NokeDevice.class);
+                    nokeDevices.put(noke.mac, noke);
+                }
+            } catch (final Exception e){
+                Log.e(TAG, "RETRIEVAL ERROR");
             }
         }
     }
