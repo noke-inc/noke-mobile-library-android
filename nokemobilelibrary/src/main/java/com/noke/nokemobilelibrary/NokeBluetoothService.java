@@ -42,6 +42,7 @@ import java.util.LinkedHashMap;
 public class NokeBluetoothService extends Service {
 
     private final static String TAG = NokeBluetoothService.class.getSimpleName();
+    static String unlockURL = "https://lock-api-dev.appspot.com/unlock/";
 
     //Bluetooth Scanning
     private BluetoothManager mBluetoothManager;

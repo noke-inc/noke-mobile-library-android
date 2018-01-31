@@ -1,5 +1,7 @@
 package com.noke.nokemobilelibrary;
 
+import android.util.Log;
+
 import nokego.Nokego;
 
 /**
@@ -7,6 +9,13 @@ import nokego.Nokego;
  */
 
 public class NokeGoUnlockCallback implements nokego.UnlockCallback {
+
+    NokeDevice noke;
+
+    public NokeGoUnlockCallback(NokeDevice noke) {
+        this.noke = noke;
+    }
+
     @Override
     public void receivedUnlockError(String s) {
 
@@ -14,6 +23,6 @@ public class NokeGoUnlockCallback implements nokego.UnlockCallback {
 
     @Override
     public void receivedUnlockResponse(String s) {
-
+        Log.w("TAG", "RESPONSE: " + s);
     }
 }

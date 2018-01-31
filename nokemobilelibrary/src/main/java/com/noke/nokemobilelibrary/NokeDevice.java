@@ -8,6 +8,8 @@ import org.json.JSONArray;
 
 import java.util.ArrayList;
 
+import nokego.Nokego;
+
 /**
  * Created by Spencer on 1/17/18.
  * Class that contains methods and properties of Noke Devices
@@ -20,6 +22,7 @@ public class NokeDevice {
     String serial;
     String version;
     String battery;
+    String trackingKey;
 
     public transient String session;
 
@@ -127,5 +130,18 @@ public class NokeDevice {
 
     public void setBattery(String battery) {
         this.battery = battery;
+    }
+
+    public String getTrackingKey() {
+        return trackingKey;
+    }
+
+    public void setTrackingKey(String trackingKey) {
+        this.trackingKey = trackingKey;
+    }
+
+    public void unlock(){
+        NokeGoUnlockCallback callback = new NokeGoUnlockCallback(this);
+        Nokego.unlockNoke(this.mac, this.session, this.trackingKey, NokeBluetoothService.unlockURL, callback);
     }
 }
