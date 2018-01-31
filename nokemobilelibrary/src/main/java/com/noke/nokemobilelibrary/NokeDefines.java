@@ -155,6 +155,10 @@ public class NokeDefines {
     public static final String PREF_DEVICES                 = "nokedevices";
     public static final String PREF_UPLOADDATA              = "uploaddata";
 
+    //URLS
+    static String unlockURL = "https://lock-api-dev.appspot.com/unlock/";
+    static String uploadURL = "https://lock-api-dev.appspot.com/upload/";
+
 
 
     final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();

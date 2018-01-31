@@ -55,8 +55,7 @@ import nokego.Nokego;
 public class NokeBluetoothService extends Service {
 
     private final static String TAG = NokeBluetoothService.class.getSimpleName();
-    static String unlockURL = "https://lock-api-dev.appspot.com/unlock/";
-    static String uploadURL = "https://lock-api-dev.appspot.com/upload/";
+
 
     //Bluetooth Scanning
     private BluetoothManager mBluetoothManager;
@@ -816,7 +815,7 @@ public class NokeBluetoothService extends Service {
 
                     Log.w(TAG, "UPLOAD DATA: " + jsonObject.toString());
                     NokeGoUploadCallback callback = new NokeGoUploadCallback(this);
-                    Nokego.uploadData(jsonObject.toString(), NokeBluetoothService.uploadURL, callback);
+                    Nokego.uploadData(jsonObject.toString(), NokeDefines.uploadURL, callback);
 
                 } catch(Exception e){
                     e.printStackTrace();
@@ -1064,6 +1063,14 @@ public class NokeBluetoothService extends Service {
             }
         }
     };
+
+    void setUnlockUrl(String unlockUrl){
+        NokeDefines.unlockURL = unlockUrl;
+    }
+
+    void setUploadUrl(String uploadUrl){
+        NokeDefines.uploadURL = uploadUrl;
+    }
 
 
 }

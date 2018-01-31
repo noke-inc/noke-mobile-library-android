@@ -151,6 +151,6 @@ public class NokeDevice {
 
     public void unlock(){
         NokeGoUnlockCallback callback = new NokeGoUnlockCallback(this);
-        Nokego.unlockNoke(this.mac, this.session, this.trackingKey, NokeBluetoothService.unlockURL, callback);
+        Nokego.unlockNoke(this.mac, this.session, this.trackingKey, NokeDefines.unlockURL, callback);
     }
 }
