@@ -19,7 +19,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 
-import com.noke.nokemobilelibrary.NokeBluetoothService;
+import com.noke.nokemobilelibrary.NokeDeviceManagerService;
 import com.noke.nokemobilelibrary.NokeDevice;
 import com.noke.nokemobilelibrary.NokeMobileError;
 import com.noke.nokemobilelibrary.NokeServiceListener;
@@ -30,7 +30,7 @@ public class MainActivity extends AppCompatActivity {
     public static final String TAG = MainActivity.class.getSimpleName();
 
     Button scanButton;
-    private NokeBluetoothService mService = null;
+    private NokeDeviceManagerService mNokeService = null;
     private static final int PERMISSION_REQUEST_COARSE_LOCATION = 1;
 
     @Override
@@ -45,8 +45,8 @@ public class MainActivity extends AppCompatActivity {
         scanButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if(mService != null) {
-                    mService.startScanningForNokeDevices();
+                if(mNokeService != null) {
+                    mNokeService.startScanningForNokeDevices();
                 }else{
                     Log.e(TAG, "SERVICE HAS NOT BEEN INITIALIZED");
                 }
@@ -55,7 +55,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void initiateNokeService(){
-        Intent nokeServiceIntent = new Intent(this, NokeBluetoothService.class);
+        Intent nokeServiceIntent = new Intent(this, NokeDeviceManagerService.class);
         bindService(nokeServiceIntent, mServiceConnection, Context.BIND_AUTO_CREATE);
     }
 
@@ -65,30 +65,30 @@ public class MainActivity extends AppCompatActivity {
             Log.w(TAG, "ON SERVICE CONNECTED");
 
             //Store reference to service
-            mService = ((NokeBluetoothService.LocalBinder) rawBinder).getService();
+            mNokeService = ((NokeDeviceManagerService.LocalBinder) rawBinder).getService();
 
             //Register callback listener
-            mService.registerNokeListener(mNokeServiceListener);
+            mNokeService.registerNokeListener(mNokeServiceListener);
 
             //Set unlock URL
-            mService.setUnlockUrl("https://lock-api-dev.appspot.com/unlock/");
+            mNokeService.setUnlockUrl("https://lock-api-dev.appspot.com/unlock/");
 
             //Add locks to device manager
             NokeDevice noke1 = new NokeDevice("PAH-CAT-SAEU", "D7:EE:3C:07:8F:68");
-            mService.addNokeDevice(noke1);
+            mNokeService.addNokeDevice(noke1);
             noke1.setTrackingKey("saeu key");
 
             NokeDevice noke2 = new NokeDevice("PAH-CAT-SAET", "C1:86:3D:EE:67:84");
-            mService.addNokeDevice(noke2);
+            mNokeService.addNokeDevice(noke2);
             noke2.setTrackingKey("saet key");
 
-            if (!mService.initialize()) {
+            if (!mNokeService.initialize()) {
                 Log.e(TAG, "Unable to initialize Bluetooth");
             }
         }
 
         public void onServiceDisconnected(ComponentName classname) {
-            mService = null;
+            mNokeService = null;
         }
     };
 
@@ -96,7 +96,7 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onNokeDiscovered(NokeDevice noke) {
             Log.w(TAG, "NOKE DISCOVERED: " + noke.getName());
-            mService.connectToNoke(noke);
+            mNokeService.connectToNoke(noke);
         }
 
         @Override
@@ -107,7 +107,7 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onNokeConnected(NokeDevice noke) {
             Log.w(TAG, "NOKE CONNECTED: " + noke.getName());
-            mService.stopScanning();
+            mNokeService.stopScanning();
             noke.unlock();
         }
 
@@ -182,7 +182,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "GRANT RESULTS: " + grantResults[0]);
                 if (grantResults[0] == PackageManager.PERMISSION_GRANTED)
                 {
-                    mService.startScanningForNokeDevices();
+                    mNokeService.startScanningForNokeDevices();
                 } else {
                     final android.support.v7.app.AlertDialog.Builder builder = new android.support.v7.app.AlertDialog.Builder(this);
                     builder.setTitle(getString(R.string.functionality_limited));

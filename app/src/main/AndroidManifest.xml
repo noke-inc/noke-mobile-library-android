@@ -22,7 +22,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <service android:name="com.noke.nokemobilelibrary.NokeBluetoothService" android:enabled="true"/>
+        <service android:name="com.noke.nokemobilelibrary.NokeDeviceManagerService" android:enabled="true"/>
     </application>
 
 </manifest>
