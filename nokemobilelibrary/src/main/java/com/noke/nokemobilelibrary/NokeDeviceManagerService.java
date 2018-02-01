@@ -1224,6 +1224,4 @@ public class NokeDeviceManagerService extends Service {
     public void setUploadUrl(String uploadUrl){
         NokeDefines.uploadURL = uploadUrl;
     }
-
-
 }
