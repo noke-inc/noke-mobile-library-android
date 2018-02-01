@@ -55,7 +55,6 @@ public class NokeBluetoothService extends Service {
 
     private final static String TAG = NokeBluetoothService.class.getSimpleName();
 
-
     /**
      * High level manager used to obtain an instance of BluetoothAdapter and to conduct overall
      * Bluetooth Managment

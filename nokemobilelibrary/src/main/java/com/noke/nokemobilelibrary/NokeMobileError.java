@@ -5,6 +5,7 @@ package com.noke.nokemobilelibrary;
  * Contains defines for errors in the library
  */
 
+@SuppressWarnings({"WeakerAccess", "unused"})
 public class NokeMobileError {
 
     //API Errors
@@ -18,7 +19,7 @@ public class NokeMobileError {
     public static final int API_ERROR_LOCK_NOT_FOUND            = 7;
     public static final int API_ERROR_UNKNOWN                   = 99;
 
-    //GO Library Error
+    //GO Library Errors
     public static final int GO_ERROR_UNLOCK                     = 100;
     public static final int GO_ERROR_UPLOAD                     = 101;
 

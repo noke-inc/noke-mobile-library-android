@@ -32,6 +32,7 @@ public class NokeGoUploadCallback implements nokego.UploadCallback {
             String message = obj.getString("message");
 
             if(errorCode == NokeMobileError.SUCCESS){
+                mService.globalUploadQueue.clear();
                 //TODO HANDLE UPLOAD SUCCESS
             }else{
                 mService.getNokeListener().onError(null, errorCode, message);

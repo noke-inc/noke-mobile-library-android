@@ -5,6 +5,7 @@ package com.noke.nokemobilelibrary;
  * Adapter for NokeServiceListener
  */
 
+@SuppressWarnings("unused")
 public class NokeServiceListenerAdapter implements NokeServiceListener{
 
     @Override
