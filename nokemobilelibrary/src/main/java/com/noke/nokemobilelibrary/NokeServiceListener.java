@@ -13,6 +13,8 @@ public interface NokeServiceListener  {
 
     void onNokeConnected(NokeDevice noke);
 
+    void onNokeSyncing(NokeDevice noke);
+
     void onNokeUnlocked(NokeDevice noke);
 
     void onNokeDisconnected(NokeDevice noke);

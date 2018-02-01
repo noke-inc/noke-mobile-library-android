@@ -47,6 +47,10 @@ public class NokeGoUnlockCallback implements nokego.UnlockCallback {
                     String command = array.getString(x);
                     noke.commands.add(command);
                 }
+                if(noke.commands.size() > 1){
+                    noke.connectionState = NokeDefines.NOKE_STATE_SYNCING;
+                    noke.mService.getNokeListener().onNokeSyncing(noke);
+                }
                 noke.mService.writeRXCharacteristic(noke);
             }else{
                 noke.mService.getNokeListener().onError(noke, errorCode, message);

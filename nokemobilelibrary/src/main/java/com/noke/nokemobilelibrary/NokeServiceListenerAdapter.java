@@ -23,8 +23,13 @@ public class NokeServiceListenerAdapter implements NokeServiceListener{
     }
 
     @Override
-    public void onNokeUnlocked(NokeDevice noke) {
+    public void onNokeSyncing(NokeDevice noke) {
+        //empty default implementation
+    }
 
+    @Override
+    public void onNokeUnlocked(NokeDevice noke) {
+        //empty default implementation
     }
 
     @Override

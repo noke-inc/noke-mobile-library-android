@@ -511,9 +511,9 @@ public class NokeBluetoothService extends Service {
                     noke.bluetoothDevice = device;
                 }
 
-                if (noke.connectionState == NokeDefines.STATE_DISCONNECTED) {
+                if (noke.connectionState == NokeDefines.NOKE_STATE_DISCONNECTED) {
                     mBluetoothAdapter.cancelDiscovery();
-                    noke.connectionState = NokeDefines.STATE_CONNECTING;
+                    noke.connectionState = NokeDefines.NOKE_STATE_CONNECTING;
 
                     Handler handler = new Handler(Looper.getMainLooper());
                     final NokeDevice finalNoke = noke;
@@ -541,9 +541,9 @@ public class NokeBluetoothService extends Service {
                     if (noke.bluetoothDevice == null) {
                         noke.bluetoothDevice = device;
                     }
-                    if (noke.connectionState == NokeDefines.STATE_DISCONNECTED) {
+                    if (noke.connectionState == NokeDefines.NOKE_STATE_DISCONNECTED) {
                         mBluetoothAdapter.cancelDiscovery();
-                        noke.connectionState = NokeDefines.STATE_CONNECTING;
+                        noke.connectionState = NokeDefines.NOKE_STATE_CONNECTING;
                         if (noke.gatt == null) {
                             Log.d(TAG, "Initializing gatt connection: " + connectToGatt(noke));
                         } else {
@@ -609,7 +609,7 @@ public class NokeBluetoothService extends Service {
         @Override
         public void onConnectionStateChange(final BluetoothGatt gatt, int status, int newState) {
             final NokeDevice noke = nokeDevices.get(gatt.getDevice().getAddress());
-            if(status == NokeDefines.GATT_ERROR) {
+            if(status == NokeDefines.NOKE_GATT_ERROR) {
                 if(noke.connectionAttempts > 4) {
                     Handler handler = new Handler(Looper.getMainLooper());
                     handler.post(new Runnable() {
@@ -618,7 +618,7 @@ public class NokeBluetoothService extends Service {
                             noke.gatt.disconnect();
                             noke.gatt.close();
                             noke.gatt = null;
-                            noke.connectionState = NokeDefines.STATE_DISCONNECTED;
+                            noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
                             mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_BLUETOOTH_GATT, "Bluetooth Gatt Error: 133");
                         }
                     });
