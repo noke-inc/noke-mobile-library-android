@@ -72,7 +72,7 @@ public class NokeDevice {
     /**
      * Reference to the bluetooth service that manages to the device
      */
-    transient NokeBluetoothService mService;
+    transient NokeDeviceManagerService mService;
 
     /**
      * Initializes Noke Device

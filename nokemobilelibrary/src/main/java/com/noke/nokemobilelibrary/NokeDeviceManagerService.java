@@ -51,9 +51,9 @@ import nokego.Nokego;
  * Service for handling all bluetooth communication with the lock
  */
 
-public class NokeBluetoothService extends Service {
+public class NokeDeviceManagerService extends Service {
 
-    private final static String TAG = NokeBluetoothService.class.getSimpleName();
+    private final static String TAG = NokeDeviceManagerService.class.getSimpleName();
 
     /**
      * High level manager used to obtain an instance of BluetoothAdapter and to conduct overall
@@ -125,8 +125,8 @@ public class NokeBluetoothService extends Service {
      * Class for binding service to activity
      */
     public class LocalBinder extends Binder{
-        public NokeBluetoothService getService(){
-            return NokeBluetoothService.this;
+        public NokeDeviceManagerService getService(){
+            return NokeDeviceManagerService.this;
         }
     }
 
@@ -589,10 +589,10 @@ public class NokeBluetoothService extends Service {
             @Override
             public void run() {
                 if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    noke.gatt = noke.bluetoothDevice.connectGatt(NokeBluetoothService.this, false, mGattCallback, BluetoothDevice.TRANSPORT_LE);
+                    noke.gatt = noke.bluetoothDevice.connectGatt(NokeDeviceManagerService.this, false, mGattCallback, BluetoothDevice.TRANSPORT_LE);
                 }
                 else {
-                    noke.gatt = noke.bluetoothDevice.connectGatt(NokeBluetoothService.this, false, mGattCallback);
+                    noke.gatt = noke.bluetoothDevice.connectGatt(NokeDeviceManagerService.this, false, mGattCallback);
                 }
             }
         });
@@ -1211,8 +1211,8 @@ public class NokeBluetoothService extends Service {
      * Sets the URL used for requesting unlock
      * @param unlockUrl string of the url
      */
-    @SuppressWarnings("unused")
-    void setUnlockUrl(String unlockUrl){
+    @SuppressWarnings({"unused", "SameParameterValue"})
+    public void setUnlockUrl(String unlockUrl){
         NokeDefines.unlockURL = unlockUrl;
     }
 
@@ -1221,7 +1221,7 @@ public class NokeBluetoothService extends Service {
      * @param uploadUrl string of the url
      */
     @SuppressWarnings("unused")
-    void setUploadUrl(String uploadUrl){
+    public void setUploadUrl(String uploadUrl){
         NokeDefines.uploadURL = uploadUrl;
     }
 

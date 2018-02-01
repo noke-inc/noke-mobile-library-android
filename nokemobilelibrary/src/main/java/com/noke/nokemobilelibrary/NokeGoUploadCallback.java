@@ -12,9 +12,9 @@ import org.json.JSONObject;
 
 public class NokeGoUploadCallback implements nokego.UploadCallback {
 
-    private NokeBluetoothService mService;
+    private NokeDeviceManagerService mService;
 
-    NokeGoUploadCallback(NokeBluetoothService mService) {
+    NokeGoUploadCallback(NokeDeviceManagerService mService) {
         this.mService = mService;
     }
 
