@@ -3,12 +3,7 @@ package com.noke.nokemobilelibrary;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.util.Log;
-
-
-import org.json.JSONArray;
-
 import java.util.ArrayList;
-
 import nokego.Nokego;
 
 
@@ -35,11 +30,9 @@ public class NokeDevice {
     transient int lockState;
     transient int connectionAttempts;
     transient int rssi;
+    transient ArrayList<String> commands;
 
-    private transient JSONArray responses = new JSONArray();
-    protected transient ArrayList<String> commands;
-
-    public transient NokeBluetoothService mService;
+    transient NokeBluetoothService mService;
 
     public NokeDevice(String name, String mac){
 

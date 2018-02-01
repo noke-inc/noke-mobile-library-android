@@ -29,7 +29,6 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.support.v4.content.ContextCompat;
-import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 
 import org.json.JSONArray;
@@ -55,7 +54,6 @@ import nokego.Nokego;
 public class NokeBluetoothService extends Service {
 
     private final static String TAG = NokeBluetoothService.class.getSimpleName();
-
 
     //Bluetooth Scanning
     private BluetoothManager mBluetoothManager;
@@ -101,7 +99,7 @@ public class NokeBluetoothService extends Service {
         setBluetoothDelayBackgroundDefault(2000);
     }
 
-    public void registerNokeListener(Context context, NokeServiceListener listener){
+    public void registerNokeListener(NokeServiceListener listener){
         this.mGlobalNokeListener = listener;
     }
 
@@ -187,7 +185,7 @@ public class NokeBluetoothService extends Service {
                     mBluetoothAdapter = mBluetoothManager.getAdapter();
                 }
                 if (mBluetoothAdapter == null || !mBluetoothAdapter.isEnabled()) {
-                    //TODO Handle cases when bluetooth is turned off
+                    mGlobalNokeListener.onError(null, NokeMobileError.ERROR_BLUETOOTH_DISABLED, "Bluetooth is disabled");
                 } else {
                     initiateBackgroundBLEScan();
                 }
@@ -348,7 +346,6 @@ public class NokeBluetoothService extends Service {
                                 byte[] getdata = getManufacturerData(scanRecord);
                                 broadcastData = new byte[]{getdata[2], getdata[3], getdata[4]};
                                 String version = noke.getVersion(broadcastData, bluetoothDevice.getName());
-                                int setupflag = (int) broadcastData[0];
                                 noke.setVersion(version);
                                 noke.bluetoothDevice = bluetoothDevice;
 
@@ -476,11 +473,13 @@ public class NokeBluetoothService extends Service {
     private boolean connectToGatt(final NokeDevice noke)
     {
         if (mBluetoothAdapter == null || noke == null) {
+            mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_BLUETOOTH_DISABLED, "Bluetooth is disabled");
             return false;
         }
 
         if(noke.bluetoothDevice == null)
         {
+            mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
             return false;
         }
 
@@ -488,12 +487,10 @@ public class NokeBluetoothService extends Service {
         handler.post(new Runnable() {
             @Override
             public void run() {
-                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
-                {
+                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     noke.gatt = noke.bluetoothDevice.connectGatt(NokeBluetoothService.this, false, mGattCallback, BluetoothDevice.TRANSPORT_LE);
                 }
-                else
-                {
+                else {
                     noke.gatt = noke.bluetoothDevice.connectGatt(NokeBluetoothService.this, false, mGattCallback);
                 }
             }
@@ -902,7 +899,7 @@ public class NokeBluetoothService extends Service {
         BluetoothGattService RxService = noke.gatt.getService(NokeDefines.RX_SERVICE_UUID);
 
         if(noke.gatt == null) {
-
+            mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
         }
 
         if (RxService == null){

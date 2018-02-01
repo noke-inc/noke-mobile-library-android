@@ -2,6 +2,7 @@ package com.noke.nokemobilelibrary;
 
 /**
  * Created by Spencer on 1/31/18.
+ * Contains defines for errors in the library
  */
 
 public class NokeMobileError {

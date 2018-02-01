@@ -2,6 +2,7 @@ package com.noke.nokemobilelibrary;
 
 /**
  * Created by Spencer on 1/19/18.
+ * Adapter for NokeServiceListener
  */
 
 public class NokeServiceListenerAdapter implements NokeServiceListener{

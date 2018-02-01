@@ -1,22 +1,20 @@
 package com.noke.nokemobilelibrary;
 
 import android.util.Log;
-
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.util.ArrayList;
 
 /**
  * Created by Spencer on 1/31/18.
+ * Class for handling upload callback from Noke Go Library
  */
 
 public class NokeGoUploadCallback implements nokego.UploadCallback {
 
-    NokeBluetoothService mService;
+    private NokeBluetoothService mService;
 
-    public NokeGoUploadCallback(NokeBluetoothService mService) {
+    NokeGoUploadCallback(NokeBluetoothService mService) {
         this.mService = mService;
     }
 

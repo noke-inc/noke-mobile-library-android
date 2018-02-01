@@ -2,6 +2,7 @@ package com.noke.nokemobilelibrary;
 
 /**
  * Created by Spencer on 1/19/18.
+ * Listener for handling callbacks from NokeService
  */
 
 public interface NokeServiceListener  {

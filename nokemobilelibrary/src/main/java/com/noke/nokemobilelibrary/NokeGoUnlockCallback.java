@@ -8,10 +8,9 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 
-import nokego.Nokego;
-
 /**
  * Created by Spencer on 1/31/18.
+ * Class for handling unlock callback from Noke Go Library
  */
 
 public class NokeGoUnlockCallback implements nokego.UnlockCallback {
