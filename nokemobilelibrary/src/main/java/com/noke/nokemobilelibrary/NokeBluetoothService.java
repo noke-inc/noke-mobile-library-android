@@ -422,7 +422,7 @@ public class NokeBluetoothService extends Service {
             {
                 if(bluetoothDevice.getName() != null)
                 {
-                    if (bluetoothDevice.getName().contains("NOKE"))
+                    if (bluetoothDevice.getName().contains(NokeDefines.NOKE_DEVICE_IDENTIFER_STRING))
                     {
                         NokeDevice noke = new NokeDevice(bluetoothDevice.getName(), bluetoothDevice.getAddress());
                         noke.bluetoothDevice = bluetoothDevice;
@@ -535,7 +535,7 @@ public class NokeBluetoothService extends Service {
                     });
                 }
             } else if (device.getName() != null) {
-                if (device.getName().contains("NOKE")) {
+                if (device.getName().contains(NokeDefines.NOKE_DEVICE_IDENTIFER_STRING)) {
                     stopLeScanning();
                     noke = new NokeDevice(device.getName(), device.getAddress());
                     if (noke.bluetoothDevice == null) {
