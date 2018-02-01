@@ -38,6 +38,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        //Initiate Noke Service
         initiateNokeService();
 
         scanButton = findViewById(R.id.scan_button);
@@ -62,11 +63,24 @@ public class MainActivity extends AppCompatActivity {
 
         public void onServiceConnected(ComponentName className, IBinder rawBinder) {
             Log.w(TAG, "ON SERVICE CONNECTED");
+
+            //Store reference to service
             mService = ((NokeBluetoothService.LocalBinder) rawBinder).getService();
+
+            //Register callback listener
             mService.registerNokeListener(mNokeServiceListener);
 
-            NokeDevice testNoke = new NokeDevice("PAH-CAT-SAEU", "D7:EE:3C:07:8F:68");
-            mService.addNokeDevice(testNoke);
+            //Set unlock URL
+            mService.setUnlockUrl("https://lock-api-dev.appspot.com/unlock/");
+
+            //Add locks to device manager
+            NokeDevice noke1 = new NokeDevice("PAH-CAT-SAEU", "D7:EE:3C:07:8F:68");
+            mService.addNokeDevice(noke1);
+            noke1.setTrackingKey("saeu key");
+
+            NokeDevice noke2 = new NokeDevice("PAH-CAT-SAET", "C1:86:3D:EE:67:84");
+            mService.addNokeDevice(noke2);
+            noke2.setTrackingKey("saet key");
 
             if (!mService.initialize()) {
                 Log.e(TAG, "Unable to initialize Bluetooth");
@@ -93,9 +107,13 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onNokeConnected(NokeDevice noke) {
             Log.w(TAG, "NOKE CONNECTED: " + noke.getName());
-            mService.cancelScanning();
-            noke.setTrackingKey("test key");
+            mService.stopScanning();
             noke.unlock();
+        }
+
+        @Override
+        public void onNokeSyncing(NokeDevice noke) {
+            Log.w(TAG, "NOKE SYNCING: " + noke.getName());
         }
 
         @Override
