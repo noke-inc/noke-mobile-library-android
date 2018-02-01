@@ -20,8 +20,8 @@ import android.view.View;
 import android.widget.Button;
 
 import com.noke.nokemobilelibrary.NokeBluetoothService;
-import com.noke.nokemobilelibrary.NokeDefines;
 import com.noke.nokemobilelibrary.NokeDevice;
+import com.noke.nokemobilelibrary.NokeMobileError;
 import com.noke.nokemobilelibrary.NokeServiceListener;
 
 
@@ -63,9 +63,9 @@ public class MainActivity extends AppCompatActivity {
         public void onServiceConnected(ComponentName className, IBinder rawBinder) {
             Log.w(TAG, "ON SERVICE CONNECTED");
             mService = ((NokeBluetoothService.LocalBinder) rawBinder).getService();
-            mService.registerNokeListener(MainActivity.this, mNokeServiceListener);
+            mService.registerNokeListener(mNokeServiceListener);
 
-            NokeDevice testNoke = new NokeDevice("testNoke", "FE:FE:A7:84:87:7D");
+            NokeDevice testNoke = new NokeDevice("PAH-CAT-SAEU", "D7:EE:3C:07:8F:68");
             mService.addNokeDevice(testNoke);
 
             if (!mService.initialize()) {
@@ -93,6 +93,9 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onNokeConnected(NokeDevice noke) {
             Log.w(TAG, "NOKE CONNECTED: " + noke.getName());
+            mService.cancelScanning();
+            noke.setTrackingKey("test key");
+            noke.unlock();
         }
 
         @Override
@@ -111,12 +114,12 @@ public class MainActivity extends AppCompatActivity {
         }
 
         @Override
-        public void onError(NokeDevice noke, int error) {
-            Log.e(TAG, "NOKE SERVICE ERROR: " + error);
+        public void onError(NokeDevice noke, int error, String message) {
+            Log.e(TAG, "NOKE SERVICE ERROR " + error + ": " + message);
             switch (error){
-                case NokeDefines.ERROR_LOCATION_PERMISSIONS_NEEDED:
+                case NokeMobileError.ERROR_LOCATION_PERMISSIONS_NEEDED:
                     break;
-                case NokeDefines.ERROR_LOCATION_SERVICES_DISABLED:
+                case NokeMobileError.ERROR_LOCATION_SERVICES_DISABLED:
                     if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
                     {
                         Handler handler = new Handler(Looper.getMainLooper());
@@ -145,9 +148,9 @@ public class MainActivity extends AppCompatActivity {
                         });
                     }
                     break;
-                case NokeDefines.ERROR_BLUETOOTH_DISABLED:
+                case NokeMobileError.ERROR_BLUETOOTH_DISABLED:
                     break;
-                case NokeDefines.ERROR_BLUETOOTH_GATT:
+                case NokeMobileError.ERROR_BLUETOOTH_GATT:
                     break;
             }
         }
