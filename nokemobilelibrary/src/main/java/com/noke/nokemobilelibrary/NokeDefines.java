@@ -8,6 +8,12 @@ import java.util.UUID;
 
 public class NokeDefines {
 
+    static final int BLUETOOTH_DEFAULT_SCAN_TIME                    = 10;
+    static final int BLUETOOTH_DEFAULT_SCAN_TIME_BACKGROUND         = 2000;
+
+    static final String NOKE_DEVICE_IDENTIFER_STRING                = "NOKE";
+
+
     //LockAppResponse 	used by the app to confirm command succeeded
     //ResultTypes
     static final byte SUCCESS_ResultType							=(byte)0x60;

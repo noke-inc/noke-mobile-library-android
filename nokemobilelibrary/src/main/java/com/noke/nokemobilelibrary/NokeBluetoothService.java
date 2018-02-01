@@ -55,34 +55,85 @@ public class NokeBluetoothService extends Service {
 
     private final static String TAG = NokeBluetoothService.class.getSimpleName();
 
-    //Bluetooth Scanning
+
+    /**
+     * High level manager used to obtain an instance of BluetoothAdapter and to conduct overall
+     * Bluetooth Managment
+      */
     private BluetoothManager mBluetoothManager;
+    /**
+     * Represents the local device Bluetooth adapter.  Used for performing fundamental Bluetooth tasks, such as
+     * device discovery, connection, and sending/receiving data
+     */
     private BluetoothAdapter mBluetoothAdapter;
+    /**
+     * Provides methods to perform scan releated operations for BLE devices.
+     */
     private BluetoothLeScanner mBluetoothScanner;
+    /**
+     * Bluetooth LE scan callbacks. Scan results are reported using these callbacks
+     * Note: This newer callback introduced in Android 5.0 has been dismissed in favor of the LE callback in Android 4.4
+     */
     private ScanCallback mNewBluetoothScanCallback;
+    /**
+     * Bluetooth LE scan callbacks.  Testing has shown that the older Android 4.4 bluetooth scanning is faster and more
+     * reliable.
+     */
     private BluetoothAdapter.LeScanCallback mOldBluetoothScanCallback;
+    /**
+     * A boolean indicating if the bluetooth broadcast receiver has been registered
+     */
     private boolean mReceiverRegistered;
+    /**
+     * A boolean indicating if the service is currently scanning for Noke devices
+     */
     private boolean mScanning;
-
+    /**
+     * Array containing responses from the lock bundled with the session, mac address, and upload time.
+     * These responses are uploaded directly to the Noke API via the Noke Go library
+     */
     ArrayList<JSONObject> globalUploadQueue;
-
+    /**
+     * Listener for Noke device events.  Triggered on various events including:
+     * <ul>
+     *     <li>Noke device discovery</li>
+     *     <li>Noke device begin connection</li>
+     *     <li>Noke device connected</li>
+     *     <li>Noke device syncing</li>
+     *     <li>Noke device unlocked</li>
+     *     <li>Noke device disconnected</li>
+     * </ul>
+     *
+     * Also used for error handling
+     */
     private NokeServiceListener mGlobalNokeListener;
-
-    //SDK Settings
+    /**
+     * To conserve battery and be compliant with the Android SDK scanning is done by toggling on and off
+     * this variable is the delay between turning off and on
+     */
     private int bluetoothDelayDefault;
+    /**
+     * Bluetooth scanning can be adjusted while in the background.
+     */
     private int bluetoothDelayBackgroundDefault;
-
-    //List of Noke Devices
+    /**
+     * A LinkedHashMap that stores a list of NokeDevices linked my MAC address.
+     * Only devices that are in this array will be discovered when scanning
+     */
     public LinkedHashMap<String, NokeDevice> nokeDevices;
 
+    /**
+     * Class for binding service to activity
+     */
     public class LocalBinder extends Binder{
         public NokeBluetoothService getService(){
             return NokeBluetoothService.this;
         }
     }
 
-
-
+    /**
+     * Read more here: <a href="https://developer.android.com/reference/android/os/IBinder.html">https://developer.android.com/reference/android/os/IBinder.html</a>
+     */
     private final IBinder mBinder = new LocalBinder();
     @Override
     public IBinder onBind(Intent intent) {
@@ -95,14 +146,22 @@ public class NokeBluetoothService extends Service {
         IntentFilter btFilter = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
         registerReceiver(bluetoothBroadcastReceiver, btFilter);
         mReceiverRegistered = true;
-        setBluetoothDelayDefault(250);
-        setBluetoothDelayBackgroundDefault(2000);
+        setBluetoothDelayDefault(NokeDefines.BLUETOOTH_DEFAULT_SCAN_TIME);
+        setBluetoothDelayBackgroundDefault(NokeDefines.BLUETOOTH_DEFAULT_SCAN_TIME_BACKGROUND);
     }
 
+    /**
+     * Sets the global listener for the service
+     * @param listener the listener implemented in the activity the registered the service
+     */
     public void registerNokeListener(NokeServiceListener listener){
         this.mGlobalNokeListener = listener;
     }
 
+    /**
+     * Used for getting the Global Noke Listener
+     * @return the global listener
+     */
     NokeServiceListener getNokeListener(){
         return mGlobalNokeListener;
     }
@@ -113,6 +172,10 @@ public class NokeBluetoothService extends Service {
         return START_STICKY;
     }
 
+    /**
+     * Adds noke device to the device array.  These devices can be discovered and connected to by the service
+     * @param noke The noke device to add
+     */
     public void addNokeDevice(NokeDevice noke){
         if(nokeDevices == null){
             nokeDevices = new LinkedHashMap<>();
@@ -135,6 +198,10 @@ public class NokeBluetoothService extends Service {
         //TODO Handle restarting service
     }
 
+    /**
+     * Initializes the bluetooth manager and adapter used for interacting with Noke devices
+     * @return boolean after initialization
+     */
     public boolean initialize(){
         if(mBluetoothManager == null){
             mBluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
@@ -147,6 +214,9 @@ public class NokeBluetoothService extends Service {
         return mBluetoothAdapter != null;
     }
 
+    /**
+     * Begins scanning for Noke devices that have been added to the device array
+     */
     public void startScanningForNokeDevices(){
         try {
             LocationManager lm = (LocationManager) getApplicationContext().getSystemService(Context.LOCATION_SERVICE);
@@ -195,26 +265,37 @@ public class NokeBluetoothService extends Service {
         }
     }
 
+
     boolean scanLoopOn = false;
     boolean scanLoopOff = false;
     boolean backgroundScanning = false;
 
+    /**
+     * Initiates BLE scan
+     */
     private void initiateBackgroundBLEScan() {
         if(!backgroundScanning) {
             backgroundScanning = true;
-            startBackgroundBLEScan();
+            turnOnBLEScan();
         }
     }
 
-    int bluetoothDelay = 10;
-    private void startBackgroundBLEScan() {
+    /**
+     * bluetoothDelay in milliseconds
+     */
+    int bluetoothDelay;
+
+    /**
+     * Starts background scanning. Will not stop until cancelled
+     */
+    private void turnOnBLEScan() {
         startLeScanning();
         final Handler refreshScan = new Handler();
         final int scanDelay = 4000;
         refreshScan.postDelayed(new Runnable(){
             @Override
             public void run() {
-                stopBackgroundBLEScan();
+                turnOffBLEScan();
                 if(isServiceRunningInForeground()){
                     bluetoothDelay = bluetoothDelayDefault;
                 }else{
@@ -225,15 +306,26 @@ public class NokeBluetoothService extends Service {
         }, scanDelay);
     }
 
+    /**
+     * Sets the default delay of scanning in the foreground.  Currently the default is 10 milliseconds
+     * @param delay time in milliseconds
+     */
     public void setBluetoothDelayDefault(int delay){
         bluetoothDelayDefault = delay;
     }
 
+    /**
+     * Sets the default delay of scanning in the background.  Currently the default is 10 milliseconds
+     * @param delay time in milliseconds
+     */
     public void setBluetoothDelayBackgroundDefault(int delay){
         bluetoothDelayBackgroundDefault = delay;
     }
 
-    private void stopBackgroundBLEScan(){
+    /**
+     * Stops background BLE Scan
+     */
+    private void turnOffBLEScan(){
         stopLeScanning();
         if(backgroundScanning){
             final Handler refreshScan = new Handler();
@@ -242,19 +334,22 @@ public class NokeBluetoothService extends Service {
                 public void run() {
                     scanLoopOn = true;
                     scanLoopOff = false;
-                    startBackgroundBLEScan();
+                    turnOnBLEScan();
                 }
             }, bluetoothDelay);
         }
     }
 
-    public void cancelScanning(){
+    /**
+     * Stops scanning for Noke devices
+     */
+    public void stopScanning(){
         Log.d(TAG, "CANCEL SCANNING");
         stopLeScanning();
         backgroundScanning = false;}
 
     /**
-     * Starts BLE scanning.
+     * Starts BLE scanning using the Bluetooth Adapter.
      */
     @SuppressWarnings("deprecation")
     private void startLeScanning()
@@ -280,7 +375,7 @@ public class NokeBluetoothService extends Service {
     }
 
     /**
-     * Stops BLE scanning.
+     * Stops BLE scanning using the bluetooth adapter.
      */
     @SuppressWarnings("deprecation")
     private void stopLeScanning()
@@ -363,6 +458,11 @@ public class NokeBluetoothService extends Service {
         };
     }
 
+    /**
+     * Parses through the manufacturer data
+     * @param scanRecord - broadcast data from the lock
+     * @return - returns formatted manufacturer data
+     */
     private byte[] getManufacturerData(byte[] scanRecord){
         int i = 0;
         do {
@@ -381,22 +481,23 @@ public class NokeBluetoothService extends Service {
                 i = i + length;
             }
         }while(i < scanRecord.length);
-
         return new byte[]{0,0,0,0,0};
     }
 
-
+    /**
+     * Starts connection to Noke device
+     * @param noke - The device to which to connect
+     */
     public void connectToNoke(NokeDevice noke){
         connectToDevice(noke.bluetoothDevice, noke.rssi);
     }
 
     /**
      * Attempts to match MAC address to device in nokeDevices list.  If device is found, stop scanning and
-     * call connectToGatt to start service disovery and connect to device.
+     * call connectToGatt to start service discovery and connect to device.
      * @param device Bluetooth device that was obtained from the scanner callback
-     * @param rssi RSSI value obtained from the scanner.  Can be used for adjusting connecting range.
+     * @param rssi RSSI value obtained from the scanner.  Can be used for adjusting or checking connecting range.
      */
-
     private void connectToDevice(BluetoothDevice device, int rssi)
     {
         if(device != null) {
@@ -457,7 +558,6 @@ public class NokeBluetoothService extends Service {
                         }
                     }
                 }
-
             }
         }
     }
@@ -496,17 +596,17 @@ public class NokeBluetoothService extends Service {
                 }
             }
         });
-
         return true;
     }
 
-    //Implements callback methods for GATT events that the app cares about. For example,
-    //connection change and services discovered
+    /**
+     * Implementation of the the BluetoothGatt callbacks.
+     * Read more here: <a href="https://developer.android.com/reference/android/bluetooth/BluetoothGattCallback.html">https://developer.android.com/reference/android/bluetooth/BluetoothGattCallback.html</a>
+     */
     private final BluetoothGattCallback mGattCallback = new BluetoothGattCallback() {
 
         @Override
         public void onConnectionStateChange(final BluetoothGatt gatt, int status, int newState) {
-
             final NokeDevice noke = nokeDevices.get(gatt.getDevice().getAddress());
             if(status == NokeDefines.GATT_ERROR) {
                 if(noke.connectionAttempts > 4) {
@@ -514,13 +614,11 @@ public class NokeBluetoothService extends Service {
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
-
                             noke.gatt.disconnect();
                             noke.gatt.close();
                             noke.gatt = null;
                             noke.connectionState = NokeDefines.STATE_DISCONNECTED;
                             mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_BLUETOOTH_GATT, "Bluetooth Gatt Error: 133");
-
                         }
                     });
                 }
@@ -530,7 +628,6 @@ public class NokeBluetoothService extends Service {
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
-
                             noke.connectionAttempts++;
                             refreshDeviceCache(noke.gatt, true);
                             if(noke.gatt != null) {
@@ -538,7 +635,6 @@ public class NokeBluetoothService extends Service {
                                 noke.gatt.close();
                                 noke.gatt = null;
                             }
-
                             try {
                                 Thread.sleep(2600);
                             } catch (InterruptedException e) {
@@ -550,7 +646,6 @@ public class NokeBluetoothService extends Service {
                 }
             }
             else if (newState == BluetoothProfile.STATE_CONNECTED) {
-
                 noke.connectionAttempts = 0;
                 noke.connectionState = NokeDefines.NOKE_STATE_CONNECTING;
                 mGlobalNokeListener.onNokeConnecting(noke);
@@ -571,8 +666,6 @@ public class NokeBluetoothService extends Service {
                         }
                     }
                 });
-
-
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
 
                 if(noke.connectionState == 2) {
@@ -692,6 +785,15 @@ public class NokeBluetoothService extends Service {
         }
     };
 
+    /**
+     * Parses through the data received from the lock after a command has been sent.  There are two different types of data packets:
+     * <ul>
+     *     <li>Server Packets - encrypted packets sent to the server to be parsed</li>
+     *     <li>App Packets - unencrypted packets that can be used by the app to handle errors</li>
+     * </ul>
+     * @param data The data from the lock. A 40 character hex string
+     * @param noke The noke device that sent the data
+     */
     public void onReceivedDataFromLock(byte[] data, NokeDevice noke){
 
         byte destination = data[0];
@@ -758,6 +860,10 @@ public class NokeBluetoothService extends Service {
         }
     }
 
+    /**
+     * Moves through the noke command array to the next command
+     * @param noke the noke device that contains the commands
+     */
     public void moveToNext(NokeDevice noke){
         if (noke.commands.size() > 0) {
             noke.commands.remove(0);
@@ -767,6 +873,12 @@ public class NokeBluetoothService extends Service {
         }
     }
 
+    /**
+     * Takes Server Packets from the lock and bundles them with the MAC address and session of the lock to be sent to the Noke API for parsing
+     * @param response the response from the lock. A 40 char hex string
+     * @param session the session of the lock read upon connecting
+     * @param mac the MAC address of the lock
+     */
     public void addDataPacketToQueue(String response, String session, String mac){
         long unixTime = System.currentTimeMillis()/1000L;
         if(globalUploadQueue == null){
@@ -804,6 +916,9 @@ public class NokeBluetoothService extends Service {
         }
     }
 
+    /**
+     * Uploads server packets from the Noke device to the server for parsing via the Noke Go Library
+     */
     public void uploadData(){
         if(globalUploadQueue != null) {
             if (globalUploadQueue.size() > 0) {
@@ -813,9 +928,7 @@ public class NokeBluetoothService extends Service {
                     for (int i = 0; i < globalUploadQueue.size(); i++) {
                         data.put(globalUploadQueue.get(i));
                     }
-
                     jsonObject.accumulate("data", data);
-
                     Log.w(TAG, "UPLOAD DATA: " + jsonObject.toString());
                     NokeGoUploadCallback callback = new NokeGoUploadCallback(this);
                     Nokego.uploadData(jsonObject.toString(), NokeDefines.uploadURL, callback);
@@ -827,6 +940,10 @@ public class NokeBluetoothService extends Service {
         }
     }
 
+    /**
+     * Caches the upload data from the lock in the case that an internet connection isn't present
+     * @param context application context used for getting shared preferences
+     */
     void cacheUploadData(Context context){
         Set<String> data = new HashSet<>();
         for(int i = 0; i <globalUploadQueue.size(); i++){
@@ -839,6 +956,10 @@ public class NokeBluetoothService extends Service {
                 .apply();
     }
 
+    /**
+     * Retrieves cached upload data that can be uploaded to the Noke API
+     * @param context application context used for getting shared preferences
+     */
     void retrieveUploadData(Context context){
         SharedPreferences pref = context.getSharedPreferences(NokeDefines.PREFS_NAME, MODE_PRIVATE);
         Set<String> data = pref.getStringSet(NokeDefines.PREF_UPLOADDATA, null);
@@ -859,6 +980,10 @@ public class NokeBluetoothService extends Service {
         }
     }
 
+    /**
+     * Caches the Noke devices for offline use
+     * @param context application context used for getting shared preferences
+     */
     void cacheNokeDevices(Context context){
         Set<String> setNokeDevices = new HashSet<>();
         for(Map.Entry<String, NokeDevice> entry : this.nokeDevices.entrySet()){
@@ -873,6 +998,10 @@ public class NokeBluetoothService extends Service {
 
     }
 
+    /**
+     * Retrieves cached Noke devices for offline use
+     * @param context application context used for getting shared preferences
+     */
     void retrieveNokeDevices(Context context){
         SharedPreferences pref = context.getSharedPreferences(NokeDefines.PREFS_NAME, MODE_PRIVATE);
         final Set<String> locks = pref.getStringSet(NokeDefines.PREF_DEVICES, null);
@@ -892,10 +1021,10 @@ public class NokeBluetoothService extends Service {
 
 
     /**
-     * Reads the State Characteristic on Noke Device.  When read this contains Lock State, Battery State,
+     * Reads the session characteristic on the Noke device.  When read this contains Lock State, Battery State,
      * and Session Key
      *
-     * @param noke The device to read the state characteristic from.
+     * @param noke The device to read the session characteristic from.
      */
     private void readStateCharacteristic(NokeDevice noke){
         if (mBluetoothAdapter == null || noke.gatt == null){
@@ -1034,6 +1163,10 @@ public class NokeBluetoothService extends Service {
         });
     }
 
+    /**
+     * Checks to see if the service is running in the background
+     * @return boolean true if running in foreground, false if running in background
+     */
     private boolean isServiceRunningInForeground() {
 
         ActivityManager.RunningAppProcessInfo myProcess = new ActivityManager.RunningAppProcessInfo();
@@ -1042,6 +1175,9 @@ public class NokeBluetoothService extends Service {
 
     }
 
+    /**
+     * Broadcast receiver for receiving information about state of bluetooth adapter
+     */
     private final BroadcastReceiver bluetoothBroadcastReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent)
@@ -1067,10 +1203,18 @@ public class NokeBluetoothService extends Service {
         }
     };
 
+    /**
+     * Sets the URL used for requesting unlock
+     * @param unlockUrl string of the url
+     */
     void setUnlockUrl(String unlockUrl){
         NokeDefines.unlockURL = unlockUrl;
     }
 
+    /**
+     * Sets the URL used for uploading data
+     * @param uploadUrl string of the url
+     */
     void setUploadUrl(String uploadUrl){
         NokeDefines.uploadURL = uploadUrl;
     }
