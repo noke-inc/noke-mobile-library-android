@@ -353,6 +353,7 @@ public class NokeBluetoothService extends Service {
                                     nokeDevices.put(noke.getMac(), noke);
                                 }
 
+                                noke.connectionState = NokeDefines.NOKE_STATE_DISCOVERED;
                                 mGlobalNokeListener.onNokeDiscovered(noke);
                             }
                         }
@@ -551,7 +552,7 @@ public class NokeBluetoothService extends Service {
             else if (newState == BluetoothProfile.STATE_CONNECTED) {
 
                 noke.connectionAttempts = 0;
-                noke.connectionState = NokeDefines.STATE_CONNECTED;
+                noke.connectionState = NokeDefines.NOKE_STATE_CONNECTING;
                 mGlobalNokeListener.onNokeConnecting(noke);
 
                 Handler handler = new Handler(Looper.getMainLooper());
@@ -593,6 +594,7 @@ public class NokeBluetoothService extends Service {
                 else {
                     if (noke.connectionAttempts == 0) {
                         refreshDeviceCache(noke.gatt, true);
+                        noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
                         mGlobalNokeListener.onNokeDisconnected(noke);
                         uploadData();
                     }
@@ -670,11 +672,15 @@ public class NokeBluetoothService extends Service {
             Log.w(TAG, "On Descriptor Write: " + descriptor.toString() + " Status: " + status);
             if(gatt.getDevice().getName().contains("NOKE_FW") || gatt.getDevice().getName().contains("NFOB_FW") || gatt.getDevice().getName().contains("N3P_FW"))
             {
-                mGlobalNokeListener.onNokeConnected(nokeDevices.get(gatt.getDevice().getAddress()));
+                NokeDevice noke = nokeDevices.get(gatt.getDevice().getAddress());
+                noke.connectionState = NokeDefines.NOKE_STATE_CONNECTED;
+                mGlobalNokeListener.onNokeConnected(noke);
             }
             else
             {
-                mGlobalNokeListener.onNokeConnected(nokeDevices.get(gatt.getDevice().getAddress()));
+                NokeDevice noke = nokeDevices.get(gatt.getDevice().getAddress());
+                noke.connectionState = NokeDefines.NOKE_STATE_CONNECTED;
+                mGlobalNokeListener.onNokeConnected(noke);
             }
         }
 
