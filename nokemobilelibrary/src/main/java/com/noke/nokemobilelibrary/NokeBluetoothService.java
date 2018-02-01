@@ -521,7 +521,7 @@ public class NokeBluetoothService extends Service {
                         @Override
                         public void run() {
                             if (finalNoke.gatt == null) {
-                                connectToGatt(finalNoke);
+                                Log.d(TAG, "Initializing gatt connection: " + connectToGatt(finalNoke));
                             } else {
                                 /*Reusing GATT objects causes issues.  If the gatt object is not null when first
                                  * connecting to lock. Disconnect/null object and try reconnecting
@@ -529,7 +529,7 @@ public class NokeBluetoothService extends Service {
                                 finalNoke.gatt.disconnect();
                                 finalNoke.gatt.close();
                                 finalNoke.gatt = null;
-                                connectToGatt(finalNoke);
+                                Log.d(TAG, "Initializing gatt connection: " + connectToGatt(finalNoke));
                             }
                         }
                     });
@@ -545,16 +545,17 @@ public class NokeBluetoothService extends Service {
                         mBluetoothAdapter.cancelDiscovery();
                         noke.connectionState = NokeDefines.STATE_CONNECTING;
                         if (noke.gatt == null) {
-                            connectToGatt(noke);
+                            Log.d(TAG, "Initializing gatt connection: " + connectToGatt(noke));
                         } else {
-                            /*Reusing GATT objects causes issues.  If the gatt object is not null when first
+                            /*
+                             * Reusing GATT objects causes issues.  If the gatt object is not null when first
                              * connecting to lock. Disconnect/null object and try reconnecting
                              */
                             noke.gatt.disconnect();
                             noke.gatt.close();
                             noke.gatt = null;
 
-                            connectToGatt(noke);
+                            Log.d(TAG, "Initializing gatt connection: " + connectToGatt(noke));
                         }
                     }
                 }
@@ -640,7 +641,7 @@ public class NokeBluetoothService extends Service {
                             } catch (InterruptedException e) {
                                 e.printStackTrace();
                             }
-                            connectToGatt(noke);
+                            Log.d(TAG, "Initializing gatt connection: " + connectToGatt(noke));
                         }
                     });
                 }
@@ -680,13 +681,13 @@ public class NokeBluetoothService extends Service {
                                 noke.gatt.close();
                                 noke.gatt = null;
                             }
-                            connectToGatt(noke);
+                            Log.d(TAG, "Initializing gatt connection: " + connectToGatt(noke));
                         }
                     });
                 }
                 else {
                     if (noke.connectionAttempts == 0) {
-                        refreshDeviceCache(noke.gatt, true);
+                        refreshDeviceCache(noke.gatt, NokeDefines.SHOULD_FORCE_GATT_REFRESH);
                         noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
                         mGlobalNokeListener.onNokeDisconnected(noke);
                         uploadData();
@@ -944,6 +945,7 @@ public class NokeBluetoothService extends Service {
      * Caches the upload data from the lock in the case that an internet connection isn't present
      * @param context application context used for getting shared preferences
      */
+    @SuppressWarnings("unused")
     void cacheUploadData(Context context){
         Set<String> data = new HashSet<>();
         for(int i = 0; i <globalUploadQueue.size(); i++){
@@ -960,6 +962,7 @@ public class NokeBluetoothService extends Service {
      * Retrieves cached upload data that can be uploaded to the Noke API
      * @param context application context used for getting shared preferences
      */
+    @SuppressWarnings("unused")
     void retrieveUploadData(Context context){
         SharedPreferences pref = context.getSharedPreferences(NokeDefines.PREFS_NAME, MODE_PRIVATE);
         Set<String> data = pref.getStringSet(NokeDefines.PREF_UPLOADDATA, null);
@@ -984,6 +987,7 @@ public class NokeBluetoothService extends Service {
      * Caches the Noke devices for offline use
      * @param context application context used for getting shared preferences
      */
+    @SuppressWarnings("unused")
     void cacheNokeDevices(Context context){
         Set<String> setNokeDevices = new HashSet<>();
         for(Map.Entry<String, NokeDevice> entry : this.nokeDevices.entrySet()){
@@ -1002,6 +1006,7 @@ public class NokeBluetoothService extends Service {
      * Retrieves cached Noke devices for offline use
      * @param context application context used for getting shared preferences
      */
+    @SuppressWarnings("unused")
     void retrieveNokeDevices(Context context){
         SharedPreferences pref = context.getSharedPreferences(NokeDefines.PREFS_NAME, MODE_PRIVATE);
         final Set<String> locks = pref.getStringSet(NokeDefines.PREF_DEVICES, null);
@@ -1207,6 +1212,7 @@ public class NokeBluetoothService extends Service {
      * Sets the URL used for requesting unlock
      * @param unlockUrl string of the url
      */
+    @SuppressWarnings("unused")
     void setUnlockUrl(String unlockUrl){
         NokeDefines.unlockURL = unlockUrl;
     }
@@ -1215,6 +1221,7 @@ public class NokeBluetoothService extends Service {
      * Sets the URL used for uploading data
      * @param uploadUrl string of the url
      */
+    @SuppressWarnings("unused")
     void setUploadUrl(String uploadUrl){
         NokeDefines.uploadURL = uploadUrl;
     }

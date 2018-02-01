@@ -12,6 +12,7 @@ public class NokeDefines {
     static final int BLUETOOTH_DEFAULT_SCAN_TIME_BACKGROUND         = 2000;
 
     static final String NOKE_DEVICE_IDENTIFER_STRING                = "NOKE";
+    static final boolean SHOULD_FORCE_GATT_REFRESH                  = true;
 
 
     //LockAppResponse 	used by the app to confirm command succeeded
