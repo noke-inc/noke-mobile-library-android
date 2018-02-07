@@ -31,7 +31,7 @@ import com.noke.nokemobilelibrary.NokeServiceListener;
 import org.w3c.dom.Text;
 
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements DemoWebClient.DemoWebClientCallback {
 
     public static final String TAG = MainActivity.class.getSimpleName();
 
@@ -40,6 +40,7 @@ public class MainActivity extends AppCompatActivity {
     EditText emailEditText;
     private NokeDeviceManagerService mNokeService = null;
     private static final int PERMISSION_REQUEST_COARSE_LOCATION = 1;
+    private NokeDevice currentNoke;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,12 +51,28 @@ public class MainActivity extends AppCompatActivity {
         initiateNokeService();
 
         lockLayout = (LinearLayout) findViewById(R.id.lock_layout);
+        lockLayout.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if(currentNoke == null){
+                    setStatusText("No Device Connected");
+                }
+                else if(emailEditText.getText().toString().length() == 0){
+
+                }
+                else{
+                    DemoWebClient demoWebClient = new DemoWebClient();
+                    demoWebClient.setWebClientCallback(MainActivity.this);
+                    demoWebClient.requestUnlock(currentNoke, emailEditText.getText().toString());
+                }
+
+            }
+        });
+
+
         lockNameText = (TextView) findViewById(R.id.lock_text);
         statusText = (TextView) findViewById(R.id.status_text);
         emailEditText = (EditText) findViewById(R.id.email_input);
-
-
-
     }
 
     private void initiateNokeService(){
@@ -240,5 +257,10 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
+    }
+
+    @Override
+    public void onUnlockReceived(String response, NokeDevice noke) {
+        Log.d(TAG, "UNLOCK RECEIVED: "+ response);
     }
 }
