@@ -41,17 +41,6 @@ public class MainActivity extends AppCompatActivity {
         //Initiate Noke Service
         initiateNokeService();
 
-        scanButton = findViewById(R.id.scan_button);
-        scanButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if(mNokeService != null) {
-                    mNokeService.startScanningForNokeDevices();
-                }else{
-                    Log.e(TAG, "SERVICE HAS NOT BEEN INITIALIZED");
-                }
-            }
-        });
     }
 
     private void initiateNokeService(){
