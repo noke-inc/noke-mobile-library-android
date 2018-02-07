@@ -9,6 +9,7 @@
     >
 
     <LinearLayout
+        android:id="@+id/lock_layout"
         android:layout_width="match_parent"
         android:layout_height="180dp"
         android:background="#575757"
@@ -16,13 +17,14 @@
         >
 
         <TextView
+            android:id="@+id/lock_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textColor="#FFFFFF"
             android:text="No Lock Connected"
             android:layout_marginLeft="10dp"
             android:layout_marginTop="10dp"
-            android:textSize="18sp"
+            android:textSize="15sp"
             />
 
         <ImageView
@@ -35,6 +37,7 @@
 
     </LinearLayout>
     <TextView
+        android:id="@+id/status_text"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Status"
@@ -42,7 +45,7 @@
         android:padding="5dp"
         android:textColor="#FFFFFF"
         android:textAlignment="center"
-        android:textSize="18sp"
+        android:textSize="15sp"
         />
     <!-- USERNAME INPUT -->
     <RelativeLayout
@@ -53,16 +56,16 @@
 
         <!-- INPUT -->
         <EditText
-            android:id="@+id/username_input"
+            android:id="@+id/email_input"
             android:layout_marginLeft="-10dp"
             android:layout_toRightOf="@+id/username_icon"
             android:text=""
             android:hint="Email"
             android:padding="10dp"
-            android:background=""
+            android:background="#F5F5F5"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textSize="18sp"
+            android:textSize="15sp"
             />
 
         <!-- ICON -->

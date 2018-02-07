@@ -8,6 +8,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
@@ -18,18 +19,25 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import com.noke.nokemobilelibrary.NokeDeviceManagerService;
 import com.noke.nokemobilelibrary.NokeDevice;
 import com.noke.nokemobilelibrary.NokeMobileError;
 import com.noke.nokemobilelibrary.NokeServiceListener;
 
+import org.w3c.dom.Text;
+
 
 public class MainActivity extends AppCompatActivity {
 
     public static final String TAG = MainActivity.class.getSimpleName();
 
-    Button scanButton;
+    LinearLayout lockLayout;
+    TextView lockNameText, statusText;
+    EditText emailEditText;
     private NokeDeviceManagerService mNokeService = null;
     private static final int PERMISSION_REQUEST_COARSE_LOCATION = 1;
 
@@ -40,6 +48,13 @@ public class MainActivity extends AppCompatActivity {
 
         //Initiate Noke Service
         initiateNokeService();
+
+        lockLayout = (LinearLayout) findViewById(R.id.lock_layout);
+        lockNameText = (TextView) findViewById(R.id.lock_text);
+        statusText = (TextView) findViewById(R.id.status_text);
+        emailEditText = (EditText) findViewById(R.id.email_input);
+
+
 
     }
 
@@ -59,17 +74,18 @@ public class MainActivity extends AppCompatActivity {
             //Register callback listener
             mNokeService.registerNokeListener(mNokeServiceListener);
 
-            //Set unlock URL
-            mNokeService.setUnlockUrl("https://lock-api-dev.appspot.com/unlock/");
-
             //Add locks to device manager
             NokeDevice noke1 = new NokeDevice("PAH-CAT-SAEU", "D7:EE:3C:07:8F:68");
             mNokeService.addNokeDevice(noke1);
             noke1.setTrackingKey("saeu key");
 
-            NokeDevice noke2 = new NokeDevice("PAH-CAT-SAET", "C1:86:3D:EE:67:84");
-            mNokeService.addNokeDevice(noke2);
-            noke2.setTrackingKey("saet key");
+            //Start bluetooth scanning
+            mNokeService.startScanningForNokeDevices();
+            setStatusText("Scanning for Noke Devices");
+
+
+
+
 
             if (!mNokeService.initialize()) {
                 Log.e(TAG, "Unable to initialize Bluetooth");
@@ -84,35 +100,38 @@ public class MainActivity extends AppCompatActivity {
     private NokeServiceListener mNokeServiceListener = new NokeServiceListener() {
         @Override
         public void onNokeDiscovered(NokeDevice noke) {
-            Log.w(TAG, "NOKE DISCOVERED: " + noke.getName());
+            setStatusText("NOKE DISCOVERED: " + noke.getName());
             mNokeService.connectToNoke(noke);
         }
 
         @Override
         public void onNokeConnecting(NokeDevice noke) {
-            Log.w(TAG, "NOKE CONNECTING: " + noke.getName());
+            setStatusText("NOKE CONNECTING: " + noke.getName());
         }
 
         @Override
         public void onNokeConnected(NokeDevice noke) {
-            Log.w(TAG, "NOKE CONNECTED: " + noke.getName());
+            setStatusText("NOKE CONNECTED: " + noke.getName());
+            setLockNameText(noke.getName());
+            setLockLayoutColor(getResources().getColor(R.color.nokeBlue));
             mNokeService.stopScanning();
-            noke.unlock();
         }
 
         @Override
         public void onNokeSyncing(NokeDevice noke) {
-            Log.w(TAG, "NOKE SYNCING: " + noke.getName());
+            setStatusText("NOKE SYNCING: " + noke.getName());
         }
 
         @Override
         public void onNokeUnlocked(NokeDevice noke) {
-            Log.w(TAG, "NOKE UNLOCKED: " + noke.getName());
+            setStatusText("NOKE UNLOCKED: " + noke.getName());
         }
 
         @Override
         public void onNokeDisconnected(NokeDevice noke) {
-            Log.w(TAG, "NOKE DISCONNECTED: " + noke.getName());
+            setStatusText("NOKE DISCONNECTED: " + noke.getName());
+            setLockLayoutColor(getResources().getColor(R.color.disconnectGray));
+            setLockNameText("No Lock Connected");
         }
 
         @Override
@@ -162,6 +181,37 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     };
+
+    public void setStatusText(final String message){
+        Handler handler = new Handler(Looper.getMainLooper());
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                statusText.setText(message);
+            }
+        });
+    }
+
+    public void setLockNameText(final String message){
+        Handler handler = new Handler(Looper.getMainLooper());
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                lockNameText.setText(message);
+            }
+        });
+    }
+
+    public void setLockLayoutColor(final int color){
+        Handler handler = new Handler(Looper.getMainLooper());
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                lockLayout.setBackgroundColor(color);
+            }
+        });
+
+    }
 
     @Override
     public void onRequestPermissionsResult(int requestCode,
