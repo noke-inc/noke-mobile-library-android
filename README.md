@@ -19,16 +19,15 @@ This library is compatible with Android devices that support Bluetooth Low Energ
                    />
 
 * The heart of the Noke Mobile Library is a service that when bound to an activity handles scanning for Noke Devices, connecting, sending commands, and receiving responses. To bind the NokeDeviceManagerService to an activity:
-        ```java
-            private void initiateNokeService(){
-            Intent nokeServiceIntent = new Intent(this, NokeDeviceManagerService.class);
-            bindService(nokeServiceIntent, mServiceConnection, Context.BIND_AUTO_CREATE);
-            }```
+```java
+private void initiateNokeService(){
+Intent nokeServiceIntent = new Intent(this, NokeDeviceManagerService.class);
+bindService(nokeServiceIntent, mServiceConnection, Context.BIND_AUTO_CREATE);
+}
             
-        ```java
-           private ServiceConnection mServiceConnection = new ServiceConnection() {
-
-           public void onServiceConnected(ComponentName className, IBinder rawBinder) {
+        
+private ServiceConnection mServiceConnection = new ServiceConnection() {
+        public void onServiceConnected(ComponentName className, IBinder rawBinder) {
 
             //Store reference to service
             mNokeService = ((NokeDeviceManagerService.LocalBinder) rawBinder).getService();
@@ -56,7 +55,7 @@ This library is compatible with Android devices that support Bluetooth Low Energ
 * Use the `NokeServiceListener` class to receive callbacks from the `NokeDeviceManagerService`:
 
 ```java
-   private NokeServiceListener mNokeServiceListener = new NokeServiceListener() {
+private NokeServiceListener mNokeServiceListener = new NokeServiceListener() {
         @Override
         public void onNokeDiscovered(NokeDevice noke) {
 
