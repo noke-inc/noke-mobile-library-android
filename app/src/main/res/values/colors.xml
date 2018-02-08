@@ -6,4 +6,5 @@
     <color name="nokeBlue">#0070CE</color>
     <color name="disconnectGray">#575757</color>
     <color name="alertRed">#c62828</color>
+    <color name="unlockGreen">#4caf50</color>
 </resources>

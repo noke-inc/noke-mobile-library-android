@@ -143,6 +143,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
         @Override
         public void onNokeUnlocked(NokeDevice noke) {
             setStatusText("NOKE UNLOCKED: " + noke.getName());
+            setLockLayoutColor(getResources().getColor(R.color.unlockGreen));
         }
 
         @Override
@@ -151,6 +152,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
             setLockLayoutColor(getResources().getColor(R.color.disconnectGray));
             setLockNameText("No Lock Connected");
             currentNoke = null;
+            mNokeService.startScanningForNokeDevices();
         }
 
         @Override
