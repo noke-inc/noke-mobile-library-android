@@ -1208,15 +1208,6 @@ public class NokeDeviceManagerService extends Service {
     };
 
     /**
-     * Sets the URL used for requesting unlock
-     * @param unlockUrl string of the url
-     */
-    @SuppressWarnings({"unused", "SameParameterValue"})
-    public void setUnlockUrl(String unlockUrl){
-        NokeDefines.unlockURL = unlockUrl;
-    }
-
-    /**
      * Sets the URL used for uploading data
      * @param uploadUrl string of the url
      */

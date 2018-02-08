@@ -4,6 +4,9 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.util.Log;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 import nokego.Nokego;
 
 /**
@@ -210,7 +213,12 @@ public class NokeDevice {
      * Unlocks the lock via the Noke Go Library
      */
     public void unlock(){
-        NokeGoUnlockCallback callback = new NokeGoUnlockCallback(this);
-        Nokego.unlockNoke(this.mac, this.session, this.trackingKey, NokeDefines.unlockURL, callback);
+
+    }
+
+    public void sendCommands(String commands){
+        List<String> commandArr = Arrays.asList(commands.split("\\+"));
+        this.commands.addAll(commandArr);
+        mService.writeRXCharacteristic(this);
     }
 }
