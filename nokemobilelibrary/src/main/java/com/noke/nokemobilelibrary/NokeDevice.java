@@ -216,6 +216,10 @@ public class NokeDevice {
 
     }
 
+    /**
+     * Sends a + delimited string of commands to the lock
+     * @param commands + delimited string returned from the unlock request
+     */
     public void sendCommands(String commands){
         List<String> commandArr = Arrays.asList(commands.split("\\+"));
         this.commands.addAll(commandArr);
