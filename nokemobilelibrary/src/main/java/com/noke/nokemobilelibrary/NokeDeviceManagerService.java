@@ -938,17 +938,10 @@ public class NokeDeviceManagerService extends Service {
                         ApplicationInfo ai = getPackageManager().getApplicationInfo(getPackageName(), PackageManager.GET_META_DATA);
                         Bundle bundle = ai.metaData;
                         String nokeMobileApiKey = bundle.getString(NokeDefines.NOKE_MOBILE_API_KEY);
-
-
                         Nokego.uploadData(jsonObject.toString(), NokeDefines.uploadURL, callback, nokeMobileApiKey);
-                    } catch (PackageManager.NameNotFoundException e){
+                    } catch (PackageManager.NameNotFoundException | NullPointerException e){
                         mGlobalNokeListener.onError(null, NokeMobileError.ERROR_MISSING_API_KEY, "No API Key found. Have you set it in your Android Manifest?");
-
-                    } catch (NullPointerException e) {
-
                     }
-
-
                 } catch(Exception e){
                     e.printStackTrace();
                 }

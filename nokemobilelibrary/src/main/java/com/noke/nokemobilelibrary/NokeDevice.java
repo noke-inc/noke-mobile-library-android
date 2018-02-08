@@ -205,6 +205,7 @@ public class NokeDevice {
         return trackingKey;
     }
 
+    @SuppressWarnings("unused")
     public void setTrackingKey(String trackingKey) {
         this.trackingKey = trackingKey;
     }
@@ -223,6 +224,10 @@ public class NokeDevice {
     public void sendCommands(String commands){
         List<String> commandArr = Arrays.asList(commands.split("\\+"));
         this.commands.addAll(commandArr);
+        if(this.commands.size() > 1){
+            this.connectionState = NokeDefines.NOKE_STATE_SYNCING;
+            mService.getNokeListener().onNokeSyncing(this);
+        }
         mService.writeRXCharacteristic(this);
     }
 }
