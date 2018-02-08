@@ -28,6 +28,8 @@ import com.noke.nokemobilelibrary.NokeDevice;
 import com.noke.nokemobilelibrary.NokeMobileError;
 import com.noke.nokemobilelibrary.NokeServiceListener;
 
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.w3c.dom.Text;
 
 
@@ -58,17 +60,15 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
                     setStatusText("No Device Connected");
                 }
                 else if(emailEditText.getText().toString().length() == 0){
-
+                    setStatusText("Email Address Required");
                 }
                 else{
                     DemoWebClient demoWebClient = new DemoWebClient();
                     demoWebClient.setWebClientCallback(MainActivity.this);
                     demoWebClient.requestUnlock(currentNoke, emailEditText.getText().toString());
                 }
-
             }
         });
-
 
         lockNameText = (TextView) findViewById(R.id.lock_text);
         statusText = (TextView) findViewById(R.id.status_text);
@@ -131,6 +131,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
             setStatusText("NOKE CONNECTED: " + noke.getName());
             setLockNameText(noke.getName());
             setLockLayoutColor(getResources().getColor(R.color.nokeBlue));
+            currentNoke = noke;
             mNokeService.stopScanning();
         }
 
@@ -149,6 +150,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
             setStatusText("NOKE DISCONNECTED: " + noke.getName());
             setLockLayoutColor(getResources().getColor(R.color.disconnectGray));
             setLockNameText("No Lock Connected");
+            currentNoke = null;
         }
 
         @Override
@@ -227,7 +229,6 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
                 lockLayout.setBackgroundColor(color);
             }
         });
-
     }
 
     @Override
@@ -262,5 +263,20 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
     @Override
     public void onUnlockReceived(String response, NokeDevice noke) {
         Log.d(TAG, "UNLOCK RECEIVED: "+ response);
+        try{
+            JSONObject obj = new JSONObject(response);
+            String result = obj.getString("result");
+            if(result.equals("success")){
+                JSONObject data = obj.getJSONObject("data");
+                String commandString = data.getString("commands");
+                currentNoke.sendCommands(commandString);
+            }else{
+                setStatusText("Access Denied");
+                setLockLayoutColor(getResources().getColor(R.color.alertRed));
+            }
+
+        }catch (JSONException e){
+
+        }
     }
 }
