@@ -21,10 +21,12 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.location.LocationManager;
 import android.os.Binder;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -45,6 +47,7 @@ import java.util.Set;
 import com.google.gson.Gson;
 
 import nokego.Nokego;
+
 
 /**
  * Created by Spencer on 1/17/18.
@@ -931,7 +934,20 @@ public class NokeDeviceManagerService extends Service {
                     jsonObject.accumulate("data", data);
                     Log.w(TAG, "UPLOAD DATA: " + jsonObject.toString());
                     NokeGoUploadCallback callback = new NokeGoUploadCallback(this);
-                    Nokego.uploadData(jsonObject.toString(), NokeDefines.uploadURL, callback);
+                    try {
+                        ApplicationInfo ai = getPackageManager().getApplicationInfo(getPackageName(), PackageManager.GET_META_DATA);
+                        Bundle bundle = ai.metaData;
+                        String nokeMobileApiKey = bundle.getString(NokeDefines.NOKE_MOBILE_API_KEY);
+
+
+                        Nokego.uploadData(jsonObject.toString(), NokeDefines.uploadURL, callback, nokeMobileApiKey);
+                    } catch (PackageManager.NameNotFoundException e){
+                        mGlobalNokeListener.onError(null, NokeMobileError.ERROR_MISSING_API_KEY, "No API Key found. Have you set it in your Android Manifest?");
+
+                    } catch (NullPointerException e) {
+
+                    }
+
 
                 } catch(Exception e){
                     e.printStackTrace();

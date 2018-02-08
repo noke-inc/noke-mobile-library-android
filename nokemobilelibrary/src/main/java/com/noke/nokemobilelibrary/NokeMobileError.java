@@ -35,7 +35,7 @@ public class NokeMobileError {
     public static final int DEVICE_ERROR_UNKNOWN                = 268;
 
 
-    //Noke Bluetooth Service Errors
+    //Noke Device Manager Service Errors
     public static final int ERROR_LOCATION_PERMISSIONS_NEEDED   = 300;
     public static final int ERROR_LOCATION_SERVICES_DISABLED    = 301;
     public static final int ERROR_BLUETOOTH_DISABLED            = 302;
@@ -44,6 +44,9 @@ public class NokeMobileError {
     public static final int ERROR_GPS_ENABLED                   = 305;
     public static final int ERROR_NETWORK_ENABLED               = 306;
     public static final int ERROR_BLUETOOTH_SCANNING            = 307;
+    public static final int ERROR_MISSING_API_KEY               = 308;
+
+
 
 
 }

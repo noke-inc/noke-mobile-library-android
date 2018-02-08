@@ -26,6 +26,13 @@ class NokeDefines {
     static final boolean SHOULD_FORCE_GATT_REFRESH                  = true;
 
     /**
+     * Identifier for Noke Mobile API Key meta data
+     */
+    static final String NOKE_MOBILE_API_KEY                        = "noke-core-api-mobile-key";
+
+
+
+    /**
      * Lock response types
      */
     static final byte SUCCESS_ResultType							=(byte)0x60;
