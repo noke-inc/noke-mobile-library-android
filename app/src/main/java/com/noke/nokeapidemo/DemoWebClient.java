@@ -1,6 +1,5 @@
 package com.noke.nokeapidemo;
 
-import android.os.Build;
 import android.util.Log;
 
 import com.noke.nokemobilelibrary.NokeDevice;
@@ -21,18 +20,19 @@ import javax.net.ssl.SSLContext;
 
 /**
  * Created by Spencer on 2/7/18.
+ * Demo Web Client for making requests to demo server and show API implementation
  */
 
-public class DemoWebClient {
+class DemoWebClient {
 
     private final static String TAG = DemoWebClient.class.getSimpleName();
     private String serverUrl = "http://slacker.noke/";
     private DemoWebClientCallback mDemoWebClientCallback;
 
-    static String POST(String urlStr, JSONObject jsonObject)
+    private static String POST(String urlStr, JSONObject jsonObject)
     {
-        HttpURLConnection conn = null;
-        InputStream inputStream = null;
+        HttpURLConnection conn;
+        InputStream inputStream;
         String result = "";
         System.setProperty("http.keepAlive", "false");
 
@@ -44,10 +44,6 @@ public class DemoWebClient {
             SSLContext sc;
             sc = SSLContext.getInstance("TLS");
             sc.init(null, null, new java.security.SecureRandom());
-            //conn.setSSLSocketFactory(sc.getSocketFactory());
-
-            int versionCode = BuildConfig.VERSION_CODE;
-            String versionName = BuildConfig.VERSION_NAME;
 
             //set Timeout and method
             conn.setReadTimeout(60000);
@@ -88,15 +84,16 @@ public class DemoWebClient {
 
     private static String convertInputStreamToString(InputStream inputStream) throws IOException {
         BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
-        String line ="";
-        String result = "";
-        while ((line = bufferedReader.readLine()) != null)
-            result += line;
+        String line;
+        StringBuilder result = new StringBuilder();
+        while ((line = bufferedReader.readLine()) != null) {
+            result.append(line);
+        }
         inputStream.close();
-        return result;
+        return result.toString();
     }
 
-    public void requestUnlock(final NokeDevice noke, final String email)
+    void requestUnlock(final NokeDevice noke, final String email)
     {
         //Log.d(TAG, "Unlock");
         Thread thread = new Thread(new Runnable() {
@@ -126,7 +123,7 @@ public class DemoWebClient {
         thread.start();
     }
 
-    public void setWebClientCallback(DemoWebClientCallback callback){
+    void setWebClientCallback(DemoWebClientCallback callback){
         this.mDemoWebClientCallback = callback;
     }
 

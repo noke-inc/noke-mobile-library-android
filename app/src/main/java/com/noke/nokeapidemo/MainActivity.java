@@ -8,7 +8,6 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
@@ -18,7 +17,6 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -30,8 +28,6 @@ import com.noke.nokemobilelibrary.NokeServiceListener;
 
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.w3c.dom.Text;
-
 
 public class MainActivity extends AppCompatActivity implements DemoWebClient.DemoWebClientCallback {
 
@@ -52,7 +48,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
         //Initiate Noke Service
         initiateNokeService();
 
-        lockLayout = (LinearLayout) findViewById(R.id.lock_layout);
+        lockLayout = findViewById(R.id.lock_layout);
         lockLayout.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -70,9 +66,9 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
             }
         });
 
-        lockNameText = (TextView) findViewById(R.id.lock_text);
-        statusText = (TextView) findViewById(R.id.status_text);
-        emailEditText = (EditText) findViewById(R.id.email_input);
+        lockNameText = findViewById(R.id.lock_text);
+        statusText = findViewById(R.id.status_text);
+        emailEditText = findViewById(R.id.email_input);
     }
 
     private void initiateNokeService(){
@@ -94,15 +90,10 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
             //Add locks to device manager
             NokeDevice noke1 = new NokeDevice("PAH-CAT-SAEU", "D7:EE:3C:07:8F:68");
             mNokeService.addNokeDevice(noke1);
-            noke1.setTrackingKey("saeu key");
 
             //Start bluetooth scanning
             mNokeService.startScanningForNokeDevices();
             setStatusText("Scanning for Noke Devices");
-
-
-
-
 
             if (!mNokeService.initialize()) {
                 Log.e(TAG, "Unable to initialize Bluetooth");
@@ -278,7 +269,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
             }
 
         }catch (JSONException e){
-
+            Log.e(TAG, e.toString());
         }
     }
 }
