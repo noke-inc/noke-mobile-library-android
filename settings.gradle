@@ -1,1 +1,1 @@
-include ':app', ':nokemobilelibrary'
+include ':app', ':nokemobilelibrary', ':Nokego'
