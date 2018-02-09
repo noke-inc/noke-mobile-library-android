@@ -1,7 +1,9 @@
+
 # Noke Mobile Library for Android #
 
-The Noke Mobile Library provides an easy-to-use and stable way to communicate with Noke Devices via Bluetooth.  It must be used in 
-conjunction with the Noke Core API for full functionality such as unlocking locks and uploading activity.
+The Noke Mobile Library provides an easy-to-use and stable way to communicate with Noke Devices via Bluetooth.  It must be used in conjunction with the Noke Core API for full functionality such as unlocking locks and uploading activity.
+
+![Alt text](https://i.imgur.com/UQh2nNy.png)
 
 ### Requirements ###
 
@@ -11,7 +13,7 @@ This library is compatible with Android devices that support Bluetooth Low Energ
 
 * The compat library may be found on Maven Central Repository.  Add it to your project by adding the following dependency:
 
-        MAVEN REPO DEPENDENCY HERE
+            MAVEN REPO DEPENDENCY COMING SOON
 	
 * Once you've add the dependency to your project, add the Mobile API Key to your Android Manifest:
         <meta-data android:name= "noke-core-api-mobile-key"
@@ -21,11 +23,10 @@ This library is compatible with Android devices that support Bluetooth Low Energ
 * The heart of the Noke Mobile Library is a service that when bound to an activity handles scanning for Noke Devices, connecting, sending commands, and receiving responses. To bind the NokeDeviceManagerService to an activity:
 ```java
 private void initiateNokeService(){
-Intent nokeServiceIntent = new Intent(this, NokeDeviceManagerService.class);
-bindService(nokeServiceIntent, mServiceConnection, Context.BIND_AUTO_CREATE);
+        Intent nokeServiceIntent = new Intent(this, NokeDeviceManagerService.class);
+        bindService(nokeServiceIntent, mServiceConnection, Context.BIND_AUTO_CREATE);
 }
             
-        
 private ServiceConnection mServiceConnection = new ServiceConnection() {
         public void onServiceConnected(ComponentName className, IBinder rawBinder) {
 
@@ -50,7 +51,8 @@ private ServiceConnection mServiceConnection = new ServiceConnection() {
         public void onServiceDisconnected(ComponentName classname) {
             mNokeService = null;
         }
-    };```
+    };
+```
 
 * Use the `NokeServiceListener` class to receive callbacks from the `NokeDeviceManagerService`:
 
@@ -96,4 +98,5 @@ private NokeServiceListener mNokeServiceListener = new NokeServiceListener() {
             Log.e(TAG, "NOKE SERVICE ERROR " + error + ": " + message);
          }
         }
-    };```
+    };
+```
