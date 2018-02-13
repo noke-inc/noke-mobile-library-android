@@ -106,7 +106,6 @@ class NokeDefines {
     /**
      * Request URLS
      */
-    static String unlockURL = "https://lock-api-dev.appspot.com/unlock/";
     static String uploadURL = "https://lock-api-dev.appspot.com/upload/";
 
     /**
