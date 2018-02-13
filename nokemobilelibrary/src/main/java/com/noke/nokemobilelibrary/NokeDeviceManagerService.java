@@ -49,7 +49,20 @@ import com.google.gson.Gson;
 import nokego.Nokego;
 
 
-/**
+/************************************************************************************************************************************************
+ * Copyright © 2018 Nokē Inc. All rights reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
  * Created by Spencer on 1/17/18.
  * Service for handling all bluetooth communication with the lock
  */
@@ -292,7 +305,7 @@ public class NokeDeviceManagerService extends Service {
      */
     private void turnOnBLEScan() {
         startLeScanning();
-        final Handler refreshScan = new Handler();
+        final Handler refreshScan = new Handler(Looper.getMainLooper());
         final int scanDelay = 4000;
         refreshScan.postDelayed(new Runnable(){
             @Override
@@ -935,11 +948,14 @@ public class NokeDeviceManagerService extends Service {
                     Log.w(TAG, "UPLOAD DATA: " + jsonObject.toString());
                     NokeGoUploadCallback callback = new NokeGoUploadCallback(this);
                     try {
-                        ApplicationInfo ai = getPackageManager().getApplicationInfo(getPackageName(), PackageManager.GET_META_DATA);
+                        PackageManager pm = getApplicationContext().getPackageManager();
+                        ApplicationInfo ai = pm.getApplicationInfo(getApplicationContext().getPackageName(), PackageManager.GET_META_DATA);
                         Bundle bundle = ai.metaData;
                         String nokeMobileApiKey = bundle.getString(NokeDefines.NOKE_MOBILE_API_KEY);
+                        Log.w(TAG, "API KEY: " + nokeMobileApiKey);
                         Nokego.uploadData(jsonObject.toString(), NokeDefines.uploadURL, callback, nokeMobileApiKey);
                     } catch (PackageManager.NameNotFoundException | NullPointerException e){
+                        e.printStackTrace();
                         mGlobalNokeListener.onError(null, NokeMobileError.ERROR_MISSING_API_KEY, "No API Key found. Have you set it in your Android Manifest?");
                     }
                 } catch(Exception e){
@@ -1220,7 +1236,7 @@ public class NokeDeviceManagerService extends Service {
      * Sets the URL used for uploading data
      * @param uploadUrl string of the url
      */
-    @SuppressWarnings("unused")
+    @SuppressWarnings({"unused", "SameParameterValue"})
     public void setUploadUrl(String uploadUrl){
         NokeDefines.uploadURL = uploadUrl;
     }
