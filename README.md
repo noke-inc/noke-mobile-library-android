@@ -1,6 +1,8 @@
 
 # Noke Mobile Library for Android #
 
+[![Download](https://api.bintray.com/packages/noke/maven/noke-mobile-library-android/images/download.svg)](https://bintray.com/noke/maven/noke-mobile-library-android/_latestVersion)
+
 The Nokē Mobile Library provides an easy-to-use and stable way to communicate with Nokē Devices via Bluetooth.  It must be used in conjunction with the Nokē Core API for full functionality such as unlocking locks and uploading activity.
 
 ![Nokē Core API Overview](https://imgur.com/vY2llC9.png)
