@@ -7,10 +7,6 @@
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
 
-    <meta-data android:name= "noke-core-api-mobile-key"
-               android:value= "eyJhbGciOiJOT0tFX01PQklMRV9TQU5EQk9YIiwidHlwIjoiSldUIn0.eyJhbGciOiJOT0tFX01PQklMRV9TQU5EQk9YIiwiY29tcGFueV91dWlkIjoiMDdjNTQ1MTItOTU4Yy00MDUzLTk0MGQtNWEzNWYwMTYxNWMxIiwiaXNzIjoibm9rZS5jb20iLCJpc3N1ZV9kYXRlIjoiMjAxOC0wMi0wOFQxMTozNzoyMS4wODk3NjQ5LTA3OjAwIn0.3c18ded78a46c6846053c7eea4e77a7703325d8d"
-        />
-
 
     <application
         android:allowBackup="true"
@@ -19,6 +15,11 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
+
+        <meta-data android:name= "noke-core-api-mobile-key"
+            android:value= "API_KEY_HERE"
+            />
+
         <activity android:name=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

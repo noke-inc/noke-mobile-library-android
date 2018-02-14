@@ -88,8 +88,10 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
             mNokeService.registerNokeListener(mNokeServiceListener);
 
             //Add locks to device manager
-            NokeDevice noke1 = new NokeDevice("PAH-CAT-SAEU", "D7:EE:3C:07:8F:68");
+            NokeDevice noke1 = new NokeDevice("TEST LOCK", "XX:XX:XX:XX:XX:XX");
             mNokeService.addNokeDevice(noke1);
+
+            mNokeService.setUploadUrl("https://coreapi-sandbox.appspot.com/upload/");
 
             //Start bluetooth scanning
             mNokeService.startScanningForNokeDevices();
@@ -143,6 +145,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
             setLockLayoutColor(getResources().getColor(R.color.disconnectGray));
             setLockNameText("No Lock Connected");
             currentNoke = null;
+            mNokeService.uploadData();
             mNokeService.startScanningForNokeDevices();
         }
 
@@ -258,8 +261,8 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
         Log.d(TAG, "UNLOCK RECEIVED: "+ response);
         try{
             JSONObject obj = new JSONObject(response);
-            String result = obj.getString("result");
-            if(result.equals("success")){
+            Boolean result = obj.getBoolean("result");
+            if(result){
                 JSONObject data = obj.getJSONObject("data");
                 String commandString = data.getString("commands");
                 currentNoke.sendCommands(commandString);
