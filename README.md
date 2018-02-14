@@ -1,5 +1,5 @@
 
-# Noke Mobile Library for Android #
+# Nokē Mobile Library for Android #
 
 [![Download](https://api.bintray.com/packages/noke/maven/noke-mobile-library-android/images/download.svg)](https://bintray.com/noke/maven/noke-mobile-library-android/_latestVersion)
 
