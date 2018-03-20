@@ -109,6 +109,13 @@ public class NokeDeviceManagerService extends Service {
      */
     ArrayList<JSONObject> globalUploadQueue;
     /**
+     * A boolean that allows the device manager to discover devices that are not in the array
+     */
+    private boolean mAllowAllDevices;
+
+
+
+    /**
      * Listener for Noke device events.  Triggered on various events including:
      * <ul>
      *     <li>Noke device discovery</li>
@@ -161,6 +168,7 @@ public class NokeDeviceManagerService extends Service {
         IntentFilter btFilter = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
         registerReceiver(bluetoothBroadcastReceiver, btFilter);
         mReceiverRegistered = true;
+        mAllowAllDevices = false;
         setBluetoothDelayDefault(NokeDefines.BLUETOOTH_DEFAULT_SCAN_TIME);
         setBluetoothDelayBackgroundDefault(NokeDefines.BLUETOOTH_DEFAULT_SCAN_TIME_BACKGROUND);
     }
@@ -426,6 +434,14 @@ public class NokeDeviceManagerService extends Service {
     }
 
     /**
+     * Sets mAllowDevices boolean
+     */
+    public void setAllowAllDevices(boolean allow){
+        mAllowAllDevices = allow;
+    }
+
+
+    /**
      * Initializes Bluetooth Scanning Callback for KitKat OS
      */
     private void initOldBluetoothCallback()
@@ -442,7 +458,7 @@ public class NokeDeviceManagerService extends Service {
                         NokeDevice noke = new NokeDevice(bluetoothDevice.getName(), bluetoothDevice.getAddress());
                         noke.bluetoothDevice = bluetoothDevice;
 
-                        if(nokeDevices.get(noke.getMac()) != null){
+                        if(nokeDevices.get(noke.getMac()) != null || mAllowAllDevices){
                             byte[] broadcastData;
                             String nameVersion;
 
@@ -467,6 +483,8 @@ public class NokeDeviceManagerService extends Service {
                                 mGlobalNokeListener.onNokeDiscovered(noke);
                             }
                         }
+
+
                     }
                 }
             }

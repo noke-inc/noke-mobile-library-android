@@ -84,6 +84,9 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
             //Store reference to service
             mNokeService = ((NokeDeviceManagerService.LocalBinder) rawBinder).getService();
 
+            //Uncomment to allow devices that aren't in the device array
+            //mNokeService.setAllowAllDevices(true);
+
             //Register callback listener
             mNokeService.registerNokeListener(mNokeServiceListener);
 
@@ -111,7 +114,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
         @Override
         public void onNokeDiscovered(NokeDevice noke) {
             setStatusText("NOKE DISCOVERED: " + noke.getName());
-            mNokeService.connectToNoke(noke);
+            //mNokeService.connectToNoke(noke);
         }
 
         @Override
