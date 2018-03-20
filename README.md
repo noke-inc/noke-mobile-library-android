@@ -109,12 +109,17 @@ private NokeServiceListener mNokeServiceListener = new NokeServiceListener() {
 
 ### Scanning for Nokē Devices ###
 
-* The `NokeDeviceManagerService` only scans for devices that have been added to the device array.
+* By default, the `NokeDeviceManagerService` only scans for devices that have been added to the device array.
 ```java
 //Add locks to device manager
 NokeDevice noke1 = new NokeDevice("LOCK NAME", "XX:XX:XX:XX:XX:XX");
 mNokeService.addNokeDevice(noke1);
 ```
+* To allow the `NokeDeviceManagerService` to discover all Noke devices, use the following method after the service has been bound:
+```java
+mNokeService.setAllowAllDevices(true);
+```
+
 **Note:** As of Android 8.0, Location Services **must** be enabled to scan for BLE devices.  If you're having trouble detecting devices, please ensure that your app has Location Permissions and that Location Services are turned on.
 
 ### Connecting to a Nokē Device ###
