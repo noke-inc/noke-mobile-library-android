@@ -21,12 +21,13 @@ import javax.net.ssl.SSLContext;
 /**
  * Created by Spencer on 2/7/18.
  * Demo Web Client for making requests to demo server and show API implementation
+ *
  */
 
 class DemoWebClient {
 
     private final static String TAG = DemoWebClient.class.getSimpleName();
-    private String serverUrl = "http://slacker.noke/";
+    private String serverUrl = "EXAMPLE_SERVER_URL_HERE";
     private DemoWebClientCallback mDemoWebClientCallback;
 
     private static String POST(String urlStr, JSONObject jsonObject)

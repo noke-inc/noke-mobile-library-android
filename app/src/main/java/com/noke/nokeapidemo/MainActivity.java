@@ -94,6 +94,11 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
             NokeDevice noke1 = new NokeDevice("TEST LOCK", "XX:XX:XX:XX:XX:XX");
             mNokeService.addNokeDevice(noke1);
 
+            /*
+            Sets the url to use for uploading responses from the lock to the API.  This is the only
+            case where the mobile app should be making requests to the Noke Core API directly.
+             */
+
             mNokeService.setUploadUrl("https://coreapi-sandbox.appspot.com/upload/");
 
             //Start bluetooth scanning
