@@ -119,7 +119,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
         @Override
         public void onNokeDiscovered(NokeDevice noke) {
             setStatusText("NOKE DISCOVERED: " + noke.getName());
-            //mNokeService.connectToNoke(noke);
+            mNokeService.connectToNoke(noke);
         }
 
         @Override
@@ -269,8 +269,8 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
         Log.d(TAG, "UNLOCK RECEIVED: "+ response);
         try{
             JSONObject obj = new JSONObject(response);
-            Boolean result = obj.getBoolean("result");
-            if(result){
+            String result = obj.getString("result");
+            if(result.equalsIgnoreCase("success")){
                 JSONObject data = obj.getJSONObject("data");
                 String commandString = data.getString("commands");
                 currentNoke.sendCommands(commandString);
