@@ -962,7 +962,7 @@ public class NokeDeviceManagerService extends Service {
                     for (int i = 0; i < globalUploadQueue.size(); i++) {
                         data.put(globalUploadQueue.get(i));
                     }
-                    jsonObject.accumulate("data", data);
+                    jsonObject.accumulate("logs", data);
                     Log.w(TAG, "UPLOAD DATA: " + jsonObject.toString());
                     NokeGoUploadCallback callback = new NokeGoUploadCallback(this);
                     try {
