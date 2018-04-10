@@ -940,7 +940,7 @@ public class NokeDeviceManagerService extends Service {
             sessionPacket.accumulate("session", session);
             sessionPacket.accumulate("responses", responses);
             sessionPacket.accumulate("mac", mac);
-            sessionPacket.accumulate("received_time", String.valueOf(unixTime));
+            sessionPacket.accumulate("received_time", unixTime);
 
             globalUploadQueue.add(sessionPacket);
 
