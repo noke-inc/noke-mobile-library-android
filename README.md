@@ -135,7 +135,7 @@ public void onNokeDiscovered(NokeDevice noke) {
 
 ### Unlocking a Nokē Device ###
 
-* Once the Nokē device has successfully connected, the unlock process can be initialized.  Unlock requires sending a web request to a server that has implemented the Noke Core API (insert link here).  While some aspects of the request can vary, an unlock request will always contain:
+* Once the Nokē device has successfully connected, the unlock process can be initialized.  Unlock requires sending a web request to a server that has implemented the [Noke Core API](https://github.com/noke-inc/noke-core-api-documentation).  While some aspects of the request can vary, an unlock request will always contain:
     - **Mac Address** (`noke.getMac()`) - The bluetooth MAC Address of the Nokē device
     - **Session** (`noke.getSession()`) - A unique session string used to encrypt commands to the lock
 * Both of these values can be read from the `noke` object *after* a successful connection
