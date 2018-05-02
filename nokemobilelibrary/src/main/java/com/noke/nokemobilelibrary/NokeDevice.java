@@ -201,6 +201,22 @@ public class NokeDevice {
         this.version = version;
     }
 
+    public String getOfflineUnlockCmd() {
+        return offlineUnlockCmd;
+    }
+
+    public void setOfflineUnlockCmd(String offlineUnlockCmd) {
+        this.offlineUnlockCmd = offlineUnlockCmd;
+    }
+
+    public String getOfflineKey() {
+        return offlineKey;
+    }
+
+    public void setOfflineKey(String offlineKey) {
+        this.offlineKey = offlineKey;
+    }
+
     @SuppressWarnings("unused")
     public String getSession() {
         return session;
@@ -251,7 +267,7 @@ public class NokeDevice {
      * Checks for a valid offline key and offline unlock and unlocks the lock without a network connection
      */
     public void offlineUnlock(){
-        if(this.offlineUnlockCmd.length() == 20 && this.offlineKey.length() == 20){
+        if(this.offlineUnlockCmd.length() == NokeDefines.UNLOCK_COMMAND_LENGTH && this.offlineKey.length() == NokeDefines.OFFLINE_KEY_LENGTH){
             byte unlockCommand[] = NokeDefines.hexToBytes(this.offlineUnlockCmd);
 
             byte header[] = new byte[4];
@@ -291,20 +307,31 @@ public class NokeDevice {
             }
 
             cmddata[15] = checksum;
-            NokeDefines.copyArray(commandpacket, 4, encryptPacket(preSessionKey, cmddata, this.Status), 0, 16);
+            System.arraycopy(encryptPacket(preSessionKey, cmddata, NokeDefines.hexToBytes(this.session)),0, commandpacket, 4, 16);
+
+            this.commands.add(NokeDefines.bytesToHex(commandpacket));
+            mService.writeRXCharacteristic(this);
         }
         else{
 
         }
     }
 
-    private byte[] encryptPacket(byte combinedkey[], byte data[], byte status[])
+    /**
+     * Used to encrypt command packets going to the lock
+     * @param combinedkey key for encrypting the commands
+     * @param data data to be encrypted
+     * @param session session read from the Noke device
+     * @return returns encrypted data packet
+     */
+    private byte[] encryptPacket(byte combinedkey[], byte data[], byte session[])
     {
         byte buffer[] = new byte[16];
         byte tmpkey[] = new byte[16];
-        NokeDefines.copyArray(tmpkey, combinedkey,16);
+        System.arraycopy(combinedkey,0,tmpkey,0,16);
+
         AesLibrary.aes_enc_dec(data, tmpkey, (byte) 1);
-        NokeDefines.copyArray(buffer,data,16);
+        System.arraycopy(data,0,buffer,0,16);
         return buffer;
     }
 }
