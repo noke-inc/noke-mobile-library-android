@@ -156,4 +156,12 @@ class NokeDefines {
         }
         return bytes;
     }
+
+    public static int toUnsigned(byte val) {
+        int out = val;
+        if (out < 0)
+            out = val & 0xFF;
+
+        return out;
+    }
 }
