@@ -499,19 +499,23 @@ public class NokeDeviceManagerService extends Service {
     private byte[] getManufacturerData(byte[] scanRecord){
         int i = 0;
         do {
-            int length = scanRecord[i];
-            i++;
-            byte type = scanRecord[i];
-            if (type == (byte) 0xFF) {
+            try {
+                int length = scanRecord[i];
                 i++;
-                byte[] manufacturerdata = new byte[length];
-                for (int j = 0; j < length; j++) {
-                    manufacturerdata[j] = scanRecord[i];
-                    i++;
+                byte type = scanRecord[i];
+                if (type == (byte) 0xFF) {
+                     i++;
+                    byte[] manufacturerdata = new byte[length];
+                    for (int j = 0; j < length; j++) {
+                        manufacturerdata[j] = scanRecord[i];
+                        i++;
+                    }
+                    return manufacturerdata;
+                } else {
+                    i = i + length;
                 }
-                return manufacturerdata;
-            } else {
-                i = i + length;
+            }catch (ArrayIndexOutOfBoundsException e){
+                return new byte[]{0,0,0,0,0};
             }
         }while(i < scanRecord.length);
         return new byte[]{0,0,0,0,0};
