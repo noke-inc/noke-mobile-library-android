@@ -59,9 +59,12 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
                     setStatusText("Email Address Required");
                 }
                 else{
+                    /*
                     DemoWebClient demoWebClient = new DemoWebClient();
                     demoWebClient.setWebClientCallback(MainActivity.this);
                     demoWebClient.requestUnlock(currentNoke, emailEditText.getText().toString());
+                     **/
+                    currentNoke.offlineUnlock();
                 }
             }
         });
@@ -91,7 +94,9 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
             mNokeService.registerNokeListener(mNokeServiceListener);
 
             //Add locks to device manager
-            NokeDevice noke1 = new NokeDevice("TEST LOCK", "XX:XX:XX:XX:XX:XX");
+            NokeDevice noke1 = new NokeDevice("New Lock", "XX:XX:XX:XX:XX:XX");
+            noke1.setOfflineKey("OFFLINE_KEY_HERE");
+            noke1.setOfflineUnlockCmd("UNLOCK_COMMAND_HERE");
             mNokeService.addNokeDevice(noke1);
 
             /*
@@ -99,7 +104,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
             case where the mobile app should be making requests to the Noke Core API directly.
              */
 
-            mNokeService.setUploadUrl("https://coreapi-sandbox.appspot.com/upload/");
+            mNokeService.setUploadUrl("UPLOAD URL HERE");
 
             //Start bluetooth scanning
             mNokeService.startScanningForNokeDevices();
@@ -269,8 +274,8 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
         Log.d(TAG, "UNLOCK RECEIVED: "+ response);
         try{
             JSONObject obj = new JSONObject(response);
-            String result = obj.getString("result");
-            if(result.equalsIgnoreCase("success")){
+            Boolean result = obj.getBoolean("result");
+            if(result){
                 JSONObject data = obj.getJSONObject("data");
                 String commandString = data.getString("commands");
                 currentNoke.sendCommands(commandString);

@@ -27,7 +27,7 @@ import javax.net.ssl.SSLContext;
 class DemoWebClient {
 
     private final static String TAG = DemoWebClient.class.getSimpleName();
-    private String serverUrl = "DEMO_URL_HERE";
+    private String serverUrl = "SERVER_URL_HERE";
     private DemoWebClientCallback mDemoWebClientCallback;
 
     private static String POST(String urlStr, JSONObject jsonObject)
