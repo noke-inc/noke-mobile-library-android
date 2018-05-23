@@ -58,6 +58,8 @@ public class NokeMobileError {
     public static final int ERROR_NETWORK_ENABLED               = 306;
     public static final int ERROR_BLUETOOTH_SCANNING            = 307;
     public static final int ERROR_MISSING_API_KEY               = 308;
+    public static final int ERROR_INVALID_OFFLINE_KEY           = 309;
+
 
 
 

@@ -313,7 +313,7 @@ public class NokeDevice {
             mService.writeRXCharacteristic(this);
         }
         else{
-
+            mService.getNokeListener().onError(this, NokeMobileError.ERROR_INVALID_OFFLINE_KEY, "Offline key/command is invalid.");
         }
     }
 
