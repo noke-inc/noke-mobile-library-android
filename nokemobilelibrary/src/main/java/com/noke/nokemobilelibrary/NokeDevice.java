@@ -2,7 +2,6 @@ package com.noke.nokemobilelibrary;
 
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
-import android.util.Log;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -158,8 +157,6 @@ public class NokeDevice {
         byte[] batteryArray = new byte[]{sessionIn[3], sessionIn[2]};
         String batteryString = NokeDefines.bytesToHex(batteryArray);
         battery = Integer.parseInt(batteryString, 16);
-        Log.w("Device", "Battery: " + battery);
-
         if(sessionIn.length>=20) {
             session = NokeDefines.bytesToHex(sessionIn);
         }

@@ -367,7 +367,6 @@ public class NokeDeviceManagerService extends Service {
      * Stops scanning for Noke devices
      */
     public void stopScanning(){
-        Log.d(TAG, "CANCEL SCANNING");
         stopLeScanning();
         backgroundScanning = false;}
 
@@ -748,7 +747,7 @@ public class NokeDeviceManagerService extends Service {
                     final Method refresh = gatt.getClass().getMethod("refresh");
                     if (refresh != null) {
                         final boolean success = (Boolean) refresh.invoke(gatt);
-                        Log.d(TAG, "REFRESHING RESULT: " + success);
+                        Log.d(TAG, "Refreshing Result: " + success);
                     }
                 } catch (Exception e) {
                     //Log.e(TAG, "REFRESH DEVICE CACHE");
@@ -790,7 +789,7 @@ public class NokeDeviceManagerService extends Service {
         public void onCharacteristicChanged(BluetoothGatt gatt,
                                             BluetoothGattCharacteristic characteristic) {
 
-            Log.w(TAG, "On Characteristic Changed: " + NokeDefines.bytesToHex(characteristic.getValue()));
+            Log.d(TAG, "On Characteristic Changed: " + NokeDefines.bytesToHex(characteristic.getValue()));
             NokeDevice noke = nokeDevices.get(gatt.getDevice().getAddress());
             byte[] data=characteristic.getValue();
             onReceivedDataFromLock(data, noke);
@@ -800,7 +799,7 @@ public class NokeDeviceManagerService extends Service {
         @Override
         public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status)
         {
-            Log.w(TAG, "On Descriptor Write: " + descriptor.toString() + " Status: " + status);
+            Log.d(TAG, "On Descriptor Write: " + descriptor.toString() + " Status: " + status);
             if(gatt.getDevice().getName().contains("NOKE_FW") || gatt.getDevice().getName().contains("NFOB_FW") || gatt.getDevice().getName().contains("N3P_FW"))
             {
                 NokeDevice noke = nokeDevices.get(gatt.getDevice().getAddress());
@@ -967,14 +966,12 @@ public class NokeDeviceManagerService extends Service {
                         data.put(globalUploadQueue.get(i));
                     }
                     jsonObject.accumulate("logs", data);
-                    Log.w(TAG, "UPLOAD DATA: " + jsonObject.toString());
                     NokeGoUploadCallback callback = new NokeGoUploadCallback(this);
                     try {
                         PackageManager pm = getApplicationContext().getPackageManager();
                         ApplicationInfo ai = pm.getApplicationInfo(getApplicationContext().getPackageName(), PackageManager.GET_META_DATA);
                         Bundle bundle = ai.metaData;
                         String nokeMobileApiKey = bundle.getString(NokeDefines.NOKE_MOBILE_API_KEY);
-                        Log.w(TAG, "API KEY: " + nokeMobileApiKey);
                         Nokego.uploadData(jsonObject.toString(), NokeDefines.uploadURL, callback, nokeMobileApiKey);
                     } catch (PackageManager.NameNotFoundException | NullPointerException e){
                         e.printStackTrace();
@@ -1065,7 +1062,7 @@ public class NokeDeviceManagerService extends Service {
                     nokeDevices.put(noke.getMac(), noke);
                 }
             } catch (final Exception e){
-                Log.e(TAG, "RETRIEVAL ERROR");
+                Log.e(TAG, "Retrieval Error");
             }
         }
     }

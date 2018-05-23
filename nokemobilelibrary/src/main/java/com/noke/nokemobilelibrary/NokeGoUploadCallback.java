@@ -38,7 +38,6 @@ public class NokeGoUploadCallback implements nokego.UploadCallback {
 
     @Override
     public void receivedUploadResponse(String s) {
-        Log.w("TAG", "RESPONSE: " + s);
         try{
             JSONObject obj = new JSONObject(s);
             int errorCode = obj.getInt("error_code");
@@ -51,7 +50,7 @@ public class NokeGoUploadCallback implements nokego.UploadCallback {
                 mService.getNokeListener().onError(null, errorCode, message);
             }
         } catch(JSONException e){
-            Log.e("DEVICE", "JSON EXCEPTION: " + e.toString());
+            Log.e("NokeGoUploadCallback", "JSON EXCEPTION: " + e.toString());
         }
     }
 }
