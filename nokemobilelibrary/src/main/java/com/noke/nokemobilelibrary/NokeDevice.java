@@ -307,7 +307,7 @@ public class NokeDevice {
             }
 
             cmddata[15] = checksum;
-            System.arraycopy(encryptPacket(preSessionKey, cmddata, NokeDefines.hexToBytes(this.session)),0, commandpacket, 4, 16);
+            System.arraycopy(encryptPacket(preSessionKey, cmddata),0, commandpacket, 4, 16);
 
             this.commands.add(NokeDefines.bytesToHex(commandpacket));
             mService.writeRXCharacteristic(this);
@@ -321,10 +321,9 @@ public class NokeDevice {
      * Used to encrypt command packets going to the lock
      * @param combinedkey key for encrypting the commands
      * @param data data to be encrypted
-     * @param session session read from the Noke device
      * @return returns encrypted data packet
      */
-    private byte[] encryptPacket(byte combinedkey[], byte data[], byte session[])
+    private byte[] encryptPacket(byte combinedkey[], byte data[])
     {
         byte buffer[] = new byte[16];
         byte tmpkey[] = new byte[16];
