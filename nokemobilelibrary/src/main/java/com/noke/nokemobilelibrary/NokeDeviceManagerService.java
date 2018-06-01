@@ -67,6 +67,7 @@ import nokego.Nokego;
  * Service for handling all bluetooth communication with the lock
  */
 
+@SuppressWarnings("unused")
 public class NokeDeviceManagerService extends Service {
 
     private final static String TAG = NokeDeviceManagerService.class.getSimpleName();
@@ -211,24 +212,39 @@ public class NokeDeviceManagerService extends Service {
         }
     }
 
+    /**
+     * Removes noke device from the device array.
+     * @param noke The noke device to remove
+     */
     public void removeNokeDevice(NokeDevice noke){
         if(nokeDevices != null){
             nokeDevices.remove(noke.getMac());
         }
     }
 
+    /**
+     * Removes noke device from the device array.  These devices can be discovered and connected to by the service
+     * @param mac The mac address of noke device to remove
+     */
     public void removeNokeDevice(String mac){
         if(nokeDevices != null){
             nokeDevices.remove(mac);
         }
     }
 
+    /**
+     * Removes all devices from the noke device array
+     */
     public void removeAllNoke(){
         if(nokeDevices != null){
             nokeDevices.clear();
         }
     }
 
+    /**
+     * Returns a count of noke devices that have been added to the device manager
+     * @return a count of devices in the device manager
+     */
     public int getNokeCount(){
         if(nokeDevices != null){
             return nokeDevices.size();
@@ -237,11 +253,15 @@ public class NokeDeviceManagerService extends Service {
         }
     }
 
+    /**
+     * Returns an array of current noke devices that have been added to the device manager
+     * @return an array of noke devices
+     */
     public ArrayList<NokeDevice> getAllNoke(){
         if(nokeDevices != null){
-            return new ArrayList<NokeDevice>(nokeDevices.values());
+            return new ArrayList<>(nokeDevices.values());
         }else{
-            return new ArrayList<NokeDevice>();
+            return new ArrayList<>();
         }
     }
 
