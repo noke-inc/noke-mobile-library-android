@@ -211,6 +211,40 @@ public class NokeDeviceManagerService extends Service {
         }
     }
 
+    public void removeNokeDevice(NokeDevice noke){
+        if(nokeDevices != null){
+            nokeDevices.remove(noke.getMac());
+        }
+    }
+
+    public void removeNokeDevice(String mac){
+        if(nokeDevices != null){
+            nokeDevices.remove(mac);
+        }
+    }
+
+    public void removeAllNoke(){
+        if(nokeDevices != null){
+            nokeDevices.clear();
+        }
+    }
+
+    public int getNokeCount(){
+        if(nokeDevices != null){
+            return nokeDevices.size();
+        }else{
+            return 0;
+        }
+    }
+
+    public ArrayList<NokeDevice> getAllNoke(){
+        if(nokeDevices != null){
+            return new ArrayList<NokeDevice>(nokeDevices.values());
+        }else{
+            return new ArrayList<NokeDevice>();
+        }
+    }
+
     @Override
     public void onDestroy(){
         super.onDestroy();
