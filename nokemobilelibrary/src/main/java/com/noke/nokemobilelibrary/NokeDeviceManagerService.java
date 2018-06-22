@@ -46,7 +46,6 @@ import java.util.Set;
 
 import com.google.gson.Gson;
 
-import nokego.Nokego;
 
 
 /************************************************************************************************************************************************
@@ -504,6 +503,7 @@ public class NokeDeviceManagerService extends Service {
     /**
      * Sets mAllowDevices boolean
      */
+    @SuppressWarnings("SameParameterValue")
     public void setAllowAllDevices(boolean allow){
         mAllowAllDevices = allow;
     }
@@ -1035,7 +1035,6 @@ public class NokeDeviceManagerService extends Service {
                         data.put(globalUploadQueue.get(i));
                     }
                     jsonObject.accumulate("logs", data);
-                    NokeGoUploadCallback callback = new NokeGoUploadCallback(this);
                     try {
                         PackageManager pm = getApplicationContext().getPackageManager();
                         ApplicationInfo ai = pm.getApplicationInfo(getApplicationContext().getPackageName(), PackageManager.GET_META_DATA);
