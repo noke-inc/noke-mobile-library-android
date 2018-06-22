@@ -32,6 +32,10 @@ class NokeDefines {
      */
     static final int BLUETOOTH_DEFAULT_SCAN_TIME_BACKGROUND         = 2000;
     /**
+     * Default scan off time for background scanning
+     */
+    static final int BLUETOOTH_DEFAULT_SCAN_DURATION                = 8000;
+    /**
      * Identifer string for Noke hardware devices
      */
     static final String NOKE_DEVICE_IDENTIFER_STRING                = "NOKE";

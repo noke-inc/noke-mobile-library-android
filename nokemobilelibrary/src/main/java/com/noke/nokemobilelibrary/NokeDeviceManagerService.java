@@ -140,6 +140,10 @@ public class NokeDeviceManagerService extends Service {
      */
     private int bluetoothDelayBackgroundDefault;
     /**
+     * Duration that bluetooth scans before shutting off and restarting
+     */
+    private int bluetoothScanDuration;
+    /**
      * A LinkedHashMap that stores a list of NokeDevices linked my MAC address.
      * Only devices that are in this array will be discovered when scanning
      */
@@ -175,6 +179,7 @@ public class NokeDeviceManagerService extends Service {
         }
         setBluetoothDelayDefault(NokeDefines.BLUETOOTH_DEFAULT_SCAN_TIME);
         setBluetoothDelayBackgroundDefault(NokeDefines.BLUETOOTH_DEFAULT_SCAN_TIME_BACKGROUND);
+        setBluetoothScanDuration(NokeDefines.BLUETOOTH_DEFAULT_SCAN_DURATION);
     }
 
     /**
@@ -371,7 +376,6 @@ public class NokeDeviceManagerService extends Service {
     private void turnOnBLEScan() {
         startLeScanning();
         final Handler refreshScan = new Handler(Looper.getMainLooper());
-        final int scanDelay = 4000;
         refreshScan.postDelayed(new Runnable(){
             @Override
             public void run() {
@@ -383,7 +387,7 @@ public class NokeDeviceManagerService extends Service {
                 }
 
             }
-        }, scanDelay);
+        }, bluetoothScanDuration);
     }
 
     /**
@@ -400,6 +404,14 @@ public class NokeDeviceManagerService extends Service {
      */
     public void setBluetoothDelayBackgroundDefault(int delay){
         bluetoothDelayBackgroundDefault = delay;
+    }
+
+    /**
+     * Sets the duration of scanning in the background.  Currently the default is 8000 milliseconds
+     * @param duration time in milliseconds
+     */
+    public void setBluetoothScanDuration(int duration){
+        bluetoothScanDuration = duration;
     }
 
     /**
