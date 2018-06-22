@@ -170,6 +170,9 @@ public class NokeDeviceManagerService extends Service {
         registerReceiver(bluetoothBroadcastReceiver, btFilter);
         mReceiverRegistered = true;
         mAllowAllDevices = false;
+        if(nokeDevices == null){
+            nokeDevices = new LinkedHashMap<>();
+        }
         setBluetoothDelayDefault(NokeDefines.BLUETOOTH_DEFAULT_SCAN_TIME);
         setBluetoothDelayBackgroundDefault(NokeDefines.BLUETOOTH_DEFAULT_SCAN_TIME_BACKGROUND);
     }
