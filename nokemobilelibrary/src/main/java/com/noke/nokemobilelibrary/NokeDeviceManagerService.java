@@ -604,7 +604,7 @@ public class NokeDeviceManagerService extends Service {
                     noke.bluetoothDevice = device;
                 }
 
-                if (noke.connectionState == NokeDefines.NOKE_STATE_DISCONNECTED) {
+                if (noke.connectionState == NokeDefines.NOKE_STATE_DISCONNECTED || noke.connectionState == NokeDefines.NOKE_STATE_DISCOVERED) {
                     mBluetoothAdapter.cancelDiscovery();
                     noke.connectionState = NokeDefines.NOKE_STATE_CONNECTING;
 
@@ -634,7 +634,7 @@ public class NokeDeviceManagerService extends Service {
                     if (noke.bluetoothDevice == null) {
                         noke.bluetoothDevice = device;
                     }
-                    if (noke.connectionState == NokeDefines.NOKE_STATE_DISCONNECTED) {
+                    if (noke.connectionState == NokeDefines.NOKE_STATE_DISCONNECTED || noke.connectionState == NokeDefines.NOKE_STATE_DISCOVERED) {
                         mBluetoothAdapter.cancelDiscovery();
                         noke.connectionState = NokeDefines.NOKE_STATE_CONNECTING;
                         if (noke.gatt == null) {
