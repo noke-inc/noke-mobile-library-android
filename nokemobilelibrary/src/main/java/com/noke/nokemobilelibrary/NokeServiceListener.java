@@ -32,6 +32,8 @@ public interface NokeServiceListener  {
 
     void onNokeDisconnected(NokeDevice noke);
 
+    void onDataUploaded(int result, String message);
+
     void onBluetoothStatusChanged(int bluetoothStatus);
 
     void onError(NokeDevice noke, int error, String message);

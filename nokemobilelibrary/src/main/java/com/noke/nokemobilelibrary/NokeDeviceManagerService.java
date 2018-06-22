@@ -1041,7 +1041,7 @@ public class NokeDeviceManagerService extends Service {
                         ApplicationInfo ai = pm.getApplicationInfo(getApplicationContext().getPackageName(), PackageManager.GET_META_DATA);
                         Bundle bundle = ai.metaData;
                         String nokeMobileApiKey = bundle.getString(NokeDefines.NOKE_MOBILE_API_KEY);
-                        Nokego.uploadData(jsonObject.toString(), NokeDefines.uploadURL, callback, nokeMobileApiKey);
+                        this.uploadDataCallback(NokeMobileApiClient.POST(NokeDefines.uploadURL, jsonObject.toString(), nokeMobileApiKey));
                     } catch (PackageManager.NameNotFoundException | NullPointerException e){
                         e.printStackTrace();
                         mGlobalNokeListener.onError(null, NokeMobileError.ERROR_MISSING_API_KEY, "No API Key found. Have you set it in your Android Manifest?");
@@ -1328,4 +1328,20 @@ public class NokeDeviceManagerService extends Service {
     public void setUploadUrl(String uploadUrl){
         NokeDefines.uploadURL = uploadUrl;
     }
+
+    private void uploadDataCallback(String s) {
+        try{
+            JSONObject obj = new JSONObject(s);
+            int errorCode = obj.getInt("error_code");
+            String message = obj.getString("message");
+
+            if(errorCode == NokeMobileError.SUCCESS){
+                this.globalUploadQueue.clear();
+            }
+            this.getNokeListener().onDataUploaded(errorCode, message);
+        } catch(JSONException e){
+            this.getNokeListener().onDataUploaded(NokeMobileError.ERROR_JSON_UPLOAD, e.toString());
+        }
+    }
+
 }
