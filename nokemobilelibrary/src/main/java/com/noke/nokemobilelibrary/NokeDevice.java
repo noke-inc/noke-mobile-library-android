@@ -31,7 +31,7 @@ public class NokeDevice {
     /**
      * Time Interval of the most recent time the device was discovered
      */
-    private double lastSeen;
+    private long lastSeen;
 
     /**
      * Name of the Noke device (strictly cosmetic)
@@ -104,10 +104,11 @@ public class NokeDevice {
 
     /**
      * Initializes Noke Device
+     *
      * @param name name of the device
-     * @param mac MAC address of the device
+     * @param mac  MAC address of the device
      */
-    public NokeDevice(String name, String mac){
+    public NokeDevice(String name, String mac) {
 
         this.name = name;
         this.mac = mac;
@@ -118,36 +119,33 @@ public class NokeDevice {
 
     /**
      * Parses through the broadcast data and pulls out the version
+     *
      * @param broadcastBytes broadcast data from the lock
-     * @param deviceName bluetooth device name of the lock. This contains the hardware version
+     * @param deviceName     bluetooth device name of the lock. This contains the hardware version
      * @return version string. @see #version
      */
     @SuppressWarnings("WeakerAccess")
     public String getVersion(byte[] broadcastBytes, String deviceName) {
         String version = "";
-        if(deviceName != null) {
-            if(deviceName.contains(NokeDefines.NOKE_DEVICE_IDENTIFER_STRING)) {
-                if(broadcastBytes != null && broadcastBytes.length > 0) {
+        if (deviceName != null) {
+            if (deviceName.contains(NokeDefines.NOKE_DEVICE_IDENTIFER_STRING)) {
+                if (broadcastBytes != null && broadcastBytes.length > 0) {
                     int majorVersion = broadcastBytes[1];
                     int minorVersion = broadcastBytes[2];
-                    String hardwareVersion = deviceName.substring(4,6);
-                    return hardwareVersion + "-"+majorVersion+"."+minorVersion;
-                }
-                else {
-                    if(deviceName.contains("2P")) {
+                    String hardwareVersion = deviceName.substring(4, 6);
+                    return hardwareVersion + "-" + majorVersion + "." + minorVersion;
+                } else {
+                    if (deviceName.contains("2P")) {
                         return "P2.0";
-                    }
-                    else {
-                        if(deviceName.contains("FOB")) {
+                    } else {
+                        if (deviceName.contains("FOB")) {
                             return "1F-1.0";
-                        }
-                        else {
+                        } else {
                             return "1P-1.0";
                         }
                     }
                 }
-            }
-            else {
+            } else {
                 return "NOT A NOKE DEVICE";
             }
         }
@@ -156,13 +154,14 @@ public class NokeDevice {
 
     /**
      * Sets the session of the lock after connecting.  Session is only valid for the duration that the lock is connected
+     *
      * @param sessionIn 20 byte array of the session read from the session characteristic
      */
     void setSession(byte[] sessionIn) {
         byte[] batteryArray = new byte[]{sessionIn[3], sessionIn[2]};
         String batteryString = NokeDefines.bytesToHex(batteryArray);
         battery = Integer.parseInt(batteryString, 16);
-        if(sessionIn.length>=20) {
+        if (sessionIn.length >= 20) {
             session = NokeDefines.bytesToHex(sessionIn);
         }
     }
@@ -219,11 +218,11 @@ public class NokeDevice {
         this.offlineKey = offlineKey;
     }
 
-    public double getLastSeen() {
+    public long getLastSeen() {
         return lastSeen;
     }
 
-    public void setLastSeen(double lastSeen) {
+    public void setLastSeen(long lastSeen) {
         this.lastSeen = lastSeen;
     }
 
@@ -260,12 +259,13 @@ public class NokeDevice {
 
     /**
      * Sends a + delimited string of commands to the lock
+     *
      * @param commands + delimited string returned from the unlock request
      */
-    public void sendCommands(String commands){
+    public void sendCommands(String commands) {
         List<String> commandArr = Arrays.asList(commands.split("\\+"));
         this.commands.addAll(commandArr);
-        if(this.commands.size() > 1){
+        if (this.commands.size() > 1) {
             this.connectionState = NokeDefines.NOKE_STATE_SYNCING;
             mService.getNokeListener().onNokeSyncing(this);
         }
@@ -273,11 +273,10 @@ public class NokeDevice {
     }
 
     /**
-     *
      * Checks for a valid offline key and offline unlock and unlocks the lock without a network connection
      */
-    public void offlineUnlock(){
-        if(this.offlineUnlockCmd.length() == NokeDefines.UNLOCK_COMMAND_LENGTH && this.offlineKey.length() == NokeDefines.OFFLINE_KEY_LENGTH){
+    public void offlineUnlock() {
+        if (this.offlineUnlockCmd.length() == NokeDefines.UNLOCK_COMMAND_LENGTH && this.offlineKey.length() == NokeDefines.OFFLINE_KEY_LENGTH) {
             byte unlockCommand[] = NokeDefines.hexToBytes(this.offlineUnlockCmd);
 
             byte header[] = new byte[4];
@@ -292,7 +291,7 @@ public class NokeDevice {
             byte cmddata[] = new byte[16];
             System.arraycopy(unlockCommand, 4, cmddata, 0, 16);
 
-            long unixTime = System.currentTimeMillis()/1000L;
+            long unixTime = System.currentTimeMillis() / 1000L;
 
             ByteBuffer buffer = ByteBuffer.allocate(Long.SIZE);
             buffer.putLong(unixTime);
@@ -317,30 +316,29 @@ public class NokeDevice {
             }
 
             cmddata[15] = checksum;
-            System.arraycopy(encryptPacket(preSessionKey, cmddata),0, commandpacket, 4, 16);
+            System.arraycopy(encryptPacket(preSessionKey, cmddata), 0, commandpacket, 4, 16);
 
             this.commands.add(NokeDefines.bytesToHex(commandpacket));
             mService.writeRXCharacteristic(this);
-        }
-        else{
+        } else {
             mService.getNokeListener().onError(this, NokeMobileError.ERROR_INVALID_OFFLINE_KEY, "Offline key/command is invalid.");
         }
     }
 
     /**
      * Used to encrypt command packets going to the lock
+     *
      * @param combinedkey key for encrypting the commands
-     * @param data data to be encrypted
+     * @param data        data to be encrypted
      * @return returns encrypted data packet
      */
-    private byte[] encryptPacket(byte combinedkey[], byte data[])
-    {
+    private byte[] encryptPacket(byte combinedkey[], byte data[]) {
         byte buffer[] = new byte[16];
         byte tmpkey[] = new byte[16];
-        System.arraycopy(combinedkey,0,tmpkey,0,16);
+        System.arraycopy(combinedkey, 0, tmpkey, 0, 16);
 
         AesLibrary.aes_enc_dec(data, tmpkey, (byte) 1);
-        System.arraycopy(data,0,buffer,0,16);
+        System.arraycopy(data, 0, buffer, 0, 16);
         return buffer;
     }
 }
