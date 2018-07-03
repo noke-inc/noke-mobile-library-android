@@ -33,19 +33,19 @@ import android.os.Looper;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
 
+import com.google.gson.Gson;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
-
-import com.google.gson.Gson;
-
 
 
 /************************************************************************************************************************************************
@@ -74,7 +74,7 @@ public class NokeDeviceManagerService extends Service {
     /**
      * High level manager used to obtain an instance of BluetoothAdapter and to conduct overall
      * Bluetooth Managment
-      */
+     */
     private BluetoothManager mBluetoothManager;
     /**
      * Represents the local device Bluetooth adapter.  Used for performing fundamental Bluetooth tasks, such as
@@ -114,18 +114,17 @@ public class NokeDeviceManagerService extends Service {
     private boolean mAllowAllDevices;
 
 
-
     /**
      * Listener for Noke device events.  Triggered on various events including:
      * <ul>
-     *     <li>Noke device discovery</li>
-     *     <li>Noke device begin connection</li>
-     *     <li>Noke device connected</li>
-     *     <li>Noke device syncing</li>
-     *     <li>Noke device unlocked</li>
-     *     <li>Noke device disconnected</li>
+     * <li>Noke device discovery</li>
+     * <li>Noke device begin connection</li>
+     * <li>Noke device connected</li>
+     * <li>Noke device syncing</li>
+     * <li>Noke device unlocked</li>
+     * <li>Noke device disconnected</li>
      * </ul>
-     *
+     * <p>
      * Also used for error handling
      */
     private NokeServiceListener mGlobalNokeListener;
@@ -151,8 +150,8 @@ public class NokeDeviceManagerService extends Service {
     /**
      * Class for binding service to activity
      */
-    public class LocalBinder extends Binder{
-        public NokeDeviceManagerService getService(){
+    public class LocalBinder extends Binder {
+        public NokeDeviceManagerService getService() {
             return NokeDeviceManagerService.this;
         }
     }
@@ -161,6 +160,7 @@ public class NokeDeviceManagerService extends Service {
      * Read more here: <a href="https://developer.android.com/reference/android/os/IBinder.html">https://developer.android.com/reference/android/os/IBinder.html</a>
      */
     private final IBinder mBinder = new LocalBinder();
+
     @Override
     public IBinder onBind(Intent intent) {
         return mBinder;
@@ -173,7 +173,7 @@ public class NokeDeviceManagerService extends Service {
         registerReceiver(bluetoothBroadcastReceiver, btFilter);
         mReceiverRegistered = true;
         mAllowAllDevices = false;
-        if(nokeDevices == null){
+        if (nokeDevices == null) {
             nokeDevices = new LinkedHashMap<>();
         }
         setBluetoothDelayDefault(NokeDefines.BLUETOOTH_DEFAULT_SCAN_TIME);
@@ -183,37 +183,40 @@ public class NokeDeviceManagerService extends Service {
 
     /**
      * Sets the global listener for the service
+     *
      * @param listener the listener implemented in the activity the registered the service
      */
-    public void registerNokeListener(NokeServiceListener listener){
+    public void registerNokeListener(NokeServiceListener listener) {
         this.mGlobalNokeListener = listener;
     }
 
     /**
      * Used for getting the Global Noke Listener
+     *
      * @return the global listener
      */
-    NokeServiceListener getNokeListener(){
+    NokeServiceListener getNokeListener() {
         return mGlobalNokeListener;
     }
 
     @Override
-    public int onStartCommand(Intent intent, int flags, int startId){
+    public int onStartCommand(Intent intent, int flags, int startId) {
         super.onStartCommand(intent, flags, startId);
         return START_STICKY;
     }
 
     /**
      * Adds noke device to the device array.  These devices can be discovered and connected to by the service
+     *
      * @param noke The noke device to add
      */
-    public void addNokeDevice(NokeDevice noke){
-        if(nokeDevices == null){
+    public void addNokeDevice(NokeDevice noke) {
+        if (nokeDevices == null) {
             nokeDevices = new LinkedHashMap<>();
         }
 
         NokeDevice newNoke = nokeDevices.get(noke.getMac());
-        if(newNoke == null){
+        if (newNoke == null) {
             noke.mService = this;
             nokeDevices.put(noke.getMac(), noke);
         }
@@ -221,20 +224,22 @@ public class NokeDeviceManagerService extends Service {
 
     /**
      * Removes noke device from the device array.
+     *
      * @param noke The noke device to remove
      */
-    public void removeNokeDevice(NokeDevice noke){
-        if(nokeDevices != null){
+    public void removeNokeDevice(NokeDevice noke) {
+        if (nokeDevices != null) {
             nokeDevices.remove(noke.getMac());
         }
     }
 
     /**
      * Removes noke device from the device array.  These devices can be discovered and connected to by the service
+     *
      * @param mac The mac address of noke device to remove
      */
-    public void removeNokeDevice(String mac){
-        if(nokeDevices != null){
+    public void removeNokeDevice(String mac) {
+        if (nokeDevices != null) {
             nokeDevices.remove(mac);
         }
     }
@@ -242,40 +247,42 @@ public class NokeDeviceManagerService extends Service {
     /**
      * Removes all devices from the noke device array
      */
-    public void removeAllNoke(){
-        if(nokeDevices != null){
+    public void removeAllNoke() {
+        if (nokeDevices != null) {
             nokeDevices.clear();
         }
     }
 
     /**
      * Returns a count of noke devices that have been added to the device manager
+     *
      * @return a count of devices in the device manager
      */
-    public int getNokeCount(){
-        if(nokeDevices != null){
+    public int getNokeCount() {
+        if (nokeDevices != null) {
             return nokeDevices.size();
-        }else{
+        } else {
             return 0;
         }
     }
 
     /**
      * Returns an array of current noke devices that have been added to the device manager
+     *
      * @return an array of noke devices
      */
-    public ArrayList<NokeDevice> getAllNoke(){
-        if(nokeDevices != null){
+    public ArrayList<NokeDevice> getAllNoke() {
+        if (nokeDevices != null) {
             return new ArrayList<>(nokeDevices.values());
-        }else{
+        } else {
             return new ArrayList<>();
         }
     }
 
     @Override
-    public void onDestroy(){
+    public void onDestroy() {
         super.onDestroy();
-        if(mReceiverRegistered){
+        if (mReceiverRegistered) {
             unregisterReceiver(bluetoothBroadcastReceiver);
             mReceiverRegistered = false;
         }
@@ -284,12 +291,13 @@ public class NokeDeviceManagerService extends Service {
 
     /**
      * Initializes the bluetooth manager and adapter used for interacting with Noke devices
+     *
      * @return boolean after initialization
      */
-    public boolean initialize(){
-        if(mBluetoothManager == null){
+    public boolean initialize() {
+        if (mBluetoothManager == null) {
             mBluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
-            if(mBluetoothManager == null){
+            if (mBluetoothManager == null) {
                 return false;
             }
         }
@@ -301,7 +309,7 @@ public class NokeDeviceManagerService extends Service {
     /**
      * Begins scanning for Noke devices that have been added to the device array
      */
-    public void startScanningForNokeDevices(){
+    public void startScanningForNokeDevices() {
         try {
             LocationManager lm = (LocationManager) getApplicationContext().getSystemService(Context.LOCATION_SERVICE);
             boolean gps_enabled = false;
@@ -344,7 +352,7 @@ public class NokeDeviceManagerService extends Service {
                     initiateBackgroundBLEScan();
                 }
             }
-        }catch (NullPointerException e) {
+        } catch (NullPointerException e) {
             mGlobalNokeListener.onError(null, NokeMobileError.ERROR_BLUETOOTH_SCANNING, "Bluetooth scanning is not supported");
         }
     }
@@ -358,7 +366,7 @@ public class NokeDeviceManagerService extends Service {
      * Initiates BLE scan
      */
     private void initiateBackgroundBLEScan() {
-        if(!backgroundScanning) {
+        if (!backgroundScanning) {
             backgroundScanning = true;
             turnOnBLEScan();
         }
@@ -375,13 +383,13 @@ public class NokeDeviceManagerService extends Service {
     private void turnOnBLEScan() {
         startLeScanning();
         final Handler refreshScan = new Handler(Looper.getMainLooper());
-        refreshScan.postDelayed(new Runnable(){
+        refreshScan.postDelayed(new Runnable() {
             @Override
             public void run() {
                 turnOffBLEScan();
-                if(isServiceRunningInForeground()){
+                if (isServiceRunningInForeground()) {
                     bluetoothDelay = bluetoothDelayDefault;
-                }else{
+                } else {
                     bluetoothDelay = bluetoothDelayBackgroundDefault;
                 }
 
@@ -391,34 +399,37 @@ public class NokeDeviceManagerService extends Service {
 
     /**
      * Sets the default delay of scanning in the foreground.  Currently the default is 10 milliseconds
+     *
      * @param delay time in milliseconds
      */
-    public void setBluetoothDelayDefault(int delay){
+    public void setBluetoothDelayDefault(int delay) {
         bluetoothDelayDefault = delay;
     }
 
     /**
      * Sets the default delay of scanning in the background.  Currently the default is 10 milliseconds
+     *
      * @param delay time in milliseconds
      */
-    public void setBluetoothDelayBackgroundDefault(int delay){
+    public void setBluetoothDelayBackgroundDefault(int delay) {
         bluetoothDelayBackgroundDefault = delay;
     }
 
     /**
      * Sets the duration of scanning in the background.  Currently the default is 8000 milliseconds
+     *
      * @param duration time in milliseconds
      */
-    public void setBluetoothScanDuration(int duration){
+    public void setBluetoothScanDuration(int duration) {
         bluetoothScanDuration = duration;
     }
 
     /**
      * Stops background BLE Scan
      */
-    private void turnOffBLEScan(){
+    private void turnOffBLEScan() {
         stopLeScanning();
-        if(backgroundScanning){
+        if (backgroundScanning) {
             final Handler refreshScan = new Handler();
             refreshScan.postDelayed(new Runnable() {
                 @Override
@@ -434,17 +445,17 @@ public class NokeDeviceManagerService extends Service {
     /**
      * Stops scanning for Noke devices
      */
-    public void stopScanning(){
+    public void stopScanning() {
         stopLeScanning();
-        backgroundScanning = false;}
+        backgroundScanning = false;
+    }
 
     /**
      * Starts BLE scanning using the Bluetooth Adapter.
      */
     @SuppressWarnings("deprecation")
-    private void startLeScanning()
-    {
-        if(!mScanning) {
+    private void startLeScanning() {
+        if (!mScanning) {
             mScanning = true;
             if (mBluetoothAdapter != null && mBluetoothAdapter.isEnabled()) {
                 if (Build.VERSION.SDK_INT >= 100) {
@@ -456,9 +467,7 @@ public class NokeDeviceManagerService extends Service {
                     initOldBluetoothCallback();
                     mBluetoothAdapter.startLeScan(mOldBluetoothScanCallback);
                 }
-            }
-            else
-            {
+            } else {
                 mGlobalNokeListener.onError(null, NokeMobileError.ERROR_BLUETOOTH_SCANNING, "Bluetooth scanning is not supported");
             }
         }
@@ -468,8 +477,7 @@ public class NokeDeviceManagerService extends Service {
      * Stops BLE scanning using the bluetooth adapter.
      */
     @SuppressWarnings("deprecation")
-    private void stopLeScanning()
-    {
+    private void stopLeScanning() {
         mScanning = false;
         if (mBluetoothAdapter != null) {
             if (mBluetoothAdapter.isEnabled()) {
@@ -489,12 +497,13 @@ public class NokeDeviceManagerService extends Service {
      * Initializes Bluetooth Scanning Callback for Lollipop and higher OS
      */
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-    private void initNewBluetoothCallback()
-    {
+    private void initNewBluetoothCallback() {
         mNewBluetoothScanCallback = new ScanCallback() {
             @Override
             public void onScanResult(int callbackType, ScanResult result) {
                 super.onScanResult(callbackType, result);
+
+//                noke.setLastSeen(new Date().getTime());
                 //TODO NEW BLUETOOTH SCAN CALLBACK
             }
         };
@@ -504,7 +513,7 @@ public class NokeDeviceManagerService extends Service {
      * Sets mAllowDevices boolean
      */
     @SuppressWarnings("SameParameterValue")
-    public void setAllowAllDevices(boolean allow){
+    public void setAllowAllDevices(boolean allow) {
         mAllowAllDevices = allow;
     }
 
@@ -512,21 +521,16 @@ public class NokeDeviceManagerService extends Service {
     /**
      * Initializes Bluetooth Scanning Callback for KitKat OS
      */
-    private void initOldBluetoothCallback()
-    {
-        mOldBluetoothScanCallback = new BluetoothAdapter.LeScanCallback()
-        {
+    private void initOldBluetoothCallback() {
+        mOldBluetoothScanCallback = new BluetoothAdapter.LeScanCallback() {
             @Override
-            public void onLeScan(final BluetoothDevice bluetoothDevice, final int rssi, byte[] scanRecord)
-            {
-                if(bluetoothDevice.getName() != null)
-                {
-                    if (bluetoothDevice.getName().contains(NokeDefines.NOKE_DEVICE_IDENTIFER_STRING))
-                    {
+            public void onLeScan(final BluetoothDevice bluetoothDevice, final int rssi, byte[] scanRecord) {
+                if (bluetoothDevice.getName() != null) {
+                    if (bluetoothDevice.getName().contains(NokeDefines.NOKE_DEVICE_IDENTIFER_STRING)) {
                         NokeDevice noke = new NokeDevice(bluetoothDevice.getName(), bluetoothDevice.getAddress());
                         noke.bluetoothDevice = bluetoothDevice;
-
-                        if(nokeDevices.get(noke.getMac()) != null || mAllowAllDevices){
+                        noke.setLastSeen(new Date().getTime());
+                        if (nokeDevices.get(noke.getMac()) != null || mAllowAllDevices) {
                             byte[] broadcastData;
                             String nameVersion;
 
@@ -543,7 +547,7 @@ public class NokeDeviceManagerService extends Service {
                                 noke.setVersion(version);
                                 noke.bluetoothDevice = bluetoothDevice;
 
-                                if(nokeDevices.get(noke.getMac()) == null){
+                                if (nokeDevices.get(noke.getMac()) == null) {
                                     nokeDevices.put(noke.getMac(), noke);
                                 }
 
@@ -561,10 +565,11 @@ public class NokeDeviceManagerService extends Service {
 
     /**
      * Parses through the manufacturer data
+     *
      * @param scanRecord - broadcast data from the lock
      * @return - returns formatted manufacturer data
      */
-    private byte[] getManufacturerData(byte[] scanRecord){
+    private byte[] getManufacturerData(byte[] scanRecord) {
         int i = 0;
         do {
             try {
@@ -572,7 +577,7 @@ public class NokeDeviceManagerService extends Service {
                 i++;
                 byte type = scanRecord[i];
                 if (type == (byte) 0xFF) {
-                     i++;
+                    i++;
                     byte[] manufacturerdata = new byte[length];
                     for (int j = 0; j < length; j++) {
                         manufacturerdata[j] = scanRecord[i];
@@ -582,30 +587,31 @@ public class NokeDeviceManagerService extends Service {
                 } else {
                     i = i + length;
                 }
-            }catch (ArrayIndexOutOfBoundsException e){
-                return new byte[]{0,0,0,0,0};
+            } catch (ArrayIndexOutOfBoundsException e) {
+                return new byte[]{0, 0, 0, 0, 0};
             }
-        }while(i < scanRecord.length);
-        return new byte[]{0,0,0,0,0};
+        } while (i < scanRecord.length);
+        return new byte[]{0, 0, 0, 0, 0};
     }
 
     /**
      * Starts connection to Noke device
+     *
      * @param noke - The device to which to connect
      */
-    public void connectToNoke(NokeDevice noke){
+    public void connectToNoke(NokeDevice noke) {
         connectToDevice(noke.bluetoothDevice, noke.rssi);
     }
 
     /**
      * Attempts to match MAC address to device in nokeDevices list.  If device is found, stop scanning and
      * call connectToGatt to start service discovery and connect to device.
+     *
      * @param device Bluetooth device that was obtained from the scanner callback
-     * @param rssi RSSI value obtained from the scanner.  Can be used for adjusting or checking connecting range.
+     * @param rssi   RSSI value obtained from the scanner.  Can be used for adjusting or checking connecting range.
      */
-    private void connectToDevice(BluetoothDevice device, int rssi)
-    {
-        if(device != null) {
+    private void connectToDevice(BluetoothDevice device, int rssi) {
+        if (device != null) {
             NokeDevice noke = nokeDevices.get(device.getAddress());
             if (noke != null) {
                 noke.mService = this;
@@ -677,15 +683,13 @@ public class NokeDeviceManagerService extends Service {
      * {@code BluetoothGattCallback#onConnectionStateChange(android.bluetooth.BluetoothGatt, int, int)}
      * callback.
      */
-    private boolean connectToGatt(final NokeDevice noke)
-    {
+    private boolean connectToGatt(final NokeDevice noke) {
         if (mBluetoothAdapter == null || noke == null) {
             mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_BLUETOOTH_DISABLED, "Bluetooth is disabled");
             return false;
         }
 
-        if(noke.bluetoothDevice == null)
-        {
+        if (noke.bluetoothDevice == null) {
             mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
             return false;
         }
@@ -694,10 +698,9 @@ public class NokeDeviceManagerService extends Service {
         handler.post(new Runnable() {
             @Override
             public void run() {
-                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     noke.gatt = noke.bluetoothDevice.connectGatt(NokeDeviceManagerService.this, false, mGattCallback, BluetoothDevice.TRANSPORT_LE);
-                }
-                else {
+                } else {
                     noke.gatt = noke.bluetoothDevice.connectGatt(NokeDeviceManagerService.this, false, mGattCallback);
                 }
             }
@@ -714,8 +717,8 @@ public class NokeDeviceManagerService extends Service {
         @Override
         public void onConnectionStateChange(final BluetoothGatt gatt, int status, int newState) {
             final NokeDevice noke = nokeDevices.get(gatt.getDevice().getAddress());
-            if(status == NokeDefines.NOKE_GATT_ERROR) {
-                if(noke.connectionAttempts > 4) {
+            if (status == NokeDefines.NOKE_GATT_ERROR) {
+                if (noke.connectionAttempts > 4) {
                     Handler handler = new Handler(Looper.getMainLooper());
                     handler.post(new Runnable() {
                         @Override
@@ -727,16 +730,14 @@ public class NokeDeviceManagerService extends Service {
                             mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_BLUETOOTH_GATT, "Bluetooth Gatt Error: 133");
                         }
                     });
-                }
-                else
-                {
+                } else {
                     Handler handler = new Handler(Looper.getMainLooper());
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
                             noke.connectionAttempts++;
                             refreshDeviceCache(noke.gatt, true);
-                            if(noke.gatt != null) {
+                            if (noke.gatt != null) {
                                 noke.gatt.disconnect();
                                 noke.gatt.close();
                                 noke.gatt = null;
@@ -750,8 +751,7 @@ public class NokeDeviceManagerService extends Service {
                         }
                     });
                 }
-            }
-            else if (newState == BluetoothProfile.STATE_CONNECTED) {
+            } else if (newState == BluetoothProfile.STATE_CONNECTED) {
                 noke.connectionAttempts = 0;
                 noke.connectionState = NokeDefines.NOKE_STATE_CONNECTING;
                 mGlobalNokeListener.onNokeConnecting(noke);
@@ -761,11 +761,10 @@ public class NokeDeviceManagerService extends Service {
                     @Override
                     public void run() {
 
-                        if(noke.gatt != null) {
+                        if (noke.gatt != null) {
                             Log.i(TAG, "Gatt not null. Attempting to start service discovery:" +
                                     noke.gatt.discoverServices());
-                        }
-                        else {
+                        } else {
                             noke.gatt = gatt;
                             Log.i(TAG, "Gatt was null. Attempting to start service discovery:" +
                                     noke.gatt.discoverServices());
@@ -774,23 +773,22 @@ public class NokeDeviceManagerService extends Service {
                 });
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
 
-                if(noke.connectionState == 2) {
+                if (noke.connectionState == 2) {
                     Handler handler = new Handler(Looper.getMainLooper());
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
-                            if(noke.gatt != null) {
+                            if (noke.gatt != null) {
                                 noke.gatt.disconnect();
                             }
-                            if(noke.gatt != null) {
+                            if (noke.gatt != null) {
                                 noke.gatt.close();
                                 noke.gatt = null;
                             }
                             Log.d(TAG, "Initializing gatt connection: " + connectToGatt(noke));
                         }
                     });
-                }
-                else {
+                } else {
                     if (noke.connectionAttempts == 0) {
                         refreshDeviceCache(noke.gatt, NokeDefines.SHOULD_FORCE_GATT_REFRESH);
                         noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
@@ -802,16 +800,16 @@ public class NokeDeviceManagerService extends Service {
         }
 
         void refreshDeviceCache(final BluetoothGatt gatt, final boolean force) {
-		/*
-		 * If the device is bonded this is up to the Service Changed characteristic to notify Android that the services has changed.
-		 * There is no need for this trick in that case.
-		 * If not bonded, the Android should not keep the services cached when the Service Changed characteristic is present in the target device database.
-		 * However, due to the Android bug (still exists in Android 5.0.1), it is keeping them anyway and the only way to clear services is by using this hidden refresh method.
-		 */
+            /*
+             * If the device is bonded this is up to the Service Changed characteristic to notify Android that the services has changed.
+             * There is no need for this trick in that case.
+             * If not bonded, the Android should not keep the services cached when the Service Changed characteristic is present in the target device database.
+             * However, due to the Android bug (still exists in Android 5.0.1), it is keeping them anyway and the only way to clear services is by using this hidden refresh method.
+             */
             if (force || gatt.getDevice().getBondState() == BluetoothDevice.BOND_NONE) {
-			/*
-			 * There is a refresh() method in BluetoothGatt class but for now it's hidden. We will call it using reflections.
-			 */
+                /*
+                 * There is a refresh() method in BluetoothGatt class but for now it's hidden. We will call it using reflections.
+                 */
                 try {
                     final Method refresh = gatt.getClass().getMethod("refresh");
                     if (refresh != null) {
@@ -825,15 +823,12 @@ public class NokeDeviceManagerService extends Service {
         }
 
         @Override
-        public void onServicesDiscovered(BluetoothGatt gatt, int status)
-        {
+        public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             NokeDevice noke = nokeDevices.get(gatt.getDevice().getAddress());
-            if (status == BluetoothGatt.GATT_SUCCESS)
-            {
-                if(gatt.getDevice().getName().contains("NOKE_FW") || gatt.getDevice().getName().contains("NFOB_FW") || gatt.getDevice().getName().contains("N3P_FW")) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                if (gatt.getDevice().getName().contains("NOKE_FW") || gatt.getDevice().getName().contains("NFOB_FW") || gatt.getDevice().getName().contains("N3P_FW")) {
                     enableFirmwareTXNotification(noke);
-                }
-                else {
+                } else {
                     readStateCharacteristic(noke);
                 }
             }
@@ -844,9 +839,9 @@ public class NokeDeviceManagerService extends Service {
                                          BluetoothGattCharacteristic characteristic,
                                          int status) {
 
-            if (status == BluetoothGatt.GATT_SUCCESS){
+            if (status == BluetoothGatt.GATT_SUCCESS) {
 
-                if(NokeDefines.STATE_CHAR_UUID.equals(characteristic.getUuid())) {
+                if (NokeDefines.STATE_CHAR_UUID.equals(characteristic.getUuid())) {
                     NokeDevice noke = nokeDevices.get(gatt.getDevice().getAddress());
                     noke.setSession(characteristic.getValue());
                     enableTXNotification(noke);
@@ -860,23 +855,19 @@ public class NokeDeviceManagerService extends Service {
 
             Log.d(TAG, "On Characteristic Changed: " + NokeDefines.bytesToHex(characteristic.getValue()));
             NokeDevice noke = nokeDevices.get(gatt.getDevice().getAddress());
-            byte[] data=characteristic.getValue();
+            byte[] data = characteristic.getValue();
             onReceivedDataFromLock(data, noke);
         }
 
 
         @Override
-        public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status)
-        {
+        public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
             Log.d(TAG, "On Descriptor Write: " + descriptor.toString() + " Status: " + status);
-            if(gatt.getDevice().getName().contains("NOKE_FW") || gatt.getDevice().getName().contains("NFOB_FW") || gatt.getDevice().getName().contains("N3P_FW"))
-            {
+            if (gatt.getDevice().getName().contains("NOKE_FW") || gatt.getDevice().getName().contains("NFOB_FW") || gatt.getDevice().getName().contains("N3P_FW")) {
                 NokeDevice noke = nokeDevices.get(gatt.getDevice().getAddress());
                 noke.connectionState = NokeDefines.NOKE_STATE_CONNECTED;
                 mGlobalNokeListener.onNokeConnected(noke);
-            }
-            else
-            {
+            } else {
                 NokeDevice noke = nokeDevices.get(gatt.getDevice().getAddress());
                 noke.connectionState = NokeDefines.NOKE_STATE_CONNECTED;
                 mGlobalNokeListener.onNokeConnected(noke);
@@ -894,69 +885,68 @@ public class NokeDeviceManagerService extends Service {
     /**
      * Parses through the data received from the lock after a command has been sent.  There are two different types of data packets:
      * <ul>
-     *     <li>Server Packets - encrypted packets sent to the server to be parsed</li>
-     *     <li>App Packets - unencrypted packets that can be used by the app to handle errors</li>
+     * <li>Server Packets - encrypted packets sent to the server to be parsed</li>
+     * <li>App Packets - unencrypted packets that can be used by the app to handle errors</li>
      * </ul>
+     *
      * @param data The data from the lock. A 40 character hex string
      * @param noke The noke device that sent the data
      */
-    public void onReceivedDataFromLock(byte[] data, NokeDevice noke){
+    public void onReceivedDataFromLock(byte[] data, NokeDevice noke) {
 
         byte destination = data[0];
         if (destination == NokeDefines.SERVER_Dest) {
-            if(noke.session != null) {
+            if (noke.session != null) {
                 addDataPacketToQueue(NokeDefines.bytesToHex(data), noke.session, noke.getMac());
             }
-        }
-        else if (destination == NokeDefines.APP_Dest) {
+        } else if (destination == NokeDefines.APP_Dest) {
             byte resulttype = data[1];
-            switch (resulttype){
-                case NokeDefines.SUCCESS_ResultType:{
+            switch (resulttype) {
+                case NokeDefines.SUCCESS_ResultType: {
                     moveToNext(noke);
-                    if(noke.commands.size() == 0){
+                    if (noke.commands.size() == 0) {
                         noke.connectionState = NokeDefines.NOKE_STATE_UNLOCKED;
                         mGlobalNokeListener.onNokeUnlocked(noke);
                     }
                     break;
                 }
-                case NokeDefines.INVALIDKEY_ResultType:{
+                case NokeDefines.INVALIDKEY_ResultType: {
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_KEY, "Invalid Key Result");
                     moveToNext(noke);
                     break;
                 }
-                case NokeDefines.INVALIDCMD_ResultType:{
+                case NokeDefines.INVALIDCMD_ResultType: {
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_CMD, "Invalid Command Result");
                     moveToNext(noke);
                     break;
                 }
-                case NokeDefines.INVALIDPERMISSION_ResultType:{
+                case NokeDefines.INVALIDPERMISSION_ResultType: {
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_PERMISSION, "Invalid Permission (wrong key) Result");
                     moveToNext(noke);
                     break;
                 }
-                case NokeDefines.SHUTDOWN_ResultType:{
+                case NokeDefines.SHUTDOWN_ResultType: {
                     moveToNext(noke);
                     byte lockstate = data[2];
-                    if(lockstate == 0){
+                    if (lockstate == 0) {
                         noke.lockState = NokeDefines.NOKE_LOCK_STATE_UNLOCKED;
-                    }
-                    else{
+                    } else {
                         noke.lockState = NokeDefines.NOKE_LOCK_STATE_LOCKED;
                     }
                     disconnectNoke(noke);
                     break;
                 }
-                case NokeDefines.INVALIDDATA_ResultType:{
+                case NokeDefines.INVALIDDATA_ResultType: {
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_DATA, "Invalid Data Result");
                     moveToNext(noke);
                     break;
                 }
-                case NokeDefines.INVALID_ResultType:{
+                case NokeDefines.INVALID_ResultType: {
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_RESULT, "Invalid Result");
                     moveToNext(noke);
                     break;
                 }
-                default:{
+                default: {
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_UNKNOWN, "Invalid packet received");
                     moveToNext(noke);
                     break;
@@ -968,9 +958,10 @@ public class NokeDeviceManagerService extends Service {
 
     /**
      * Moves through the noke command array to the next command
+     *
      * @param noke the noke device that contains the commands
      */
-    public void moveToNext(NokeDevice noke){
+    public void moveToNext(NokeDevice noke) {
         if (noke.commands.size() > 0) {
             noke.commands.remove(0);
             if (noke.commands.size() > 0) {
@@ -981,31 +972,32 @@ public class NokeDeviceManagerService extends Service {
 
     /**
      * Takes Server Packets from the lock and bundles them with the MAC address and session of the lock to be sent to the Noke API for parsing
+     *
      * @param response the response from the lock. A 40 char hex string
-     * @param session the session of the lock read upon connecting
-     * @param mac the MAC address of the lock
+     * @param session  the session of the lock read upon connecting
+     * @param mac      the MAC address of the lock
      */
-    public void addDataPacketToQueue(String response, String session, String mac){
-        long unixTime = System.currentTimeMillis()/1000L;
-        if(globalUploadQueue == null){
+    public void addDataPacketToQueue(String response, String session, String mac) {
+        long unixTime = System.currentTimeMillis() / 1000L;
+        if (globalUploadQueue == null) {
             globalUploadQueue = new ArrayList<>();
         }
-        for(int i = 0; i < globalUploadQueue.size(); i++){
+        for (int i = 0; i < globalUploadQueue.size(); i++) {
             JSONObject dataObject = globalUploadQueue.get(i);
-            try{
+            try {
                 String dataSession = dataObject.getString("session");
-                if(session.equals(dataSession)){
+                if (session.equals(dataSession)) {
                     JSONArray responses = dataObject.getJSONArray("responses");
                     responses.put(response);
                     //TODO: CACHE UPLOAD QUEUE
                     return;
                 }
-            } catch(JSONException e){
+            } catch (JSONException e) {
                 e.printStackTrace();
             }
         }
 
-        try{
+        try {
             JSONArray responses = new JSONArray();
             responses.put(response);
             JSONObject sessionPacket = new JSONObject();
@@ -1017,7 +1009,7 @@ public class NokeDeviceManagerService extends Service {
             globalUploadQueue.add(sessionPacket);
 
             //TODO: CACHE UPLOAD QUEUE
-        } catch (JSONException e){
+        } catch (JSONException e) {
             e.printStackTrace();
         }
     }
@@ -1025,8 +1017,8 @@ public class NokeDeviceManagerService extends Service {
     /**
      * Uploads server packets from the Noke device to the server for parsing via the Noke Go Library
      */
-    public void uploadData(){
-        if(globalUploadQueue != null) {
+    public void uploadData() {
+        if (globalUploadQueue != null) {
             if (globalUploadQueue.size() > 0) {
                 try {
                     JSONObject jsonObject = new JSONObject();
@@ -1041,11 +1033,11 @@ public class NokeDeviceManagerService extends Service {
                         Bundle bundle = ai.metaData;
                         String nokeMobileApiKey = bundle.getString(NokeDefines.NOKE_MOBILE_API_KEY);
                         this.uploadDataCallback(NokeMobileApiClient.POST(NokeDefines.uploadURL, jsonObject.toString(), nokeMobileApiKey));
-                    } catch (PackageManager.NameNotFoundException | NullPointerException e){
+                    } catch (PackageManager.NameNotFoundException | NullPointerException e) {
                         e.printStackTrace();
                         mGlobalNokeListener.onError(null, NokeMobileError.ERROR_MISSING_API_KEY, "No API Key found. Have you set it in your Android Manifest?");
                     }
-                } catch(Exception e){
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
@@ -1054,12 +1046,13 @@ public class NokeDeviceManagerService extends Service {
 
     /**
      * Caches the upload data from the lock in the case that an internet connection isn't present
+     *
      * @param context application context used for getting shared preferences
      */
     @SuppressWarnings("unused")
-    void cacheUploadData(Context context){
+    void cacheUploadData(Context context) {
         Set<String> data = new HashSet<>();
-        for(int i = 0; i <globalUploadQueue.size(); i++){
+        for (int i = 0; i < globalUploadQueue.size(); i++) {
             String jsonData = globalUploadQueue.get(i).toString();
             data.add(jsonData);
         }
@@ -1071,22 +1064,23 @@ public class NokeDeviceManagerService extends Service {
 
     /**
      * Retrieves cached upload data that can be uploaded to the Noke API
+     *
      * @param context application context used for getting shared preferences
      */
     @SuppressWarnings("unused")
-    void retrieveUploadData(Context context){
+    void retrieveUploadData(Context context) {
         SharedPreferences pref = context.getSharedPreferences(NokeDefines.PREFS_NAME, MODE_PRIVATE);
         Set<String> data = pref.getStringSet(NokeDefines.PREF_UPLOADDATA, null);
-        if(globalUploadQueue == null){
+        if (globalUploadQueue == null) {
             globalUploadQueue = new ArrayList<>();
         }
 
-        if(data != null){
-            for(String entry : data){
+        if (data != null) {
+            for (String entry : data) {
                 JSONObject dataEntry = null;
-                try{
+                try {
                     dataEntry = new JSONObject(entry);
-                } catch (JSONException e){
+                } catch (JSONException e) {
                     e.printStackTrace();
                 }
                 globalUploadQueue.add(dataEntry);
@@ -1096,40 +1090,42 @@ public class NokeDeviceManagerService extends Service {
 
     /**
      * Caches the Noke devices for offline use
+     *
      * @param context application context used for getting shared preferences
      */
     @SuppressWarnings("unused")
-    void cacheNokeDevices(Context context){
+    void cacheNokeDevices(Context context) {
         Set<String> setNokeDevices = new HashSet<>();
-        for(Map.Entry<String, NokeDevice> entry : this.nokeDevices.entrySet()){
+        for (Map.Entry<String, NokeDevice> entry : this.nokeDevices.entrySet()) {
             Gson gson = new Gson();
             String jsonNoke = gson.toJson(entry.getValue());
             setNokeDevices.add(jsonNoke);
         }
 
         context.getSharedPreferences(NokeDefines.PREFS_NAME, MODE_PRIVATE).edit()
-                .putStringSet(NokeDefines.PREF_DEVICES,setNokeDevices)
+                .putStringSet(NokeDefines.PREF_DEVICES, setNokeDevices)
                 .apply();
 
     }
 
     /**
      * Retrieves cached Noke devices for offline use
+     *
      * @param context application context used for getting shared preferences
      */
     @SuppressWarnings("unused")
-    void retrieveNokeDevices(Context context){
+    void retrieveNokeDevices(Context context) {
         SharedPreferences pref = context.getSharedPreferences(NokeDefines.PREFS_NAME, MODE_PRIVATE);
         final Set<String> locks = pref.getStringSet(NokeDefines.PREF_DEVICES, null);
 
-        if(locks != null){
-            try{
-                for (String entry : locks){
+        if (locks != null) {
+            try {
+                for (String entry : locks) {
                     Gson gson = new Gson();
                     NokeDevice noke = gson.fromJson(entry, NokeDevice.class);
                     nokeDevices.put(noke.getMac(), noke);
                 }
-            } catch (final Exception e){
+            } catch (final Exception e) {
                 Log.e(TAG, "Retrieval Error");
             }
         }
@@ -1142,18 +1138,18 @@ public class NokeDeviceManagerService extends Service {
      *
      * @param noke The device to read the session characteristic from.
      */
-    private void readStateCharacteristic(NokeDevice noke){
-        if (mBluetoothAdapter == null || noke.gatt == null){
+    private void readStateCharacteristic(NokeDevice noke) {
+        if (mBluetoothAdapter == null || noke.gatt == null) {
             return;
         }
 
         BluetoothGattService RxService = noke.gatt.getService(NokeDefines.RX_SERVICE_UUID);
 
-        if(noke.gatt == null) {
+        if (noke.gatt == null) {
             mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
         }
 
-        if (RxService == null){
+        if (RxService == null) {
             mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
             return;
         }
@@ -1171,8 +1167,7 @@ public class NokeDeviceManagerService extends Service {
      * @param noke Noke device
      */
 
-    private void enableTXNotification(NokeDevice noke)
-    {
+    private void enableTXNotification(NokeDevice noke) {
 
         if (noke.gatt == null) {
             mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
@@ -1197,8 +1192,7 @@ public class NokeDeviceManagerService extends Service {
     }
 
 
-    private void enableFirmwareTXNotification(NokeDevice noke)
-    {
+    private void enableFirmwareTXNotification(NokeDevice noke) {
         if (noke.gatt == null) {
             mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
             return;
@@ -1226,11 +1220,9 @@ public class NokeDeviceManagerService extends Service {
      * @param noke Noke device
      */
 
-    void writeRXCharacteristic(NokeDevice noke)
-    {
+    void writeRXCharacteristic(NokeDevice noke) {
         BluetoothGattService RxService = noke.gatt.getService(NokeDefines.RX_SERVICE_UUID);
-        if (noke.gatt == null)
-        {
+        if (noke.gatt == null) {
             return;
         }
 
@@ -1265,7 +1257,7 @@ public class NokeDeviceManagerService extends Service {
             @Override
             public void run() {
 
-                if(noke.gatt != null) {
+                if (noke.gatt != null) {
                     noke.gatt.disconnect();
                     try {
                         Thread.sleep(100);
@@ -1281,6 +1273,7 @@ public class NokeDeviceManagerService extends Service {
 
     /**
      * Checks to see if the service is running in the background
+     *
      * @return boolean true if running in foreground, false if running in background
      */
     private boolean isServiceRunningInForeground() {
@@ -1296,10 +1289,9 @@ public class NokeDeviceManagerService extends Service {
      */
     private final BroadcastReceiver bluetoothBroadcastReceiver = new BroadcastReceiver() {
         @Override
-        public void onReceive(Context context, Intent intent)
-        {
+        public void onReceive(Context context, Intent intent) {
             final String action = intent.getAction();
-            if(action != null) {
+            if (action != null) {
                 if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
                     final int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
                     switch (state) {
@@ -1321,24 +1313,25 @@ public class NokeDeviceManagerService extends Service {
 
     /**
      * Sets the URL used for uploading data
+     *
      * @param uploadUrl string of the url
      */
     @SuppressWarnings({"unused", "SameParameterValue"})
-    public void setUploadUrl(String uploadUrl){
+    public void setUploadUrl(String uploadUrl) {
         NokeDefines.uploadURL = uploadUrl;
     }
 
     private void uploadDataCallback(String s) {
-        try{
+        try {
             JSONObject obj = new JSONObject(s);
             int errorCode = obj.getInt("error_code");
             String message = obj.getString("message");
 
-            if(errorCode == NokeMobileError.SUCCESS){
+            if (errorCode == NokeMobileError.SUCCESS) {
                 this.globalUploadQueue.clear();
             }
             this.getNokeListener().onDataUploaded(errorCode, message);
-        } catch(JSONException e){
+        } catch (JSONException e) {
             this.getNokeListener().onDataUploaded(NokeMobileError.ERROR_JSON_UPLOAD, e.toString());
         }
     }
