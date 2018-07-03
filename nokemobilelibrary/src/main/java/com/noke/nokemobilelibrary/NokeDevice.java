@@ -29,6 +29,11 @@ import java.util.List;
 public class NokeDevice {
 
     /**
+     * Time Interval of the most recent time the device was discovered
+     */
+    private double lastSeen;
+
+    /**
      * Name of the Noke device (strictly cosmetic)
      */
     private String name;
@@ -212,6 +217,14 @@ public class NokeDevice {
 
     public void setOfflineKey(String offlineKey) {
         this.offlineKey = offlineKey;
+    }
+
+    public double getLastSeen() {
+        return lastSeen;
+    }
+
+    public void setLastSeen(double lastSeen) {
+        this.lastSeen = lastSeen;
     }
 
     @SuppressWarnings("unused")
