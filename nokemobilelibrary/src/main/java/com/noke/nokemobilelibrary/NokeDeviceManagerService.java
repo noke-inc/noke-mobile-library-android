@@ -502,6 +502,8 @@ public class NokeDeviceManagerService extends Service {
             @Override
             public void onScanResult(int callbackType, ScanResult result) {
                 super.onScanResult(callbackType, result);
+
+//                noke.setLastSeen(new Date().getTime());
                 //TODO NEW BLUETOOTH SCAN CALLBACK
             }
         };
