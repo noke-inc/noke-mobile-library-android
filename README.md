@@ -16,10 +16,16 @@ This library is compatible with Android devices that support Bluetooth Low Energ
 * The compat library may be found on Maven Central Repository.  Add it to your project by adding the following dependency:
 
 ```java
-    compile 'com.noke.nokemobilelibrary:nokemobilelibrary:0.1.0'
+    compile 'com.noke.nokemobilelibrary:nokemobilelibrary:0.4.1'
 ```
+
+* After adding the dependency to your project, add the `NokeDeviceManagerService` to your Android Manifest:
+```xml
+<service android:name="com.noke.nokemobilelibrary.NokeDeviceManagerService" android:enabled="true"/>
+```
+
 	
-* Once you've add the dependency to your project, add the Mobile API Key to your Android Manifest under the `<application>` header:
+* Add the Mobile API Key to your Android Manifest under the `<application>` header:
 ```xml
 <meta-data android:name= "noke-core-api-mobile-key"
            android:value= "MOBILE_KEY_HERE"
