@@ -59,12 +59,14 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
                     setStatusText("Email Address Required");
                 }
                 else{
-                    /*
+
+
                     DemoWebClient demoWebClient = new DemoWebClient();
                     demoWebClient.setWebClientCallback(MainActivity.this);
                     demoWebClient.requestUnlock(currentNoke, emailEditText.getText().toString());
-                     **/
-                    currentNoke.offlineUnlock();
+
+
+                    //currentNoke.offlineUnlock();
                 }
             }
         });
@@ -72,6 +74,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
         lockNameText = findViewById(R.id.lock_text);
         statusText = findViewById(R.id.status_text);
         emailEditText = findViewById(R.id.email_input);
+
     }
 
     private void initiateNokeService(){
@@ -95,8 +98,8 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
 
             //Add locks to device manager
             NokeDevice noke1 = new NokeDevice("New Lock", "XX:XX:XX:XX:XX:XX");
-            noke1.setOfflineKey("OFFLINE_KEY_HERE");
-            noke1.setOfflineUnlockCmd("UNLOCK_COMMAND_HERE");
+            //noke1.setOfflineKey("OFFLINE_KEY_HERE");
+            //noke1.setOfflineUnlockCmd("OFFLINE_UNLOCK_COMMAND_HERE");
             mNokeService.addNokeDevice(noke1);
 
             /*
@@ -104,7 +107,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
             case where the mobile app should be making requests to the Noke Core API directly.
              */
 
-            mNokeService.setUploadUrl("UPLOAD URL HERE");
+            mNokeService.setUploadUrl("core api url here");
 
             //Start bluetooth scanning
             mNokeService.startScanningForNokeDevices();
@@ -158,8 +161,14 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
             setLockLayoutColor(getResources().getColor(R.color.disconnectGray));
             setLockNameText("No Lock Connected");
             currentNoke = null;
-            mNokeService.uploadData();
+            //mNokeService.uploadData();
             mNokeService.startScanningForNokeDevices();
+            mNokeService.setBluetoothScanDuration(8000);
+        }
+
+        @Override
+        public void onDataUploaded(int result, String message) {
+            Log.w(TAG, "DATA UPLOADED: " + message);
         }
 
         @Override
@@ -271,7 +280,14 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
 
     @Override
     public void onUnlockReceived(String response, NokeDevice noke) {
-        Log.d(TAG, "UNLOCK RECEIVED: "+ response);
+
+        /* Note: This is an example response from a demo server, it does not represent a response from the Noke Core API.
+         * Requests should not be made to the Core API directly from the mobile app.
+         * Please refer to the documentation for more details
+         * (https://github.com/noke-inc/noke-mobile-library-android#nok%C4%93-mobile-library-for-android)
+         */
+
+        Log.d(TAG, "Unlock Received: "+ response);
         try{
             JSONObject obj = new JSONObject(response);
             Boolean result = obj.getBoolean("result");
