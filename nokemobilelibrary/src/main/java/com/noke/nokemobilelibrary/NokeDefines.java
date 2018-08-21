@@ -21,7 +21,7 @@ import java.util.UUID;
  * Set of defines used in the Noke Mobile Library
  */
 
-class NokeDefines {
+public class NokeDefines {
 
     /**
      * Default scan off time for foreground scanning
@@ -109,10 +109,25 @@ class NokeDefines {
     static final String PREF_DEVICES                 = "nokedevices";
     static final String PREF_UPLOADDATA              = "uploaddata";
 
+
+    /**
+     * Noke Library Modes
+     */
+    public static final int NOKE_LIBRARY_SANDBOX           = 0;
+    public static final int NOKE_LIBRARY_PRODUCTION        = 1;
+    public static final int NOKE_LIBRARY_DEVELOP           = 2;
+
+
     /**
      * Request URLS
      */
-    static String uploadURL = "https://lock-api-dev.appspot.com/upload/";
+    static String uploadURL = "";
+
+    static final String sandboxUploadURL            = "https://coreapi-sandbox.appspot.com/upload/";
+    static final String productionUploadURL         = "https://coreapi-beta.appspot.com/upload/";
+    static final String developUploadURL            = "https://lock-api-dev.appspot.com/upload/";
+
+
 
     /**
      * Used for converting bytes to hex

@@ -101,6 +101,11 @@ public class NokeDevice {
      * Reference to the bluetooth service that manages to the device
      */
     transient NokeDeviceManagerService mService;
+    /**
+     * Boolean that indicates if the lock is being restored by the Core API
+     */
+    public transient boolean isRestoring;
+
 
     /**
      * Initializes Noke Device

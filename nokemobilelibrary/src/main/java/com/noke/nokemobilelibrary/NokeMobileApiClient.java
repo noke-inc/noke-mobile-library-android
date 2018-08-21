@@ -35,7 +35,6 @@ public class NokeMobileApiClient {
 
             URL url = new URL(urlStr);
             conn = (HttpURLConnection) url.openConnection();
-
             //Create the SSL connection
             SSLContext sc;
             sc = SSLContext.getInstance("TLS");
