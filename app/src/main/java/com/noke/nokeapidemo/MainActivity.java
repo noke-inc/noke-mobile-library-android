@@ -85,7 +85,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
             mNokeService = ((NokeDeviceManagerService.LocalBinder) rawBinder).getService(NokeDefines.NOKE_LIBRARY_SANDBOX);
 
             //Uncomment to allow devices that aren't in the device array
-            mNokeService.setAllowAllDevices(true);
+            //mNokeService.setAllowAllDevices(true);
 
             //Register callback listener
             mNokeService.registerNokeListener(mNokeServiceListener);
@@ -202,11 +202,6 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
                 case NokeMobileError.ERROR_BLUETOOTH_GATT:
                     break;
                 case NokeMobileError.DEVICE_ERROR_INVALID_KEY:
-                    //If you receive an invalid key error from a lock that you believe you should have access to, you can use the restore functionality to attempt to
-                    //restore the keys
-                    if(!noke.isRestoring) {
-                        mNokeService.restoreDevice(noke);
-                    }
                     break;
             }
         }
