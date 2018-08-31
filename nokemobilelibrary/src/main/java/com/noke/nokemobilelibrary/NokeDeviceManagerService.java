@@ -937,8 +937,7 @@ public class NokeDeviceManagerService extends Service {
                         noke.isRestoring = false;
                         Log.d(TAG, "CLEAR COMMANDS!");
                         confirmRestore(noke.getMac(), commandid);
-                        noke.connectionState = NokeDefines.NOKE_STATE_UNLOCKED;
-                        mGlobalNokeListener.onNokeUnlocked(noke);
+                        disconnectNoke(noke);
                     }else {
                         moveToNext(noke);
                         if (noke.commands.size() == 0) {
@@ -1464,8 +1463,6 @@ public class NokeDeviceManagerService extends Service {
         });
 
         thread.start();
-
-
     }
 
     private void confirmRestoreCallback(String s) {
@@ -1476,8 +1473,9 @@ public class NokeDeviceManagerService extends Service {
 
             if (errorCode == NokeMobileError.SUCCESS) {
                 Log.w(TAG, "RESTORE SUCCESSFUL");
+                this.getNokeListener().onDataUploaded(errorCode, "Restore Successful: " + message);
             }
-            this.getNokeListener().onDataUploaded(errorCode, "Restore Successful: " + message);
+
         } catch (JSONException e) {
             this.getNokeListener().onDataUploaded(NokeMobileError.ERROR_JSON_UPLOAD, e.toString());
         }
