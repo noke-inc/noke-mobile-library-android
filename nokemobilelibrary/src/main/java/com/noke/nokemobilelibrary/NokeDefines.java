@@ -112,6 +112,7 @@ public class NokeDefines {
 
     /**
      * Noke Library Modes
+     * Determines where the logs from the lock are sent
      */
     public static final int NOKE_LIBRARY_SANDBOX           = 0;
     public static final int NOKE_LIBRARY_PRODUCTION        = 1;
@@ -126,7 +127,6 @@ public class NokeDefines {
     static final String sandboxUploadURL            = "https://coreapi-sandbox.appspot.com/upload/";
     static final String productionUploadURL         = "https://coreapi-beta.appspot.com/upload/";
     static final String developUploadURL            = "https://lock-api-dev.appspot.com/upload/";
-
 
 
     /**

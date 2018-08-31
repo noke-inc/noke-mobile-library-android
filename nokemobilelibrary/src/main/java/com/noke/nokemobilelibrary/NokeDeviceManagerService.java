@@ -151,6 +151,16 @@ public class NokeDeviceManagerService extends Service {
      * Class for binding service to activity
      */
     public class LocalBinder extends Binder {
+        /**
+         * Returns reference to the NokeDeviceManagerService
+         *
+         * @param mode must be set upon initialization. Determines the upload url used for uploading
+         *             responses from the lock to the Core API.  Mode types can be found in NokeDefines
+         *             file:
+         *             - Sandbox (NOKE_LIBRARY_SANDBOX)
+         *             - Production (NOKE_LIBRARY_PRODUCTION)
+         *             - Develop (NOKE_LIBRARY_DEVELOP)
+         */
         public NokeDeviceManagerService getService(int mode) {
             switch (mode) {
                 case NokeDefines.NOKE_LIBRARY_SANDBOX:
@@ -163,7 +173,7 @@ public class NokeDeviceManagerService extends Service {
                     setUploadUrl(NokeDefines.developUploadURL);
                     break;
                 default:
-                    Log.e(TAG, "UNKNOWN MODE TYPE. SETTING UPLOAD URL TO SANDBOX");
+                    Log.e(TAG, "Unknown Mode Type. Setting URL to Sandbox");
                     setUploadUrl(NokeDefines.sandboxUploadURL);
                     break;
             }
@@ -770,6 +780,7 @@ public class NokeDeviceManagerService extends Service {
             } else if (newState == BluetoothProfile.STATE_CONNECTED) {
                 noke.connectionAttempts = 0;
                 noke.connectionState = NokeDefines.NOKE_STATE_CONNECTING;
+                noke.isRestoring = false;
                 mGlobalNokeListener.onNokeConnecting(noke);
 
                 Handler handler = new Handler(Looper.getMainLooper());
@@ -921,18 +932,31 @@ public class NokeDeviceManagerService extends Service {
                 case NokeDefines.SUCCESS_ResultType: {
                     int commandid = data[2];
                     if(noke.isRestoring) {
+                        noke.commands.clear();
+                        globalUploadQueue.clear();
+                        noke.isRestoring = false;
+                        Log.d(TAG, "CLEAR COMMANDS!");
                         confirmRestore(noke.getMac(), commandid);
-                    }
-                    moveToNext(noke);
-                    if (noke.commands.size() == 0) {
                         noke.connectionState = NokeDefines.NOKE_STATE_UNLOCKED;
                         mGlobalNokeListener.onNokeUnlocked(noke);
+                    }else {
+                        moveToNext(noke);
+                        if (noke.commands.size() == 0) {
+                            noke.connectionState = NokeDefines.NOKE_STATE_UNLOCKED;
+                            mGlobalNokeListener.onNokeUnlocked(noke);
+                        }
                     }
                     break;
                 }
                 case NokeDefines.INVALIDKEY_ResultType: {
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_KEY, "Invalid Key Result");
                     moveToNext(noke);
+                    if (noke.commands.size() == 0) {
+                        //If library receives an invalid key error, it will attempt to restore the key by working with the API
+                        if(!noke.isRestoring) {
+                            restoreDevice(noke);
+                        }
+                    }
                     break;
                 }
                 case NokeDefines.INVALIDCMD_ResultType: {
