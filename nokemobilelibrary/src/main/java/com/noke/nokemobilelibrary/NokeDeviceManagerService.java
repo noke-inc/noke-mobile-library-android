@@ -1380,7 +1380,7 @@ public class NokeDeviceManagerService extends Service {
         }
     }
 
-    public void restoreDevice(NokeDevice noke){
+    private void restoreDevice(NokeDevice noke){
         noke.isRestoring = true;
         restoreKey(noke);
     }
