@@ -21,6 +21,7 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.noke.nokemobilelibrary.NokeDefines;
 import com.noke.nokemobilelibrary.NokeDeviceManagerService;
 import com.noke.nokemobilelibrary.NokeDevice;
 import com.noke.nokemobilelibrary.NokeMobileError;
@@ -55,18 +56,10 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
                 if(currentNoke == null){
                     setStatusText("No Device Connected");
                 }
-                else if(emailEditText.getText().toString().length() == 0){
-                    setStatusText("Email Address Required");
-                }
                 else{
-
-
                     DemoWebClient demoWebClient = new DemoWebClient();
                     demoWebClient.setWebClientCallback(MainActivity.this);
                     demoWebClient.requestUnlock(currentNoke, emailEditText.getText().toString());
-
-
-                    //currentNoke.offlineUnlock();
                 }
             }
         });
@@ -74,6 +67,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
         lockNameText = findViewById(R.id.lock_text);
         statusText = findViewById(R.id.status_text);
         emailEditText = findViewById(R.id.email_input);
+        emailEditText.setVisibility(View.GONE);
 
     }
 
@@ -88,26 +82,17 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
             Log.w(TAG, "ON SERVICE CONNECTED");
 
             //Store reference to service
-            mNokeService = ((NokeDeviceManagerService.LocalBinder) rawBinder).getService();
+            mNokeService = ((NokeDeviceManagerService.LocalBinder) rawBinder).getService(NokeDefines.NOKE_LIBRARY_SANDBOX);
 
             //Uncomment to allow devices that aren't in the device array
-            //mNokeService.setAllowAllDevices(true);
+            mNokeService.setAllowAllDevices(true);
 
             //Register callback listener
             mNokeService.registerNokeListener(mNokeServiceListener);
 
             //Add locks to device manager
-            NokeDevice noke1 = new NokeDevice("New Lock", "XX:XX:XX:XX:XX:XX");
-            //noke1.setOfflineKey("OFFLINE_KEY_HERE");
-            //noke1.setOfflineUnlockCmd("OFFLINE_UNLOCK_COMMAND_HERE");
+            NokeDevice noke1 = new NokeDevice("Dev Lock 1", "XX:XX:XX:XX:XX:XX");
             mNokeService.addNokeDevice(noke1);
-
-            /*
-            Sets the url to use for uploading responses from the lock to the API.  This is the only
-            case where the mobile app should be making requests to the Noke Core API directly.
-             */
-
-            mNokeService.setUploadUrl("core api url here");
 
             //Start bluetooth scanning
             mNokeService.startScanningForNokeDevices();
@@ -169,6 +154,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
         @Override
         public void onDataUploaded(int result, String message) {
             Log.w(TAG, "DATA UPLOADED: " + message);
+            setStatusText(message);
         }
 
         @Override
@@ -214,6 +200,13 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
                 case NokeMobileError.ERROR_BLUETOOTH_DISABLED:
                     break;
                 case NokeMobileError.ERROR_BLUETOOTH_GATT:
+                    break;
+                case NokeMobileError.DEVICE_ERROR_INVALID_KEY:
+                    //If you receive an invalid key error from a lock that you believe you should have access to, you can use the restore functionality to attempt to
+                    //restore the keys
+                    if(!noke.isRestoring) {
+                        mNokeService.restoreDevice(noke);
+                    }
                     break;
             }
         }
@@ -290,8 +283,8 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
         Log.d(TAG, "Unlock Received: "+ response);
         try{
             JSONObject obj = new JSONObject(response);
-            Boolean result = obj.getBoolean("result");
-            if(result){
+            String result = obj.getString("result");
+            if(result.equals("success")){
                 JSONObject data = obj.getJSONObject("data");
                 String commandString = data.getString("commands");
                 currentNoke.sendCommands(commandString);
