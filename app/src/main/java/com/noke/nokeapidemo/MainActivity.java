@@ -90,7 +90,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
             mNokeService.registerNokeListener(mNokeServiceListener);
 
             //Add locks to device manager
-            NokeDevice noke1 = new NokeDevice("Dev Lock 1", "XX:XX:XX:XX:XX:XX");
+            NokeDevice noke1 = new NokeDevice("XXX-XXX-XXXX", "XX:XX:XX:XX:XX:XX");
             mNokeService.addNokeDevice(noke1);
 
             //Start bluetooth scanning
@@ -137,6 +137,11 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
         public void onNokeUnlocked(NokeDevice noke) {
             setStatusText("NOKE UNLOCKED: " + noke.getName());
             setLockLayoutColor(getResources().getColor(R.color.unlockGreen));
+        }
+
+        @Override
+        public void onNokeShutdown(NokeDevice noke, Boolean isLocked, Boolean didTimeout) {
+            setStatusText("NOKE SHUTDOWN: " + noke.getName() + " LOCKED: " + true + " TIMEOUT: " + didTimeout);
         }
 
         @Override
@@ -207,6 +212,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
     };
 
     public void setStatusText(final String message){
+        Log.d(TAG, message);
         Handler handler = new Handler(Looper.getMainLooper());
         handler.post(new Runnable() {
             @Override
