@@ -971,11 +971,21 @@ public class NokeDeviceManagerService extends Service {
                 case NokeDefines.SHUTDOWN_ResultType: {
                     moveToNext(noke);
                     byte lockstate = data[2];
+                    Boolean isLocked = true;
                     if (lockstate == 0) {
                         noke.lockState = NokeDefines.NOKE_LOCK_STATE_UNLOCKED;
+                        isLocked = false;
                     } else {
                         noke.lockState = NokeDefines.NOKE_LOCK_STATE_LOCKED;
                     }
+
+                    byte timeoutstate = data[3];
+                    Boolean didTimeout = true;
+                    if(timeoutstate == 1){
+                        didTimeout = false;
+                    }
+
+                    mGlobalNokeListener.onNokeShutdown(noke, isLocked, didTimeout);
                     disconnectNoke(noke);
                     break;
                 }
