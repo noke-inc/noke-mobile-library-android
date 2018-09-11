@@ -1,4 +1,22 @@
 
+# **** Recent Changes (v0.5.0) ****
+* Noke Mobile Library now requires settings a ```mode``` when initializing the ```NokeDeviceManagerService```.  Options are:
+
+```NOKE_LIBRARY_SANDBOX```
+```NOKE_LIBRARY_PRODUCTION```
+
+The mode determines where responses from the lock are uploaded.  **Setting an upload URL manually is no longer supported**
+
+* New method has been added to the ```Noke Service Listener```: 
+
+```java
+public void onNokeShutdown(NokeDevice noke, Boolean isLocked, Boolean didTimeout) {
+            //Called when device goes to sleep.  Indicates if was locked or unlocked at the time
+            //of shutdown and if it was closed manually or unlocked
+        }
+
+```
+
 # Nokē Mobile Library for Android #
 
 [![Download](https://api.bintray.com/packages/noke/maven/noke-mobile-library-android/images/download.svg)](https://bintray.com/noke/maven/noke-mobile-library-android/_latestVersion)
@@ -198,10 +216,15 @@ Logs, errors, and callbacks will continue to function the same as when unlocking
 
 The Nokē Mobile Library automatically uploads all responses from the Nokē device to the Nokē Core API for parsing.  Responses that contain activity logs are stored in the database and can be accessed using endpoints from the API.  Please see the Nokē Core API documentation for more details.
 
-* The library is set to upload responses to the production API.  If you need to change this url for testing or other custom implementations, you can change the url using the 'NokeDeviceManagerService'
+* Noke Mobile Library now requires settings a ```mode``` when initializing the ```NokeDeviceManagerService```.  Options are:
 
-```swift
-NokeDeviceManager.shared().changeDefaultUploadUrl("NEW_URL_HERE")
+```NOKE_LIBRARY_SANDBOX```
+```NOKE_LIBRARY_PRODUCTION```
+
+The mode determines where responses from the lock are uploaded.  **Setting an upload URL manually is no longer supported**
+
+```java
+mNokeService = ((NokeDeviceManagerService.LocalBinder) rawBinder).getService(NokeDefines.NOKE_LIBRARY_DEVELOP);
 ```
 
 ### Uploading Activity Logs ###
