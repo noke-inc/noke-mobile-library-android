@@ -1,9 +1,12 @@
+# Nokē Mobile Library for Android #
 
-# **** Recent Changes (v0.5.0) ****
+[![Download](https://api.bintray.com/packages/noke/maven/noke-mobile-library-android/images/download.svg)](https://bintray.com/noke/maven/noke-mobile-library-android/_latestVersion)
+
+## **** Recent Changes (v0.5.0) ****
 * Noke Mobile Library now requires settings a ```mode``` when initializing the ```NokeDeviceManagerService```.  Options are:
 
-```NOKE_LIBRARY_SANDBOX```
-```NOKE_LIBRARY_PRODUCTION```
+** ```NOKE_LIBRARY_SANDBOX```
+** ```NOKE_LIBRARY_PRODUCTION```
 
 The mode determines where responses from the lock are uploaded.  **Setting an upload URL manually is no longer supported**
 
@@ -16,10 +19,6 @@ public void onNokeShutdown(NokeDevice noke, Boolean isLocked, Boolean didTimeout
         }
 
 ```
-
-# Nokē Mobile Library for Android #
-
-[![Download](https://api.bintray.com/packages/noke/maven/noke-mobile-library-android/images/download.svg)](https://bintray.com/noke/maven/noke-mobile-library-android/_latestVersion)
 
 The Nokē Mobile Library provides an easy-to-use and stable way to communicate with Nokē Devices via Bluetooth.  It must be used in conjunction with the Nokē Core API for full functionality such as unlocking locks and uploading activity.
 
@@ -34,7 +33,7 @@ This library is compatible with Android devices that support Bluetooth Low Energ
 * The compat library may be found on Maven Central Repository.  Add it to your project by adding the following dependency:
 
 ```java
-    compile 'com.noke.nokemobilelibrary:nokemobilelibrary:0.4.1'
+    compile 'com.noke.nokemobilelibrary:nokemobilelibrary:0.5.0'
 ```
 
 * After adding the dependency to your project, add the `NokeDeviceManagerService` to your Android Manifest:
