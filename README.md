@@ -5,8 +5,8 @@
 ## **** Recent Changes (v0.5.0) ****
 * Noke Mobile Library now requires settings a ```mode``` when initializing the ```NokeDeviceManagerService```.  Options are:
 
-** ```NOKE_LIBRARY_SANDBOX```
-** ```NOKE_LIBRARY_PRODUCTION```
+   * ```NOKE_LIBRARY_SANDBOX```
+   * ```NOKE_LIBRARY_PRODUCTION```
 
 The mode determines where responses from the lock are uploaded.  **Setting an upload URL manually is no longer supported**
 
@@ -113,9 +113,19 @@ private NokeServiceListener mNokeServiceListener = new NokeServiceListener() {
         }
 
         @Override
+        public void onNokeShutdown(NokeDevice noke, Boolean isLocked, Boolean didTimeout) {
+
+        }
+
+        @Override
         public void onNokeDisconnected(NokeDevice noke) {
 
         }
+
+        @Override
+        public void onDataUploaded(int result, String message) {
+
+        }        
 
         @Override
         public void onBluetoothStatusChanged(int bluetoothStatus) {
