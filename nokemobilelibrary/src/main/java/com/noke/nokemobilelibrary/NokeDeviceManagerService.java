@@ -950,12 +950,12 @@ public class NokeDeviceManagerService extends Service {
                 case NokeDefines.INVALIDKEY_ResultType: {
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_KEY, "Invalid Key Result");
                     moveToNext(noke);
-                    if (noke.commands.size() == 0) {
-                        //If library receives an invalid key error, it will attempt to restore the key by working with the API
-                        if(!noke.isRestoring) {
-                            restoreDevice(noke);
-                        }
-                    }
+//                    if (noke.commands.size() == 0) {
+//                        //If library receives an invalid key error, it will attempt to restore the key by working with the API
+//                        if(!noke.isRestoring) {
+//                            restoreDevice(noke);
+//                        }
+//                    }
                     break;
                 }
                 case NokeDefines.INVALIDCMD_ResultType: {
