@@ -141,6 +141,9 @@ public class NokeDeviceManagerService extends Service {
      * Duration that bluetooth scans before shutting off and restarting
      */
     private int bluetoothScanDuration;
+
+    private String apiKey;
+
     /**
      * A LinkedHashMap that stores a list of NokeDevices linked my MAC address.
      * Only devices that are in this array will be discovered when scanning
@@ -179,6 +182,14 @@ public class NokeDeviceManagerService extends Service {
         setBluetoothDelayDefault(NokeDefines.BLUETOOTH_DEFAULT_SCAN_TIME);
         setBluetoothDelayBackgroundDefault(NokeDefines.BLUETOOTH_DEFAULT_SCAN_TIME_BACKGROUND);
         setBluetoothScanDuration(NokeDefines.BLUETOOTH_DEFAULT_SCAN_DURATION);
+    }
+
+    public String getApiKey() {
+        return apiKey;
+    }
+
+    public void setApiKey(String apiKey) {
+        this.apiKey = apiKey;
     }
 
     /**
@@ -1031,8 +1042,8 @@ public class NokeDeviceManagerService extends Service {
                         PackageManager pm = getApplicationContext().getPackageManager();
                         ApplicationInfo ai = pm.getApplicationInfo(getApplicationContext().getPackageName(), PackageManager.GET_META_DATA);
                         Bundle bundle = ai.metaData;
-                        String nokeMobileApiKey = bundle.getString(NokeDefines.NOKE_MOBILE_API_KEY);
-                        this.uploadDataCallback(NokeMobileApiClient.POST(NokeDefines.uploadURL, jsonObject.toString(), nokeMobileApiKey));
+                        // String nokeMobileApiKey = bundle.getString(NokeDefines.NOKE_MOBILE_API_KEY);
+                        this.uploadDataCallback(NokeMobileApiClient.POST(NokeDefines.uploadURL, jsonObject.toString(), this.apiKey));
                     } catch (PackageManager.NameNotFoundException | NullPointerException e) {
                         e.printStackTrace();
                         mGlobalNokeListener.onError(null, NokeMobileError.ERROR_MISSING_API_KEY, "No API Key found. Have you set it in your Android Manifest?");
@@ -1324,7 +1335,7 @@ public class NokeDeviceManagerService extends Service {
     private void uploadDataCallback(String s) {
         try {
             JSONObject obj = new JSONObject(s);
-            int errorCode = obj.getInt("error_code");
+            int errorCode = obj.getInt("errorCode");
             String message = obj.getString("message");
 
             if (errorCode == NokeMobileError.SUCCESS) {
