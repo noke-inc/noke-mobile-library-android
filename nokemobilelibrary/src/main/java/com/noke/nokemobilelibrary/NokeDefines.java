@@ -112,7 +112,7 @@ class NokeDefines {
     /**
      * Request URLS
      */
-    static String uploadURL = "https://lock-api-dev.appspot.com/upload/";
+    static String uploadURL = "https://v1.api.nokepro.com/lock/upload/";
 
     /**
      * Used for converting bytes to hex
