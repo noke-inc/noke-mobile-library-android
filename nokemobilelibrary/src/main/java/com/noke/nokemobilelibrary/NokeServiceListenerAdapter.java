@@ -47,6 +47,11 @@ public class NokeServiceListenerAdapter implements NokeServiceListener{
     }
 
     @Override
+    public void onNokeLocked(NokeDevice noke) {
+        //empty default implementation
+    }
+
+    @Override
     public void onNokeDisconnected(NokeDevice noke) {
         //empty default implementation
     }

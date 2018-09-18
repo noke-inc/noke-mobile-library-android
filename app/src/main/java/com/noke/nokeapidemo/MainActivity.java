@@ -156,6 +156,12 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
         }
 
         @Override
+        public void onNokeLocked(NokeDevice noke) {
+            setStatusText("NOKE LOCKED: " + noke.getName());
+            setLockLayoutColor(getResources().getColor(R.color.alertRed));
+        }
+
+        @Override
         public void onNokeDisconnected(NokeDevice noke) {
             setStatusText("NOKE DISCONNECTED: " + noke.getName());
             setLockLayoutColor(getResources().getColor(R.color.disconnectGray));

@@ -30,6 +30,8 @@ public interface NokeServiceListener  {
 
     void onNokeUnlocked(NokeDevice noke);
 
+    void onNokeLocked(NokeDevice noke);
+
     void onNokeDisconnected(NokeDevice noke);
 
     void onDataUploaded(int result, String message);

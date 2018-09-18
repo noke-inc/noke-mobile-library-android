@@ -943,6 +943,7 @@ public class NokeDeviceManagerService extends Service {
                         noke.lockState = NokeDefines.NOKE_LOCK_STATE_UNLOCKED;
                     } else {
                         noke.lockState = NokeDefines.NOKE_LOCK_STATE_LOCKED;
+                        mGlobalNokeListener.onNokeLocked(noke);
                     }
                     disconnectNoke(noke);
                     break;
