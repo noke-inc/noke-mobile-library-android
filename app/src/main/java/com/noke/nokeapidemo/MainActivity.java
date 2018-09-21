@@ -93,7 +93,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
     private ServiceConnection mServiceConnection = new ServiceConnection() {
 
         public void onServiceConnected(ComponentName className, IBinder rawBinder) {
-            Log.w(TAG, "ON SERVICE CONNECTED");
+            Log.w(TAG, "############ ON SERVICE CONNECTED");
 
             //Store reference to service
             mNokeService = ((NokeDeviceManagerService.LocalBinder) rawBinder).getService();
