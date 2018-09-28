@@ -538,10 +538,15 @@ public class NokeDeviceManagerService extends Service {
             public void onLeScan(final BluetoothDevice bluetoothDevice, final int rssi, byte[] scanRecord) {
                 if (bluetoothDevice.getName() != null) {
                     if (bluetoothDevice.getName().contains(NokeDefines.NOKE_DEVICE_IDENTIFER_STRING)) {
-                        NokeDevice noke = new NokeDevice(bluetoothDevice.getName(), bluetoothDevice.getAddress());
-                        noke.bluetoothDevice = bluetoothDevice;
-                        noke.setLastSeen(new Date().getTime());
-                        if (nokeDevices.get(noke.getMac()) != null || mAllowAllDevices) {
+                        // NokeDevice noke = new NokeDevice(bluetoothDevice.getName(), bluetoothDevice.getAddress());
+                        NokeDevice noke = nokeDevices.get(bluetoothDevice.getAddress());
+                        if (noke != null || mAllowAllDevices) {
+                            if (noke == null) {
+                                noke = new NokeDevice(bluetoothDevice.getName(), bluetoothDevice.getAddress());
+                            }
+                            noke.bluetoothDevice = bluetoothDevice;
+                            noke.setLastSeen(new Date().getTime());
+                        // if (nokeDevices.get(noke.getMac()) != null || mAllowAllDevices) {
                             byte[] broadcastData;
                             String nameVersion;
 
@@ -562,7 +567,7 @@ public class NokeDeviceManagerService extends Service {
                                     nokeDevices.put(noke.getMac(), noke);
                                 }
 
-                                Log.d(TAG, "Sending onNokeDiscovered event for : " + noke);
+                                Log.d(TAG, "$$$$$$$$$$$$ Sending onNokeDiscovered event for : " + noke);
                                 noke.connectionState = NokeDefines.NOKE_STATE_DISCOVERED;
                                 mGlobalNokeListener.onNokeDiscovered(noke);
                             }
