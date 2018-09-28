@@ -562,6 +562,7 @@ public class NokeDeviceManagerService extends Service {
                                     nokeDevices.put(noke.getMac(), noke);
                                 }
 
+                                Log.d(TAG, "Sending onNokeDiscovered event for : " + noke);
                                 noke.connectionState = NokeDefines.NOKE_STATE_DISCOVERED;
                                 mGlobalNokeListener.onNokeDiscovered(noke);
                             }
