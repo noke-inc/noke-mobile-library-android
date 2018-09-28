@@ -572,11 +572,7 @@ public class NokeDeviceManagerService extends Service {
                                 String version = noke.getVersion(broadcastData, bluetoothDevice.getName());
                                 noke.setVersion(version);
                                 noke.bluetoothDevice = bluetoothDevice;
-
-                                if (nokeDevices.get(noke.getMac()) == null) {
-                                    nokeDevices.put(noke.getMac(), noke);
-                                }
-
+                                nokeDevices.put(noke.getMac(), noke);
                                 noke.connectionState = NokeDefines.NOKE_STATE_DISCOVERED;
                                 mGlobalNokeListener.onNokeDiscovered(noke);
                             }
@@ -950,12 +946,12 @@ public class NokeDeviceManagerService extends Service {
                 case NokeDefines.INVALIDKEY_ResultType: {
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_KEY, "Invalid Key Result");
                     moveToNext(noke);
-//                    if (noke.commands.size() == 0) {
-//                        //If library receives an invalid key error, it will attempt to restore the key by working with the API
+                    if (noke.commands.size() == 0) {
+                        //If library receives an invalid key error, it will attempt to restore the key by working with the API
 //                        if(!noke.isRestoring) {
 //                            restoreDevice(noke);
 //                        }
-//                    }
+                    }
                     break;
                 }
                 case NokeDefines.INVALIDCMD_ResultType: {
