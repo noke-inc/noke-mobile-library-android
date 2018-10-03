@@ -154,7 +154,33 @@ public class NokeDeviceManagerService extends Service {
      * Class for binding service to activity
      */
     public class LocalBinder extends Binder {
-        public NokeDeviceManagerService getService() {
+        /**
+         * Returns reference to the NokeDeviceManagerService
+         *
+         * @param mode must be set upon initialization. Determines the upload url used for uploading
+         *             responses from the lock to the Core API.  Mode types can be found in NokeDefines
+         *             file:
+         *             - Sandbox (NOKE_LIBRARY_SANDBOX)
+         *             - Production (NOKE_LIBRARY_PRODUCTION)
+         *             - Develop (NOKE_LIBRARY_DEVELOP)
+         */
+        public NokeDeviceManagerService getService(int mode) {
+            switch (mode) {
+                case NokeDefines.NOKE_LIBRARY_SANDBOX:
+                    setUploadUrl(NokeDefines.sandboxUploadURL);
+                    break;
+                case NokeDefines.NOKE_LIBRARY_PRODUCTION:
+                    setUploadUrl(NokeDefines.productionUploadURL);
+                    break;
+                case NokeDefines.NOKE_LIBRARY_DEVELOP:
+                    setUploadUrl(NokeDefines.developUploadURL);
+                    break;
+                default:
+                    Log.e(TAG, "Unknown Mode Type. Setting URL to Sandbox");
+                    setUploadUrl(NokeDefines.sandboxUploadURL);
+                    break;
+            }
+
             return NokeDeviceManagerService.this;
         }
     }
@@ -495,7 +521,7 @@ public class NokeDeviceManagerService extends Service {
                 if (Build.VERSION.SDK_INT >= 100) {
                     mBluetoothScanner.stopScan(mNewBluetoothScanCallback);
                 } else {
-                    //DEPRECTATED. INCLUDING FOR 4.0 SUPPORT
+                    //DEPRECATED. INCLUDING FOR 4.0 SUPPORT
                     if (mOldBluetoothScanCallback != null) {
                         mBluetoothAdapter.stopLeScan(mOldBluetoothScanCallback);
                     }
@@ -567,7 +593,6 @@ public class NokeDeviceManagerService extends Service {
                                     nokeDevices.put(noke.getMac(), noke);
                                 }
 
-                                Log.d(TAG, "$$$$$$$$$$$$ Sending onNokeDiscovered event for : " + noke);
                                 noke.connectionState = NokeDefines.NOKE_STATE_DISCOVERED;
                                 mGlobalNokeListener.onNokeDiscovered(noke);
                             }
@@ -771,6 +796,7 @@ public class NokeDeviceManagerService extends Service {
             } else if (newState == BluetoothProfile.STATE_CONNECTED) {
                 noke.connectionAttempts = 0;
                 noke.connectionState = NokeDefines.NOKE_STATE_CONNECTING;
+                noke.isRestoring = false;
                 mGlobalNokeListener.onNokeConnecting(noke);
 
                 Handler handler = new Handler(Looper.getMainLooper());
@@ -920,16 +946,32 @@ public class NokeDeviceManagerService extends Service {
             byte resulttype = data[1];
             switch (resulttype) {
                 case NokeDefines.SUCCESS_ResultType: {
-                    moveToNext(noke);
-                    if (noke.commands.size() == 0) {
-                        noke.connectionState = NokeDefines.NOKE_STATE_UNLOCKED;
-                        mGlobalNokeListener.onNokeUnlocked(noke);
+                    int commandid = data[2];
+                    if(noke.isRestoring) {
+                        noke.commands.clear();
+                        globalUploadQueue.clear();
+                        noke.isRestoring = false;
+                        Log.d(TAG, "CLEAR COMMANDS!");
+                        confirmRestore(noke.getMac(), commandid);
+                        disconnectNoke(noke);
+                    }else {
+                        moveToNext(noke);
+                        if (noke.commands.size() == 0) {
+                            noke.connectionState = NokeDefines.NOKE_STATE_UNLOCKED;
+                            mGlobalNokeListener.onNokeUnlocked(noke);
+                        }
                     }
                     break;
                 }
                 case NokeDefines.INVALIDKEY_ResultType: {
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_KEY, "Invalid Key Result");
                     moveToNext(noke);
+                    if (noke.commands.size() == 0) {
+                        //If library receives an invalid key error, it will attempt to restore the key by working with the API
+//                        if(!noke.isRestoring) {
+//                            restoreDevice(noke);
+//                        }
+                    }
                     break;
                 }
                 case NokeDefines.INVALIDCMD_ResultType: {
@@ -945,12 +987,22 @@ public class NokeDeviceManagerService extends Service {
                 case NokeDefines.SHUTDOWN_ResultType: {
                     moveToNext(noke);
                     byte lockstate = data[2];
+                    Boolean isLocked = true;
                     if (lockstate == 0) {
                         noke.lockState = NokeDefines.NOKE_LOCK_STATE_UNLOCKED;
+                        isLocked = false;
                     } else {
                         noke.lockState = NokeDefines.NOKE_LOCK_STATE_LOCKED;
                         mGlobalNokeListener.onNokeLocked(noke);
                     }
+
+                    byte timeoutstate = data[3];
+                    Boolean didTimeout = true;
+                    if(timeoutstate == 1){
+                        didTimeout = false;
+                    }
+
+                    mGlobalNokeListener.onNokeShutdown(noke, isLocked, didTimeout);
                     disconnectNoke(noke);
                     break;
                 }
@@ -1335,7 +1387,7 @@ public class NokeDeviceManagerService extends Service {
      * @param uploadUrl string of the url
      */
     @SuppressWarnings({"unused", "SameParameterValue"})
-    public void setUploadUrl(String uploadUrl) {
+    private void setUploadUrl(String uploadUrl) {
         NokeDefines.uploadURL = uploadUrl;
     }
 
@@ -1349,6 +1401,108 @@ public class NokeDeviceManagerService extends Service {
                 this.globalUploadQueue.clear();
             }
             this.getNokeListener().onDataUploaded(errorCode, message);
+        } catch (JSONException e) {
+            this.getNokeListener().onDataUploaded(NokeMobileError.ERROR_JSON_UPLOAD, e.toString());
+        }
+    }
+
+    private void restoreDevice(NokeDevice noke){
+        noke.isRestoring = true;
+        restoreKey(noke);
+    }
+
+    private void restoreKey(final NokeDevice noke)
+    {
+        Thread thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+                try {
+                    JSONObject jsonObject = new JSONObject();
+                    jsonObject.accumulate("session", noke.getSession());
+                    jsonObject.accumulate("mac", noke.getMac());
+                    String url = NokeDefines.uploadURL.replace("upload/","restore/");
+                    try {
+                        PackageManager pm = getApplicationContext().getPackageManager();
+                        ApplicationInfo ai = pm.getApplicationInfo(getApplicationContext().getPackageName(), PackageManager.GET_META_DATA);
+                        Bundle bundle = ai.metaData;
+                        String nokeMobileApiKey = bundle.getString(NokeDefines.NOKE_MOBILE_API_KEY);
+                        NokeDeviceManagerService.this.restoreKeyCallback(NokeMobileApiClient.POST(url, jsonObject.toString(), nokeMobileApiKey), noke);
+                    } catch (PackageManager.NameNotFoundException | NullPointerException e) {
+                        e.printStackTrace();
+                        mGlobalNokeListener.onError(null, NokeMobileError.ERROR_MISSING_API_KEY, "No API Key found. Have you set it in your Android Manifest?");
+                        noke.isRestoring = false;
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    noke.isRestoring = false;
+                }
+            }
+        });
+
+        thread.start();
+
+
+    }
+
+    private void restoreKeyCallback(String response, NokeDevice noke){
+        try{
+            JSONObject obj = new JSONObject(response);
+            String result = obj.getString("result");
+            if(result.equals("success")){
+                JSONObject data = obj.getJSONObject("data");
+                String commandString = data.getString("commands");
+                noke.sendCommands(commandString);
+            }else{
+                noke.isRestoring = false;
+            }
+        }catch (JSONException e){
+            Log.e(TAG, e.toString());
+            noke.isRestoring = false;
+        }
+    }
+
+
+    private void confirmRestore(final String mac, final int commandid){
+        Thread thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+                try {
+                    JSONObject jsonObject = new JSONObject();
+                    jsonObject.accumulate("mac", mac);
+                    jsonObject.accumulate("command_id", commandid);
+                    String url = NokeDefines.uploadURL.replace("upload/","restore/confirm/");
+                    try {
+                        PackageManager pm = getApplicationContext().getPackageManager();
+                        ApplicationInfo ai = pm.getApplicationInfo(getApplicationContext().getPackageName(), PackageManager.GET_META_DATA);
+                        Bundle bundle = ai.metaData;
+                        String nokeMobileApiKey = bundle.getString(NokeDefines.NOKE_MOBILE_API_KEY);
+                        NokeDeviceManagerService.this.confirmRestoreCallback(NokeMobileApiClient.POST(url, jsonObject.toString(), nokeMobileApiKey));
+                    } catch (PackageManager.NameNotFoundException | NullPointerException e) {
+                        e.printStackTrace();
+                        mGlobalNokeListener.onError(null, NokeMobileError.ERROR_MISSING_API_KEY, "No API Key found. Have you set it in your Android Manifest?");
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+
+        thread.start();
+    }
+
+    private void confirmRestoreCallback(String s) {
+        try {
+            JSONObject obj = new JSONObject(s);
+            int errorCode = obj.getInt("error_code");
+            String message = obj.getString("message");
+
+            if (errorCode == NokeMobileError.SUCCESS) {
+                Log.w(TAG, "RESTORE SUCCESSFUL");
+                this.getNokeListener().onDataUploaded(errorCode, "Restore Successful: " + message);
+            }
+
         } catch (JSONException e) {
             this.getNokeListener().onDataUploaded(NokeMobileError.ERROR_JSON_UPLOAD, e.toString());
         }

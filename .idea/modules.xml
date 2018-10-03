@@ -4,7 +4,6 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/android-noke-mobile.iml" filepath="$PROJECT_DIR$/android-noke-mobile.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
-      <module fileurl="file://$PROJECT_DIR$/noke-mobile-library-android.iml" filepath="$PROJECT_DIR$/noke-mobile-library-android.iml" />
       <module fileurl="file://$PROJECT_DIR$/nokemobilelibrary/nokemobilelibrary.iml" filepath="$PROJECT_DIR$/nokemobilelibrary/nokemobilelibrary.iml" />
     </modules>
   </component>
