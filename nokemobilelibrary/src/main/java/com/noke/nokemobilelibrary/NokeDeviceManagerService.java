@@ -1380,6 +1380,7 @@ public class NokeDeviceManagerService extends Service {
             final String action = intent.getAction();
             if (action != null) {
                 if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
+                    Log.d(TAG, "#### *** action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)");
                     final int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
                     switch (state) {
                         case BluetoothAdapter.STATE_OFF:
@@ -1393,6 +1394,14 @@ public class NokeDeviceManagerService extends Service {
                             break;
                     }
                     mGlobalNokeListener.onBluetoothStatusChanged(state);
+                } else if (action.equals(BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED)) {
+                    Log.d(TAG, "#### *** action.equals(BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED)");
+                } else if (action.equals(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)) {
+                    Log.d(TAG, "#### *** action.equals(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)");
+                } else if (action.equals(BluetoothAdapter.ACTION_DISCOVERY_STARTED)) {
+                    Log.d(TAG, "#### *** action.equals(BluetoothAdapter.ACTION_DISCOVERY_STARTED)");
+                } else {
+                    Log.d(TAG, "#### *** action.equals( - not checked for - )");
                 }
             }
         }
