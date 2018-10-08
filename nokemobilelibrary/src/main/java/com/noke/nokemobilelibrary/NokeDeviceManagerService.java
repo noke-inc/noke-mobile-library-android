@@ -760,6 +760,7 @@ public class NokeDeviceManagerService extends Service {
         public void onConnectionStateChange(final BluetoothGatt gatt, int status, int newState) {
             final NokeDevice noke = nokeDevices.get(gatt.getDevice().getAddress());
             if (status == NokeDefines.NOKE_GATT_ERROR) {
+                Log.d(TAG, "### status == NokeDefines.NOKE_GATT_ERROR");
                 if (noke.connectionAttempts > 4) {
                     Handler handler = new Handler(Looper.getMainLooper());
                     handler.post(new Runnable() {
@@ -794,6 +795,7 @@ public class NokeDeviceManagerService extends Service {
                     });
                 }
             } else if (newState == BluetoothProfile.STATE_CONNECTED) {
+                Log.d(TAG, "### newState == BluetoothProfile.STATE_CONNECTED");
                 noke.connectionAttempts = 0;
                 noke.connectionState = NokeDefines.NOKE_STATE_CONNECTING;
                 noke.isRestoring = false;
@@ -815,6 +817,7 @@ public class NokeDeviceManagerService extends Service {
                     }
                 });
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                Log.d(TAG, "### newState == BluetoothProfile.STATE_DISCONNECTED");
 
                 if (noke.connectionState == 2) {
                     Handler handler = new Handler(Looper.getMainLooper());
@@ -946,6 +949,7 @@ public class NokeDeviceManagerService extends Service {
             byte resulttype = data[1];
             switch (resulttype) {
                 case NokeDefines.SUCCESS_ResultType: {
+                    Log.d(TAG, "### NokeDefines.SUCCESS_ResultType");
                     int commandid = data[2];
                     if(noke.isRestoring) {
                         noke.commands.clear();
@@ -964,6 +968,7 @@ public class NokeDeviceManagerService extends Service {
                     break;
                 }
                 case NokeDefines.INVALIDKEY_ResultType: {
+                    Log.d(TAG, "### NokeDefines.INVALIDKEY_ResultType");
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_KEY, "Invalid Key Result");
                     moveToNext(noke);
                     if (noke.commands.size() == 0) {
@@ -975,16 +980,19 @@ public class NokeDeviceManagerService extends Service {
                     break;
                 }
                 case NokeDefines.INVALIDCMD_ResultType: {
+                    Log.d(TAG, "### NokeDefines.INVALIDCMD_ResultType");
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_CMD, "Invalid Command Result");
                     moveToNext(noke);
                     break;
                 }
                 case NokeDefines.INVALIDPERMISSION_ResultType: {
+                    Log.d(TAG, "### NokeDefines.INVALIDPERMISSION_ResultType");
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_PERMISSION, "Invalid Permission (wrong key) Result");
                     moveToNext(noke);
                     break;
                 }
                 case NokeDefines.SHUTDOWN_ResultType: {
+                    Log.d(TAG, "### NokeDefines.SHUTDOWN_ResultType");
                     moveToNext(noke);
                     byte lockstate = data[2];
                     Boolean isLocked = true;
@@ -1007,16 +1015,19 @@ public class NokeDeviceManagerService extends Service {
                     break;
                 }
                 case NokeDefines.INVALIDDATA_ResultType: {
+                    Log.d(TAG, "### NokeDefines.INVALIDDATA_ResultType");
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_DATA, "Invalid Data Result");
                     moveToNext(noke);
                     break;
                 }
                 case NokeDefines.INVALID_ResultType: {
+                    Log.d(TAG, "### NokeDefines.INVALID_ResultType");
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_RESULT, "Invalid Result");
                     moveToNext(noke);
                     break;
                 }
                 default: {
+                    Log.d(TAG, "### default");
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_UNKNOWN, "Invalid packet received");
                     moveToNext(noke);
                     break;
