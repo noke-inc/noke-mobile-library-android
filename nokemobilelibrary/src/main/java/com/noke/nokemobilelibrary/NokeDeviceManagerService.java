@@ -562,8 +562,11 @@ public class NokeDeviceManagerService extends Service {
         mOldBluetoothScanCallback = new BluetoothAdapter.LeScanCallback() {
             @Override
             public void onLeScan(final BluetoothDevice bluetoothDevice, final int rssi, byte[] scanRecord) {
+                Log.d(TAG, "### onLeScan");
                 if (bluetoothDevice.getName() != null) {
+                    Log.d(TAG, "### bluetoothDevice.getName() != null");
                     if (bluetoothDevice.getName().contains(NokeDefines.NOKE_DEVICE_IDENTIFER_STRING)) {
+                        Log.d(TAG, "### TRUE:  bluetoothDevice.getName().contains(NokeDefines.NOKE_DEVICE_IDENTIFER_STRING)");
                         // NokeDevice noke = new NokeDevice(bluetoothDevice.getName(), bluetoothDevice.getAddress());
                         NokeDevice noke = nokeDevices.get(bluetoothDevice.getAddress());
                         if (noke != null || mAllowAllDevices) {
@@ -598,6 +601,9 @@ public class NokeDeviceManagerService extends Service {
                             }
                         }
 
+
+                    } else {
+                        Log.d(TAG, "### FALSE: bluetoothDevice.getName().contains(NokeDefines.NOKE_DEVICE_IDENTIFER_STRING)");
 
                     }
                 }
