@@ -1006,26 +1006,29 @@ public class NokeDeviceManagerService extends Service {
                     break;
                 }
                 case NokeDefines.SHUTDOWN_ResultType: {
-                    Log.d(TAG, "### NokeDefines.SHUTDOWN_ResultType");
+                    Log.d(TAG, "### *** NokeDefines.SHUTDOWN_ResultType");
                     moveToNext(noke);
                     byte lockstate = data[2];
                     Boolean isLocked = true;
                     if (lockstate == 0) {
                         noke.lockState = NokeDefines.NOKE_LOCK_STATE_UNLOCKED;
                         isLocked = false;
-                        // mGlobalNokeListener.onNokeShutdown(noke, isLocked, true); //
+                        // mGlobalNokeListener.onNokeShutdown(noke, isLocked, true); // works when lock is left unlocked 
                     } else {
                         noke.lockState = NokeDefines.NOKE_LOCK_STATE_LOCKED;
-                        mGlobalNokeListener.onNokeLocked(noke);
+                        // mGlobalNokeListener.onNokeLocked(noke);
                     }
 
-                    mGlobalNokeListener.onNokeShutdown(noke, isLocked, true); //
+                    // mGlobalNokeListener.onNokeShutdown(noke, isLocked, true); // works when lock is left unlocked; does not work when lock is left locked 
 
                     byte timeoutstate = data[3];
                     Boolean didTimeout = true;
                     if(timeoutstate == 1){
                         didTimeout = false;
                     }
+
+                    Log.d(TAG, "### *** isLocked: " + String.valueOf(isLocked));
+                    Log.d(TAG, "### *** didTimeout: " + String.valueOf(didTimeout));
 
                     mGlobalNokeListener.onNokeShutdown(noke, isLocked, didTimeout);
                     disconnectNoke(noke);
