@@ -1013,11 +1013,13 @@ public class NokeDeviceManagerService extends Service {
                     if (lockstate == 0) {
                         noke.lockState = NokeDefines.NOKE_LOCK_STATE_UNLOCKED;
                         isLocked = false;
-                        mGlobalNokeListener.onNokeShutdown(noke, isLocked, true); //
+                        // mGlobalNokeListener.onNokeShutdown(noke, isLocked, true); //
                     } else {
                         noke.lockState = NokeDefines.NOKE_LOCK_STATE_LOCKED;
                         mGlobalNokeListener.onNokeLocked(noke);
                     }
+
+                    mGlobalNokeListener.onNokeShutdown(noke, isLocked, true); //
 
                     byte timeoutstate = data[3];
                     Boolean didTimeout = true;
