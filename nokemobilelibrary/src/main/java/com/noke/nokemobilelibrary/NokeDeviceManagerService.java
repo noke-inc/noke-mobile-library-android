@@ -197,24 +197,17 @@ public class NokeDeviceManagerService extends Service {
 
     @Override
     public void onCreate() {
-        Log.d(TAG, "### *** onCreate (will register bluetoothBroadcastReceiver)");
         super.onCreate();
-        Log.d(TAG, "### *** onCreate (after super)");
         IntentFilter btFilter = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
-        Log.d(TAG, "### *** onCreate (after declaring & assigning btFilter)");
         registerReceiver(bluetoothBroadcastReceiver, btFilter);
-        Log.d(TAG, "### *** onCreate (after registerReceiver)");
         mReceiverRegistered = true;
         mAllowAllDevices = false;
         if (nokeDevices == null) {
             nokeDevices = new LinkedHashMap<>();
         }
         setBluetoothDelayDefault(NokeDefines.BLUETOOTH_DEFAULT_SCAN_TIME);
-        Log.d(TAG, "### *** onCreate (after setBluetoothDelayDefault)");
         setBluetoothDelayBackgroundDefault(NokeDefines.BLUETOOTH_DEFAULT_SCAN_TIME_BACKGROUND);
-        Log.d(TAG, "### *** onCreate (after setBluetoothDelayBackgroundDefault)");
         setBluetoothScanDuration(NokeDefines.BLUETOOTH_DEFAULT_SCAN_DURATION);
-        Log.d(TAG, "### *** onCreate (after setBluetoothScanDuration)");
     }
 
     public String getApiKey() {
@@ -325,7 +318,6 @@ public class NokeDeviceManagerService extends Service {
 
     @Override
     public void onDestroy() {
-        Log.d(TAG, "### *** onDestroy (will unregister bluetoothBroadcastReceiver)");
         super.onDestroy();
         if (mReceiverRegistered) {
             unregisterReceiver(bluetoothBroadcastReceiver);
@@ -570,11 +562,8 @@ public class NokeDeviceManagerService extends Service {
         mOldBluetoothScanCallback = new BluetoothAdapter.LeScanCallback() {
             @Override
             public void onLeScan(final BluetoothDevice bluetoothDevice, final int rssi, byte[] scanRecord) {
-                Log.d(TAG, "### onLeScan");
                 if (bluetoothDevice.getName() != null) {
-                    Log.d(TAG, "### bluetoothDevice.getName() != null");
                     if (bluetoothDevice.getName().contains(NokeDefines.NOKE_DEVICE_IDENTIFER_STRING)) {
-                        Log.d(TAG, "### bluetoothDevice name does contain NOKE_DEVICE_IDENTIFER_STRING");
                         // NokeDevice noke = new NokeDevice(bluetoothDevice.getName(), bluetoothDevice.getAddress());
                         NokeDevice noke = nokeDevices.get(bluetoothDevice.getAddress());
                         if (noke != null || mAllowAllDevices) {
@@ -610,10 +599,7 @@ public class NokeDeviceManagerService extends Service {
                         }
 
 
-                    } else {
-                        Log.d(TAG, "### bluetoothDevice name does NOT contain NOKE_DEVICE_IDENTIFER_STRING");
-
-                    }
+                    } 
                 }
             }
         };
@@ -774,7 +760,6 @@ public class NokeDeviceManagerService extends Service {
         public void onConnectionStateChange(final BluetoothGatt gatt, int status, int newState) {
             final NokeDevice noke = nokeDevices.get(gatt.getDevice().getAddress());
             if (status == NokeDefines.NOKE_GATT_ERROR) {
-                Log.d(TAG, "### status == NokeDefines.NOKE_GATT_ERROR");
                 if (noke.connectionAttempts > 4) {
                     Handler handler = new Handler(Looper.getMainLooper());
                     handler.post(new Runnable() {
@@ -809,7 +794,6 @@ public class NokeDeviceManagerService extends Service {
                     });
                 }
             } else if (newState == BluetoothProfile.STATE_CONNECTED) {
-                Log.d(TAG, "### newState == BluetoothProfile.STATE_CONNECTED");
                 noke.connectionAttempts = 0;
                 noke.connectionState = NokeDefines.NOKE_STATE_CONNECTING;
                 noke.isRestoring = false;
@@ -831,7 +815,6 @@ public class NokeDeviceManagerService extends Service {
                     }
                 });
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                Log.d(TAG, "### newState == BluetoothProfile.STATE_DISCONNECTED");
 
                 if (noke.connectionState == 2) {
                     Handler handler = new Handler(Looper.getMainLooper());
@@ -963,7 +946,6 @@ public class NokeDeviceManagerService extends Service {
             byte resulttype = data[1];
             switch (resulttype) {
                 case NokeDefines.SUCCESS_ResultType: {
-                    Log.d(TAG, "### NokeDefines.SUCCESS_ResultType");
                     int commandid = data[2];
                     if(noke.isRestoring) {
                         noke.commands.clear();
@@ -982,7 +964,6 @@ public class NokeDeviceManagerService extends Service {
                     break;
                 }
                 case NokeDefines.INVALIDKEY_ResultType: {
-                    Log.d(TAG, "### NokeDefines.INVALIDKEY_ResultType");
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_KEY, "Invalid Key Result");
                     moveToNext(noke);
                     if (noke.commands.size() == 0) {
@@ -994,32 +975,26 @@ public class NokeDeviceManagerService extends Service {
                     break;
                 }
                 case NokeDefines.INVALIDCMD_ResultType: {
-                    Log.d(TAG, "### NokeDefines.INVALIDCMD_ResultType");
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_CMD, "Invalid Command Result");
                     moveToNext(noke);
                     break;
                 }
                 case NokeDefines.INVALIDPERMISSION_ResultType: {
-                    Log.d(TAG, "### NokeDefines.INVALIDPERMISSION_ResultType");
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_PERMISSION, "Invalid Permission (wrong key) Result");
                     moveToNext(noke);
                     break;
                 }
                 case NokeDefines.SHUTDOWN_ResultType: {
-                    Log.d(TAG, "### *** NokeDefines.SHUTDOWN_ResultType");
                     moveToNext(noke);
                     byte lockstate = data[2];
                     Boolean isLocked = true;
                     if (lockstate == 0) {
                         noke.lockState = NokeDefines.NOKE_LOCK_STATE_UNLOCKED;
                         isLocked = false;
-                        // mGlobalNokeListener.onNokeShutdown(noke, isLocked, true); // works when lock is left unlocked 
                     } else {
                         noke.lockState = NokeDefines.NOKE_LOCK_STATE_LOCKED;
                         // mGlobalNokeListener.onNokeLocked(noke);
                     }
-
-                    // mGlobalNokeListener.onNokeShutdown(noke, isLocked, true); // works when lock is left unlocked; does not work when lock is left locked 
 
                     byte timeoutstate = data[3];
                     Boolean didTimeout = true;
@@ -1027,27 +1002,21 @@ public class NokeDeviceManagerService extends Service {
                         didTimeout = false;
                     }
 
-                    Log.d(TAG, "### *** isLocked: " + String.valueOf(isLocked));
-                    Log.d(TAG, "### *** didTimeout: " + String.valueOf(didTimeout));
-
                     mGlobalNokeListener.onNokeShutdown(noke, isLocked, didTimeout);
                     disconnectNoke(noke);
                     break;
                 }
                 case NokeDefines.INVALIDDATA_ResultType: {
-                    Log.d(TAG, "### NokeDefines.INVALIDDATA_ResultType");
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_DATA, "Invalid Data Result");
                     moveToNext(noke);
                     break;
                 }
                 case NokeDefines.INVALID_ResultType: {
-                    Log.d(TAG, "### NokeDefines.INVALID_ResultType");
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_RESULT, "Invalid Result");
                     moveToNext(noke);
                     break;
                 }
                 default: {
-                    Log.d(TAG, "### default");
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_UNKNOWN, "Invalid packet received");
                     moveToNext(noke);
                     break;
@@ -1391,11 +1360,9 @@ public class NokeDeviceManagerService extends Service {
     private final BroadcastReceiver bluetoothBroadcastReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            Log.d(TAG, "### *** BroadcastReceiver.onReceive");
             final String action = intent.getAction();
             if (action != null) {
                 if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
-                    Log.d(TAG, "### *** action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)");
                     final int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
                     switch (state) {
                         case BluetoothAdapter.STATE_OFF:
@@ -1409,14 +1376,6 @@ public class NokeDeviceManagerService extends Service {
                             break;
                     }
                     mGlobalNokeListener.onBluetoothStatusChanged(state);
-                } else if (action.equals(BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED)) {
-                    Log.d(TAG, "### *** action.equals(BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED)");
-                } else if (action.equals(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)) {
-                    Log.d(TAG, "### *** action.equals(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)");
-                } else if (action.equals(BluetoothAdapter.ACTION_DISCOVERY_STARTED)) {
-                    Log.d(TAG, "### *** action.equals(BluetoothAdapter.ACTION_DISCOVERY_STARTED)");
-                } else {
-                    Log.d(TAG, "### *** action.equals( - not checked for - )");
                 }
             }
         }
