@@ -1,5 +1,9 @@
 package com.noke.nokeapidemo;
 
+import android.content.Context;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
+import android.os.Bundle;
 import android.util.Log;
 
 import com.noke.nokemobilelibrary.NokeDevice;
@@ -27,7 +31,7 @@ import javax.net.ssl.SSLContext;
 class DemoWebClient {
 
     private final static String TAG = DemoWebClient.class.getSimpleName();
-    private String serverUrl = "DEMO_URL_HERE";
+    private String serverUrl = "DEMO SERVER URL";
     private DemoWebClientCallback mDemoWebClientCallback;
 
     private static String POST(String urlStr, JSONObject jsonObject)
@@ -56,8 +60,6 @@ class DemoWebClient {
             conn.setRequestProperty("Connection", "close");
             conn.setRequestProperty("charset", "utf-8");
 
-            Log.w(TAG, "URL: " + url + "\nJSON: " + jsonObject.toString());
-
             DataOutputStream wr = new DataOutputStream( conn.getOutputStream());
             wr.writeBytes(jsonObject.toString());
             wr.flush();
@@ -79,7 +81,6 @@ class DemoWebClient {
             e.printStackTrace();
         }
 
-        Log.w(TAG, "RESULT: " + result);
         return result;
     }
 
@@ -112,10 +113,7 @@ class DemoWebClient {
 
                     jsonObject.accumulate("session", noke.getSession());
                     jsonObject.accumulate("mac", noke.getMac());
-                    jsonObject.accumulate("email", email);
-
                     String url = serverUrl + "unlock/";
-                    //Log.d("CLIENT", "UNLOCK URL IS: " + url);
 
                     mDemoWebClientCallback.onUnlockReceived(POST(url, jsonObject), noke);
 

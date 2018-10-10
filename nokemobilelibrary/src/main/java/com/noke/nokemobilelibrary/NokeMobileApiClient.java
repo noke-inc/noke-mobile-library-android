@@ -1,11 +1,5 @@
 package com.noke.nokemobilelibrary;
 
-import android.content.Context;
-import android.os.Build;
-import android.util.Log;
-
-import org.json.JSONObject;
-
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -20,11 +14,12 @@ import javax.net.ssl.SSLContext;
 
 /**
  * Created by Spencer on 6/22/18.
+ * Client class for making requests directly to the Core API
  */
 
-public class NokeMobileApiClient {
+class NokeMobileApiClient {
 
-    public static String POST(String urlStr, String jsonString, String apiKey)
+    static String POST(String urlStr, String jsonString, String apiKey)
     {
         HttpURLConnection conn;
         InputStream inputStream;
@@ -35,14 +30,10 @@ public class NokeMobileApiClient {
 
             URL url = new URL(urlStr);
             conn = (HttpURLConnection) url.openConnection();
-
             //Create the SSL connection
             SSLContext sc;
             sc = SSLContext.getInstance("TLS");
             sc.init(null, null, new java.security.SecureRandom());
-
-            int versionCode = BuildConfig.VERSION_CODE;
-            String versionName = BuildConfig.VERSION_NAME;
 
             //set Timeout and method
             conn.setReadTimeout(60000);
@@ -54,7 +45,6 @@ public class NokeMobileApiClient {
             conn.setRequestProperty("Connection", "close");
             conn.setRequestProperty("charset", "utf-8");
             conn.setRequestProperty("Authorization", "Bearer " + apiKey);
-
 
             DataOutputStream wr = new DataOutputStream( conn.getOutputStream());
             wr.writeBytes(jsonString);
@@ -73,8 +63,6 @@ public class NokeMobileApiClient {
             else{
                 result = "Did not work!";
             }
-
-
         } catch (IOException |NoSuchAlgorithmException |KeyManagementException e) {
             e.printStackTrace();
         }
@@ -84,10 +72,10 @@ public class NokeMobileApiClient {
     private static String convertInputStreamToString(InputStream inputStream) throws IOException {
         BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
         String line;
-        String result = "";
+        StringBuilder result = new StringBuilder();
         while ((line = bufferedReader.readLine()) != null)
-            result += line;
+            result.append(line);
         inputStream.close();
-        return result;
+        return result.toString();
     }
 }

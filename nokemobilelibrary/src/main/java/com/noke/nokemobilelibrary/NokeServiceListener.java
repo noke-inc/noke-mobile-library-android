@@ -30,6 +30,8 @@ public interface NokeServiceListener  {
 
     void onNokeUnlocked(NokeDevice noke);
 
+    void onNokeShutdown(NokeDevice noke, Boolean isLocked, Boolean didTimeout);
+
     void onNokeLocked(NokeDevice noke);
 
     void onNokeDisconnected(NokeDevice noke);
