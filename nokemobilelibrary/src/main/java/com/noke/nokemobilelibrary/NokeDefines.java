@@ -26,7 +26,7 @@ public class NokeDefines {
     /**
      * Default scan off time for foreground scanning
      */
-    static final int BLUETOOTH_DEFAULT_SCAN_TIME                    = 5000;
+    static final int BLUETOOTH_DEFAULT_SCAN_TIME                    = 10;
     /**
      * Default scan off time for background scanning
      */
