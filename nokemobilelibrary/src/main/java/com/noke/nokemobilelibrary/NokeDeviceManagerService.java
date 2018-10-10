@@ -551,35 +551,40 @@ public class NokeDeviceManagerService extends Service {
         mOldBluetoothScanCallback = new BluetoothAdapter.LeScanCallback() {
             @Override
             public void onLeScan(final BluetoothDevice bluetoothDevice, final int rssi, byte[] scanRecord) {
-                if (bluetoothDevice.getName() != null) {
-                    if (bluetoothDevice.getName().contains(NokeDefines.NOKE_DEVICE_IDENTIFER_STRING)) {
-                        NokeDevice noke = new NokeDevice(bluetoothDevice.getName(), bluetoothDevice.getAddress());
+                String btDeviceName = bluetoothDevice.getName();
+                if (btDeviceName != null && btDeviceName.contains(NokeDefines.NOKE_DEVICE_IDENTIFER_STRING)) {
+                    NokeDevice noke = nokeDevices.get(bluetoothDevice.getAddress());
+                    if (noke != null || mAllowAllDevices) {
+                        if (noke == null) {
+                          noke = new NokeDevice(btDeviceName, bluetoothDevice.getAddress());
+                        }
                         noke.bluetoothDevice = bluetoothDevice;
                         noke.setLastSeen(new Date().getTime());
-                        if (nokeDevices.get(noke.getMac()) != null || mAllowAllDevices) {
-                            byte[] broadcastData;
-                            String nameVersion;
+                        byte[] broadcastData;
+                        String nameVersion;
 
-                            if (bluetoothDevice.getName().contains("FOB") && !bluetoothDevice.getName().contains("NFOB")) {
-                                nameVersion = bluetoothDevice.getName().substring(3, 5);
-                            } else {
-                                nameVersion = bluetoothDevice.getName().substring(4, 6);
-                            }
-
-                            if (!nameVersion.equals("06") && !nameVersion.equals("04")) {
-                                byte[] getdata = getManufacturerData(scanRecord);
-                                broadcastData = new byte[]{getdata[2], getdata[3], getdata[4]};
-                                String version = noke.getVersion(broadcastData, bluetoothDevice.getName());
-                                noke.setVersion(version);
-                                noke.bluetoothDevice = bluetoothDevice;
-                                nokeDevices.put(noke.getMac(), noke);
-                                noke.connectionState = NokeDefines.NOKE_STATE_DISCOVERED;
-                                mGlobalNokeListener.onNokeDiscovered(noke);
-                            }
+                        if (btDeviceName.contains("FOB") && !btDeviceName.contains("NFOB")) {
+                            nameVersion = btDeviceName.substring(3, 5);
+                        } else {
+                            nameVersion = btDeviceName.substring(4, 6);
                         }
 
+                        if (!nameVersion.equals("06") && !nameVersion.equals("04")) {
+                            byte[] getdata = getManufacturerData(scanRecord);
+                            broadcastData = new byte[]{getdata[2], getdata[3], getdata[4]};
+                            String version = noke.getVersion(broadcastData, btDeviceName);
+                            noke.setVersion(version);
+                            noke.bluetoothDevice = bluetoothDevice;
+                            noke.connectionState = NokeDefines.NOKE_STATE_DISCOVERED;
 
+                            if (nokeDevices.get(noke.getMac()) == null) {
+                                nokeDevices.put(noke.getMac(), noke);
+                            }
+                            mGlobalNokeListener.onNokeDiscovered(noke);
+                        }
                     }
+
+
                 }
             }
         };
