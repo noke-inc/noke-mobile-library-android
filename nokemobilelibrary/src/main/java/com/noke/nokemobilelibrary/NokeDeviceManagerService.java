@@ -951,12 +951,12 @@ public class NokeDeviceManagerService extends Service {
                 case NokeDefines.INVALIDKEY_ResultType: {
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_KEY, "Invalid Key Result");
                     moveToNext(noke);
-                    if (noke.commands.size() == 0) {
+//                    if (noke.commands.size() == 0) {
                         //If library receives an invalid key error, it will attempt to restore the key by working with the API
 //                        if(!noke.isRestoring) {
 //                            restoreDevice(noke);
 //                        }
-                    }
+//                    }
                     break;
                 }
                 case NokeDefines.INVALIDCMD_ResultType: {
@@ -1275,24 +1275,32 @@ public class NokeDeviceManagerService extends Service {
      */
 
     void writeRXCharacteristic(NokeDevice noke) {
-        BluetoothGattService RxService = noke.gatt.getService(NokeDefines.RX_SERVICE_UUID);
-        if (noke.gatt == null) {
-            return;
-        }
 
-        if (RxService == null) {
-            mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
-            return;
-        }
-        BluetoothGattCharacteristic RxChar = RxService.getCharacteristic(NokeDefines.RX_CHAR_UUID);
-        if (RxChar == null) {
-            mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
-            return;
-        }
+        try{
+            if (noke.gatt == null) {
+                return;
+            }
 
-        RxChar.setValue(NokeDefines.hexToBytes(noke.commands.get(0)));
-        boolean status = noke.gatt.writeCharacteristic(RxChar);
-        Log.d(TAG, "write TXchar - status =" + status);
+            BluetoothGattService RxService = noke.gatt.getService(NokeDefines.RX_SERVICE_UUID);
+
+
+            if (RxService == null) {
+                mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
+                return;
+            }
+            BluetoothGattCharacteristic RxChar = RxService.getCharacteristic(NokeDefines.RX_CHAR_UUID);
+            if (RxChar == null) {
+                mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
+                return;
+            }
+
+            RxChar.setValue(NokeDefines.hexToBytes(noke.commands.get(0)));
+            boolean status = noke.gatt.writeCharacteristic(RxChar);
+            Log.d(TAG, "write TXchar - status =" + status);
+        }
+        catch (NullPointerException e){
+            mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
+        }
     }
 
     /**
