@@ -583,8 +583,6 @@ public class NokeDeviceManagerService extends Service {
                             mGlobalNokeListener.onNokeDiscovered(noke);
                         }
                     }
-
-
                 }
             }
         };

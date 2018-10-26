@@ -261,6 +261,15 @@ public class NokeDevice {
         this.trackingKey = trackingKey;
     }
 
+    @SuppressWarnings("unused")
+    public int getConnectionState() {
+        return connectionState;
+    }
+
+    @SuppressWarnings("unused")
+    public void setConnectionState(int connectionState) {
+        this.connectionState = connectionState;
+    }
 
     /**
      * Sends a + delimited string of commands to the lock
