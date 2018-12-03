@@ -562,44 +562,38 @@ public class NokeDeviceManagerService extends Service {
         mOldBluetoothScanCallback = new BluetoothAdapter.LeScanCallback() {
             @Override
             public void onLeScan(final BluetoothDevice bluetoothDevice, final int rssi, byte[] scanRecord) {
-                if (bluetoothDevice.getName() != null) {
-                    if (bluetoothDevice.getName().contains(NokeDefines.NOKE_DEVICE_IDENTIFER_STRING)) {
-                        // NokeDevice noke = new NokeDevice(bluetoothDevice.getName(), bluetoothDevice.getAddress());
-                        NokeDevice noke = nokeDevices.get(bluetoothDevice.getAddress());
-                        if (noke != null || mAllowAllDevices) {
-                            if (noke == null) {
-                                noke = new NokeDevice(bluetoothDevice.getName(), bluetoothDevice.getAddress());
-                            }
-                            noke.bluetoothDevice = bluetoothDevice;
-                            noke.setLastSeen(new Date().getTime());
-                        // if (nokeDevices.get(noke.getMac()) != null || mAllowAllDevices) {
-                            byte[] broadcastData;
-                            String nameVersion;
+                String btDeviceName = bluetoothDevice.getName();
+                if (btDeviceName != null && btDeviceName.contains(NokeDefines.NOKE_DEVICE_IDENTIFER_STRING)) {
+                    NokeDevice noke = nokeDevices.get(bluetoothDevice.getAddress());
+                    if (noke != null || mAllowAllDevices) {
+                        if (noke == null) {
+                          noke = new NokeDevice(btDeviceName, bluetoothDevice.getAddress());
+                        }
+                        noke.bluetoothDevice = bluetoothDevice;
+                        noke.setLastSeen(new Date().getTime());
+                        byte[] broadcastData;
+                        String nameVersion;
 
-                            if (bluetoothDevice.getName().contains("FOB") && !bluetoothDevice.getName().contains("NFOB")) {
-                                nameVersion = bluetoothDevice.getName().substring(3, 5);
-                            } else {
-                                nameVersion = bluetoothDevice.getName().substring(4, 6);
-                            }
-
-                            if (!nameVersion.equals("06") && !nameVersion.equals("04")) {
-                                byte[] getdata = getManufacturerData(scanRecord);
-                                broadcastData = new byte[]{getdata[2], getdata[3], getdata[4]};
-                                String version = noke.getVersion(broadcastData, bluetoothDevice.getName());
-                                noke.setVersion(version);
-                                noke.bluetoothDevice = bluetoothDevice;
-
-                                if (nokeDevices.get(noke.getMac()) == null) {
-                                    nokeDevices.put(noke.getMac(), noke);
-                                }
-
-                                noke.connectionState = NokeDefines.NOKE_STATE_DISCOVERED;
-                                mGlobalNokeListener.onNokeDiscovered(noke);
-                            }
+                        if (btDeviceName.contains("FOB") && !btDeviceName.contains("NFOB")) {
+                            nameVersion = btDeviceName.substring(3, 5);
+                        } else {
+                            nameVersion = btDeviceName.substring(4, 6);
                         }
 
+                        if (!nameVersion.equals("06") && !nameVersion.equals("04")) {
+                            byte[] getdata = getManufacturerData(scanRecord);
+                            broadcastData = new byte[]{getdata[2], getdata[3], getdata[4]};
+                            String version = noke.getVersion(broadcastData, btDeviceName);
+                            noke.setVersion(version);
+                            noke.bluetoothDevice = bluetoothDevice;
+                            noke.connectionState = NokeDefines.NOKE_STATE_DISCOVERED;
 
-                    } 
+                            if (nokeDevices.get(noke.getMac()) == null) {
+                                nokeDevices.put(noke.getMac(), noke);
+                            }
+                            mGlobalNokeListener.onNokeDiscovered(noke);
+                        }
+                    }
                 }
             }
         };
@@ -966,12 +960,12 @@ public class NokeDeviceManagerService extends Service {
                 case NokeDefines.INVALIDKEY_ResultType: {
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_KEY, "Invalid Key Result");
                     moveToNext(noke);
-                    if (noke.commands.size() == 0) {
+//                    if (noke.commands.size() == 0) {
                         //If library receives an invalid key error, it will attempt to restore the key by working with the API
 //                        if(!noke.isRestoring) {
 //                            restoreDevice(noke);
 //                        }
-                    }
+//                    }
                     break;
                 }
                 case NokeDefines.INVALIDCMD_ResultType: {
@@ -1290,25 +1284,41 @@ public class NokeDeviceManagerService extends Service {
      * @param noke Noke device
      */
 
-    void writeRXCharacteristic(NokeDevice noke) {
-        BluetoothGattService RxService = noke.gatt.getService(NokeDefines.RX_SERVICE_UUID);
-        if (noke.gatt == null) {
-            return;
-        }
+    void writeRXCharacteristic(final NokeDevice noke) {
 
-        if (RxService == null) {
-            mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
-            return;
-        }
-        BluetoothGattCharacteristic RxChar = RxService.getCharacteristic(NokeDefines.RX_CHAR_UUID);
-        if (RxChar == null) {
-            mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
-            return;
-        }
+        try{
+            if (noke.gatt == null) {
+                return;
+            }
 
-        RxChar.setValue(NokeDefines.hexToBytes(noke.commands.get(0)));
-        boolean status = noke.gatt.writeCharacteristic(RxChar);
-        Log.d(TAG, "write TXchar - status =" + status);
+            Handler handler = new Handler(Looper.getMainLooper());
+            handler.post(new Runnable() {
+                @Override
+                public void run() {
+
+                    BluetoothGattService RxService = noke.gatt.getService(NokeDefines.RX_SERVICE_UUID);
+
+                    if (RxService == null) {
+                        mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
+                        return;
+                    }
+                    BluetoothGattCharacteristic RxChar = RxService.getCharacteristic(NokeDefines.RX_CHAR_UUID);
+                    if (RxChar == null) {
+                        mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
+                        return;
+                    }
+
+                    RxChar.setValue(NokeDefines.hexToBytes(noke.commands.get(0)));
+                    boolean status = noke.gatt.writeCharacteristic(RxChar);
+                    Log.d(TAG, "write TXchar - status =" + status);
+                }
+            });
+
+
+        }
+        catch (NullPointerException e){
+            mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
+        }
     }
 
     /**

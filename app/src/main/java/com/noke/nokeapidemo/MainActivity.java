@@ -30,6 +30,8 @@ import com.noke.nokemobilelibrary.NokeServiceListener;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
+
 public class MainActivity extends AppCompatActivity implements DemoWebClient.DemoWebClientCallback {
 
     public static final String TAG = MainActivity.class.getSimpleName();
@@ -89,7 +91,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
         public void onServiceConnected(ComponentName className, IBinder rawBinder) {
             Log.w(TAG, "ON SERVICE CONNECTED");
             //Store reference to service
-            mNokeService = ((NokeDeviceManagerService.LocalBinder) rawBinder).getService(NokeDefines.NOKE_LIBRARY_SANDBOX);
+            mNokeService = ((NokeDeviceManagerService.LocalBinder) rawBinder).getService(NokeDefines.NOKE_LIBRARY_DEVELOP);
 
             //Uncomment to allow devices that aren't in the device array
             //mNokeService.setAllowAllDevices(true);
@@ -98,8 +100,9 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
             mNokeService.registerNokeListener(mNokeServiceListener);
 
             //Add locks to device manager
-            NokeDevice noke1 = new NokeDevice("XXX-XXX-XXXX", "XX:XX:XX:XX:XX:XX");
+            NokeDevice noke1 = new NokeDevice("Noke Device", "XX:XX:XX:XX:XX:XX");
             mNokeService.addNokeDevice(noke1);
+
 
             //Start bluetooth scanning
             mNokeService.startScanningForNokeDevices();
@@ -297,8 +300,8 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
         Log.d(TAG, "Unlock Received: "+ response);
         try{
             JSONObject obj = new JSONObject(response);
-            String result = obj.getString("result");
-            if(result.equals("success")){
+            Boolean result = obj.getBoolean("result");
+            if(result){
                 JSONObject data = obj.getJSONObject("data");
                 String commandString = data.getString("commands");
                 currentNoke.sendCommands(commandString);
