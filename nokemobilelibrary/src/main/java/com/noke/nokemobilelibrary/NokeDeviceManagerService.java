@@ -38,6 +38,7 @@ import com.google.gson.Gson;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.w3c.dom.Text;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -573,6 +574,11 @@ public class NokeDeviceManagerService extends Service {
                             byte[] getdata = getManufacturerData(scanRecord);
                             broadcastData = new byte[]{getdata[2], getdata[3], getdata[4]};
                             String version = noke.getVersion(broadcastData, btDeviceName);
+                            Log.d("BROADCAST", noke.getMac() + " " +NokeDefines.bytesToHex(broadcastData));
+                            int lockStateBroadcast = (broadcastData[0] >>5) & 0x01;
+                            int lockStateBroadcast2 = (broadcastData[0] >> 6) & 0x01;
+                            Log.d("BROADCAST", "LOCK STATE: " + lockStateBroadcast + " " + lockStateBroadcast2);
+
                             noke.setVersion(version);
                             noke.bluetoothDevice = bluetoothDevice;
                             noke.connectionState = NokeDefines.NOKE_STATE_DISCOVERED;
@@ -920,12 +926,15 @@ public class NokeDeviceManagerService extends Service {
      */
     public void onReceivedDataFromLock(byte[] data, NokeDevice noke) {
 
+
+
         byte destination = data[0];
         if (destination == NokeDefines.SERVER_Dest) {
             if (noke.session != null) {
                 addDataPacketToQueue(NokeDefines.bytesToHex(data), noke.session, noke.getMac());
             }
         } else if (destination == NokeDefines.APP_Dest) {
+            Log.w(TAG, "RECEIVED APP DATA: " + NokeDefines.bytesToHex(data));
             byte resulttype = data[1];
             switch (resulttype) {
                 case NokeDefines.SUCCESS_ResultType: {
@@ -971,7 +980,7 @@ public class NokeDeviceManagerService extends Service {
                     moveToNext(noke);
                     byte lockstate = data[2];
                     Boolean isLocked = true;
-                    if (lockstate == 0) {
+                    if (lockstate == (byte)0) {
                         noke.lockState = NokeDefines.NOKE_LOCK_STATE_UNLOCKED;
                         isLocked = false;
                     } else {
@@ -980,7 +989,7 @@ public class NokeDeviceManagerService extends Service {
 
                     byte timeoutstate = data[3];
                     Boolean didTimeout = true;
-                    if(timeoutstate == 1){
+                    if(timeoutstate == (byte)1){
                         didTimeout = false;
                     }
 
@@ -995,6 +1004,21 @@ public class NokeDeviceManagerService extends Service {
                 }
                 case NokeDefines.INVALID_ResultType: {
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_RESULT, "Invalid Result");
+                    moveToNext(noke);
+                    break;
+                }
+                case NokeDefines.FAILEDTOLOCK_ResultType:{
+                    mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_FAILED_TO_LOCK, "Device Failed to Lock");
+                    moveToNext(noke);
+                    break;
+                }
+                case NokeDefines.FAILEDTOUNLOCK_ResultType:{
+                    mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_RESULT, "Device Failed to Unlock");
+                    moveToNext(noke);
+                    break;
+                }
+                case NokeDefines.FAILEDTOUNSHACKLE_ResultType:{
+                    mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_RESULT, "Device Failed to Unlock Shackle");
                     moveToNext(noke);
                     break;
                 }

@@ -62,6 +62,9 @@ public class NokeDefines {
     static final byte INVALIDPERMISSION_ResultType				    =(byte)0x63;
     static final byte SHUTDOWN_ResultType						    =(byte)0x64;
     static final byte INVALIDDATA_ResultType						=(byte)0x65;
+    static final byte FAILEDTOLOCK_ResultType                       =(byte)0x68;
+    static final byte FAILEDTOUNLOCK_ResultType                     =(byte)0x69;
+    static final byte FAILEDTOUNSHACKLE_ResultType                  =(byte)0x6A;
     static final byte INVALID_ResultType							=(byte)0xFF;
 
     /**
