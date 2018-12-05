@@ -355,4 +355,22 @@ public class NokeDevice {
         System.arraycopy(data, 0, buffer, 0, 16);
         return buffer;
     }
+
+    public int getLockState() {
+        return lockState;
+    }
+
+    public void setLockState(int lockState) {
+        this.lockState = lockState;
+    }
+
+    public String getHardwareVersion(){
+        return this.version.substring(0,2);
+    }
+
+    public String getSoftwareVersion(){
+        return this.version.substring(3);
+    }
+
+
 }
