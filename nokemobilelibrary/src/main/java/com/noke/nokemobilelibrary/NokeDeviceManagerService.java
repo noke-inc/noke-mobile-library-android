@@ -574,18 +574,27 @@ public class NokeDeviceManagerService extends Service {
                             byte[] getdata = getManufacturerData(scanRecord);
                             broadcastData = new byte[]{getdata[2], getdata[3], getdata[4]};
                             String version = noke.getVersion(broadcastData, btDeviceName);
-                            Log.d("BROADCAST", noke.getMac() + " " +NokeDefines.bytesToHex(broadcastData));
-                            int lockStateBroadcast = (broadcastData[0] >>5) & 0x01;
-                            int lockStateBroadcast2 = (broadcastData[0] >> 6) & 0x01;
-                            Log.d("BROADCAST", "LOCK STATE: " + lockStateBroadcast + " " + lockStateBroadcast2);
-
                             noke.setVersion(version);
+
+                            Log.d("BROADCAST", noke.getMac() + " HW: " + noke.getHardwareVersion() + " SW: " + noke.getSoftwareVersion());
+                            int lockState = NokeDefines.NOKE_LOCK_STATE_LOCKED;
+                            if(noke.getHardwareVersion().equals(NokeDefines.NOKE_HW_TYPE_HD_LOCK)) {
+                                if(Integer.parseInt(noke.getSoftwareVersion().substring(2)) >= 13){
+                                    int lockStateBroadcast = (broadcastData[0] >> 5) & 0x01;
+                                    int lockStateBroadcast2 = (broadcastData[0] >> 6) & 0x01;
+                                    lockState = lockStateBroadcast + lockStateBroadcast2;
+                                }else{
+                                    lockState = NokeDefines.NOKE_LOCK_STATE_UNKNOWN;
+                                }
+                            }
+
                             noke.bluetoothDevice = bluetoothDevice;
                             noke.connectionState = NokeDefines.NOKE_STATE_DISCOVERED;
 
                             if (nokeDevices.get(noke.getMac()) == null) {
                                 nokeDevices.put(noke.getMac(), noke);
                             }
+                            noke.lockState = lockState;
                             mGlobalNokeListener.onNokeDiscovered(noke);
                         }
                     }
