@@ -31,7 +31,7 @@ import javax.net.ssl.SSLContext;
 class DemoWebClient {
 
     private final static String TAG = DemoWebClient.class.getSimpleName();
-    private String serverUrl = "DEMO SERVER URL";
+    private String serverUrl = "DEMO_SERVER_URL_HERE";
     private DemoWebClientCallback mDemoWebClientCallback;
 
     private static String POST(String urlStr, JSONObject jsonObject)
@@ -40,6 +40,7 @@ class DemoWebClient {
         InputStream inputStream;
         String result = "";
         System.setProperty("http.keepAlive", "false");
+        Log.w("CLIENT", "JSON: " + jsonObject);
 
         try {
             URL url = new URL(urlStr);
@@ -114,6 +115,38 @@ class DemoWebClient {
                     jsonObject.accumulate("session", noke.getSession());
                     jsonObject.accumulate("mac", noke.getMac());
                     String url = serverUrl + "unlock/";
+
+                    mDemoWebClientCallback.onUnlockReceived(POST(url, jsonObject), noke);
+
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+
+        thread.start();
+    }
+
+    void requestUnshackle(final NokeDevice noke, final String email)
+    {
+        /* Note: This is an example request to a demo server, it does not represent a request to the Noke Core API.
+         * Requests should not be made to the Core API directly from the mobile app.
+         * Please refer to the documentation for more details
+         * (https://github.com/noke-inc/noke-mobile-library-android#nok%C4%93-mobile-library-for-android)
+         */
+
+        Thread thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+                try {
+
+                    JSONObject jsonObject = new JSONObject();
+
+                    jsonObject.accumulate("session", noke.getSession());
+                    jsonObject.accumulate("mac", noke.getMac());
+                    String url = serverUrl + "unshackle/";
 
                     mDemoWebClientCallback.onUnlockReceived(POST(url, jsonObject), noke);
 

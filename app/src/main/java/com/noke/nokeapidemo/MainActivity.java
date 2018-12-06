@@ -30,7 +30,9 @@ import com.noke.nokemobilelibrary.NokeServiceListener;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements DemoWebClient.DemoWebClientCallback {
 
@@ -82,8 +84,9 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
 
         public void onServiceConnected(ComponentName className, IBinder rawBinder) {
             Log.w(TAG, "ON SERVICE CONNECTED");
+
             //Store reference to service
-            mNokeService = ((NokeDeviceManagerService.LocalBinder) rawBinder).getService(NokeDefines.NOKE_LIBRARY_DEVELOP);
+            mNokeService = ((NokeDeviceManagerService.LocalBinder) rawBinder).getService(NokeDefines.NOKE_LIBRARY_SANDBOX);
 
             //Uncomment to allow devices that aren't in the device array
             //mNokeService.setAllowAllDevices(true);
@@ -91,9 +94,14 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
             //Register callback listener
             mNokeService.registerNokeListener(mNokeServiceListener);
 
-            //Add locks to device manager
-            NokeDevice noke1 = new NokeDevice("Noke Device", "XX:XX:XX:XX:XX:XX");
-            mNokeService.addNokeDevice(noke1);
+            String[] macs = {"XX:XX:XX:XX:XX:XX"};
+
+            for (String mac:macs
+                 ) {
+                //Add locks to device manager
+                NokeDevice noke1 = new NokeDevice(mac, mac);
+                mNokeService.addNokeDevice(noke1);
+            }
 
 
             //Start bluetooth scanning
@@ -113,8 +121,30 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
     private NokeServiceListener mNokeServiceListener = new NokeServiceListener() {
         @Override
         public void onNokeDiscovered(NokeDevice noke) {
-            setStatusText("NOKE DISCOVERED: " + noke.getName());
-            mNokeService.connectToNoke(noke);
+
+
+            setLockLayoutColor(getResources().getColor(R.color.nokeBlue));
+
+            String lockState = "";
+            switch (noke.getLockState()){
+                case NokeDefines.NOKE_LOCK_STATE_LOCKED:
+                    lockState = "Locked";
+                    break;
+                case NokeDefines.NOKE_LOCK_STATE_UNLOCKED:
+                    lockState = "Unlocked";
+                    break;
+                case NokeDefines.NOKE_LOCK_STATE_UNSHACKLED:
+                    lockState = "Unshackled";
+                    break;
+                case NokeDefines.NOKE_LOCK_STATE_UNKNOWN:
+                    lockState = "Unknown";
+                    break;
+            }
+
+
+            setStatusText("NOKE DISCOVERED: " + noke.getName() + " (" + lockState + ")");
+            mNokeService.connectToNoke(currentNoke);
+
         }
 
         @Override
@@ -144,7 +174,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
 
         @Override
         public void onNokeShutdown(NokeDevice noke, Boolean isLocked, Boolean didTimeout) {
-            setStatusText("NOKE SHUTDOWN: " + noke.getName() + " LOCKED: " + true + " TIMEOUT: " + didTimeout);
+            setStatusText("NOKE SHUTDOWN: " + noke.getName() + " LOCKED: " + isLocked + " TIMEOUT: " + didTimeout);
         }
 
         @Override
