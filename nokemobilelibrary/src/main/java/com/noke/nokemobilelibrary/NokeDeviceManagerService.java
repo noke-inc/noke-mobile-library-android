@@ -38,7 +38,6 @@ import com.google.gson.Gson;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.w3c.dom.Text;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -576,7 +575,6 @@ public class NokeDeviceManagerService extends Service {
                             String version = noke.getVersion(broadcastData, btDeviceName);
                             noke.setVersion(version);
 
-                            Log.d("BROADCAST", noke.getMac() + " HW: " + noke.getHardwareVersion() + " SW: " + noke.getSoftwareVersion());
                             int lockState = NokeDefines.NOKE_LOCK_STATE_LOCKED;
                             if(noke.getHardwareVersion().equals(NokeDefines.NOKE_HW_TYPE_HD_LOCK)) {
                                 if(Integer.parseInt(noke.getSoftwareVersion().substring(2)) >= 13){
@@ -852,7 +850,7 @@ public class NokeDeviceManagerService extends Service {
                  * There is a refresh() method in BluetoothGatt class but for now it's hidden. We will call it using reflections.
                  */
                 try {
-                    final Method refresh = gatt.getClass().getMethod("refresh");
+                    @SuppressWarnings("JavaReflectionMemberAccess") final Method refresh = gatt.getClass().getMethod("refresh");
                     if (refresh != null) {
                         final boolean success = (Boolean) refresh.invoke(gatt);
                         Log.d(TAG, "Refreshing Result: " + success);
@@ -943,7 +941,6 @@ public class NokeDeviceManagerService extends Service {
                 addDataPacketToQueue(NokeDefines.bytesToHex(data), noke.session, noke.getMac());
             }
         } else if (destination == NokeDefines.APP_Dest) {
-            Log.w(TAG, "RECEIVED APP DATA: " + NokeDefines.bytesToHex(data));
             byte resulttype = data[1];
             switch (resulttype) {
                 case NokeDefines.SUCCESS_ResultType: {
@@ -952,7 +949,6 @@ public class NokeDeviceManagerService extends Service {
                         noke.commands.clear();
                         globalUploadQueue.clear();
                         noke.isRestoring = false;
-                        Log.d(TAG, "CLEAR COMMANDS!");
                         confirmRestore(noke.getMac(), commandid);
                         disconnectNoke(noke);
                     }else {
@@ -1530,7 +1526,6 @@ public class NokeDeviceManagerService extends Service {
             String message = obj.getString("message");
 
             if (errorCode == NokeMobileError.SUCCESS) {
-                Log.w(TAG, "RESTORE SUCCESSFUL");
                 this.getNokeListener().onDataUploaded(errorCode, "Restore Successful: " + message);
             }
 

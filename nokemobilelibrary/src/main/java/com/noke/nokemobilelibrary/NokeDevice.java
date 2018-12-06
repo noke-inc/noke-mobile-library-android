@@ -104,7 +104,7 @@ public class NokeDevice {
     /**
      * Boolean that indicates if the lock is being restored by the Core API
      */
-    public transient boolean isRestoring;
+    transient boolean isRestoring;
 
 
     /**
@@ -207,27 +207,32 @@ public class NokeDevice {
         this.version = version;
     }
 
+    @SuppressWarnings("unused")
     public String getOfflineUnlockCmd() {
         return offlineUnlockCmd;
     }
 
+    @SuppressWarnings("unused")
     public void setOfflineUnlockCmd(String offlineUnlockCmd) {
         this.offlineUnlockCmd = offlineUnlockCmd;
     }
 
+    @SuppressWarnings("unused")
     public String getOfflineKey() {
         return offlineKey;
     }
 
+    @SuppressWarnings("unused")
     public void setOfflineKey(String offlineKey) {
         this.offlineKey = offlineKey;
     }
 
+    @SuppressWarnings("unused")
     public long getLastSeen() {
         return lastSeen;
     }
 
-    public void setLastSeen(long lastSeen) {
+    void setLastSeen(long lastSeen) {
         this.lastSeen = lastSeen;
     }
 
@@ -371,6 +376,5 @@ public class NokeDevice {
     public String getSoftwareVersion(){
         return this.version.substring(3);
     }
-
 
 }
