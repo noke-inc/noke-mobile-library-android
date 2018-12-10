@@ -76,16 +76,8 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
     }
 
     private void initiateNokeService(){
-        Log.w(TAG, "############ initiateNokeService");
         Intent nokeServiceIntent = new Intent(this, NokeDeviceManagerService.class);
         bindService(nokeServiceIntent, mServiceConnection, Context.BIND_AUTO_CREATE);
-    }
-
-    private void stopNokeService(){
-        Log.w(TAG, "############ stopNokeService");
-        Intent nokeServiceIntent = new Intent(this, NokeDeviceManagerService.class);
-        stopService(nokeServiceIntent, mServiceConnection);
-        stopSelf();
     }
 
     private ServiceConnection mServiceConnection = new ServiceConnection() {
