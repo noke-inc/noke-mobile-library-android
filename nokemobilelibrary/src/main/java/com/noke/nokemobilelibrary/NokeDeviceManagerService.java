@@ -585,12 +585,25 @@ public class NokeDeviceManagerService extends Service {
                             broadcastData = new byte[]{getdata[2], getdata[3], getdata[4]};
                             String version = noke.getVersion(broadcastData, btDeviceName);
                             noke.setVersion(version);
+
+                            int lockState = NokeDefines.NOKE_LOCK_STATE_LOCKED;
+                            if(noke.getHardwareVersion().equals(NokeDefines.NOKE_HW_TYPE_HD_LOCK)) {
+                                if(Integer.parseInt(noke.getSoftwareVersion().substring(2)) >= 13){
+                                    int lockStateBroadcast = (broadcastData[0] >> 5) & 0x01;
+                                    int lockStateBroadcast2 = (broadcastData[0] >> 6) & 0x01;
+                                    lockState = lockStateBroadcast + lockStateBroadcast2;
+                                }else{
+                                    lockState = NokeDefines.NOKE_LOCK_STATE_UNKNOWN;
+                                }
+                            }
+
                             noke.bluetoothDevice = bluetoothDevice;
                             noke.connectionState = NokeDefines.NOKE_STATE_DISCOVERED;
 
                             if (nokeDevices.get(noke.getMac()) == null) {
                                 nokeDevices.put(noke.getMac(), noke);
                             }
+                            noke.lockState = lockState;
                             mGlobalNokeListener.onNokeDiscovered(noke);
                         }
                     }
@@ -848,7 +861,7 @@ public class NokeDeviceManagerService extends Service {
                  * There is a refresh() method in BluetoothGatt class but for now it's hidden. We will call it using reflections.
                  */
                 try {
-                    final Method refresh = gatt.getClass().getMethod("refresh");
+                    @SuppressWarnings("JavaReflectionMemberAccess") final Method refresh = gatt.getClass().getMethod("refresh");
                     if (refresh != null) {
                         final boolean success = (Boolean) refresh.invoke(gatt);
                         Log.d(TAG, "Refreshing Result: " + success);
@@ -931,6 +944,8 @@ public class NokeDeviceManagerService extends Service {
      */
     public void onReceivedDataFromLock(byte[] data, NokeDevice noke) {
 
+
+
         byte destination = data[0];
         if (destination == NokeDefines.SERVER_Dest) {
             if (noke.session != null) {
@@ -945,7 +960,6 @@ public class NokeDeviceManagerService extends Service {
                         noke.commands.clear();
                         globalUploadQueue.clear();
                         noke.isRestoring = false;
-                        Log.d(TAG, "CLEAR COMMANDS!");
                         confirmRestore(noke.getMac(), commandid);
                         disconnectNoke(noke);
                     }else {
@@ -982,7 +996,7 @@ public class NokeDeviceManagerService extends Service {
                     moveToNext(noke);
                     byte lockstate = data[2];
                     Boolean isLocked = true;
-                    if (lockstate == 0) {
+                    if (lockstate == (byte)0) {
                         noke.lockState = NokeDefines.NOKE_LOCK_STATE_UNLOCKED;
                         isLocked = false;
                     } else {
@@ -992,7 +1006,7 @@ public class NokeDeviceManagerService extends Service {
 
                     byte timeoutstate = data[3];
                     Boolean didTimeout = true;
-                    if(timeoutstate == 1){
+                    if(timeoutstate == (byte)1){
                         didTimeout = false;
                     }
 
@@ -1007,6 +1021,21 @@ public class NokeDeviceManagerService extends Service {
                 }
                 case NokeDefines.INVALID_ResultType: {
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_RESULT, "Invalid Result");
+                    moveToNext(noke);
+                    break;
+                }
+                case NokeDefines.FAILEDTOLOCK_ResultType:{
+                    mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_FAILED_TO_LOCK, "Device Failed to Lock");
+                    moveToNext(noke);
+                    break;
+                }
+                case NokeDefines.FAILEDTOUNLOCK_ResultType:{
+                    mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_RESULT, "Device Failed to Unlock");
+                    moveToNext(noke);
+                    break;
+                }
+                case NokeDefines.FAILEDTOUNSHACKLE_ResultType:{
+                    mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_RESULT, "Device Failed to Unlock Shackle");
                     moveToNext(noke);
                     break;
                 }
@@ -1509,7 +1538,6 @@ public class NokeDeviceManagerService extends Service {
             String message = obj.getString("message");
 
             if (errorCode == NokeMobileError.SUCCESS) {
-                Log.w(TAG, "RESTORE SUCCESSFUL");
                 this.getNokeListener().onDataUploaded(errorCode, "Restore Successful: " + message);
             }
 

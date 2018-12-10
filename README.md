@@ -33,7 +33,7 @@ This library is compatible with Android devices that support Bluetooth Low Energ
 * The compat library may be found on Maven Central Repository.  Add it to your project by adding the following dependency:
 
 ```java
-    compile 'com.noke.nokemobilelibrary:nokemobilelibrary:0.5.3'
+    compile 'com.noke.nokemobilelibrary:nokemobilelibrary:0.6.1'
 ```
 
 * After adding the dependency to your project, add the `NokeDeviceManagerService` to your Android Manifest:

@@ -37,16 +37,18 @@ public class NokeMobileError {
     public static final int GO_ERROR_UPLOAD                     = 101;
 
     //Noke Device Errors (200 + error code)
-    //public static final int DEVICE_SUCCESS                    = 260; //that's not an error
-    public static final int DEVICE_ERROR_INVALID_KEY            = 261;
-    public static final int DEVICE_ERROR_INVALID_CMD            = 262;
-    public static final int DEVICE_ERROR_INVALID_PERMISSION     = 263;
-    public static final int DEVICE_SHUTDOWN_RESULT              = 264;
-    public static final int DEVICE_ERROR_INVALID_DATA           = 265;
-    public static final int DEVICE_BATTERY_RESULT               = 266;
-    public static final int DEVICE_ERROR_INVALID_RESULT         = 267;
-    public static final int DEVICE_ERROR_UNKNOWN                = 268;
-
+    //public static final int DEVICE_SUCCESS                        = 260; //that's not an error
+    public static final int DEVICE_ERROR_INVALID_KEY                = 261;
+    public static final int DEVICE_ERROR_INVALID_CMD                = 262;
+    public static final int DEVICE_ERROR_INVALID_PERMISSION         = 263;
+    public static final int DEVICE_SHUTDOWN_RESULT                  = 264;
+    public static final int DEVICE_ERROR_INVALID_DATA               = 265;
+    public static final int DEVICE_BATTERY_RESULT                   = 266;
+    public static final int DEVICE_ERROR_INVALID_RESULT             = 267;
+    public static final int DEVICE_ERROR_FAILED_TO_LOCK             = 268;
+    public static final int DEVICE_ERROR_FAILED_TO_UNLOCK           = 269;
+    public static final int DEVICE_ERROR_FAILED_TO_REMOVE_SHACKLE   = 270;
+    public static final int DEVICE_ERROR_UNKNOWN                    = 299;
 
     //Noke Device Manager Service Errors
     public static final int ERROR_LOCATION_PERMISSIONS_NEEDED   = 300;
