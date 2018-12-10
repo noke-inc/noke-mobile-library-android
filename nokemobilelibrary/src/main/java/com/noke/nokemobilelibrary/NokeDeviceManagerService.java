@@ -1001,7 +1001,6 @@ public class NokeDeviceManagerService extends Service {
                         isLocked = false;
                     } else {
                         noke.lockState = NokeDefines.NOKE_LOCK_STATE_LOCKED;
-                        // mGlobalNokeListener.onNokeLocked(noke);
                     }
 
                     byte timeoutstate = data[3];

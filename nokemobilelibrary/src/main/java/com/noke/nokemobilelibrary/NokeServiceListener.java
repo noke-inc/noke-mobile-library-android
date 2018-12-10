@@ -32,8 +32,6 @@ public interface NokeServiceListener  {
 
     void onNokeShutdown(NokeDevice noke, Boolean isLocked, Boolean didTimeout);
 
-    void onNokeLocked(NokeDevice noke);
-
     void onNokeDisconnected(NokeDevice noke);
 
     void onDataUploaded(int result, String message);

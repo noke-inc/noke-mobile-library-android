@@ -118,11 +118,6 @@ private NokeServiceListener mNokeServiceListener = new NokeServiceListener() {
         }
 
         @Override
-        public void onNokeLocked(NokeDevice noke) {
-
-        }
-
-        @Override
         public void onNokeDisconnected(NokeDevice noke) {
 
         }
