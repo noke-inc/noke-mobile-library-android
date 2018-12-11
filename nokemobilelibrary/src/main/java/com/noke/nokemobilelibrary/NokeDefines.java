@@ -139,7 +139,7 @@ public class NokeDefines {
     /**
      * Request URLS
      */
-    static String uploadURL = "https://v1.api.nokepro.com/lock/upload/";
+    static String uploadURL = "";
 
     static final String sandboxUploadURL            = "https://coreapi-sandbox.appspot.com/upload/";
     static final String productionUploadURL         = "https://coreapi-beta.appspot.com/upload/";
