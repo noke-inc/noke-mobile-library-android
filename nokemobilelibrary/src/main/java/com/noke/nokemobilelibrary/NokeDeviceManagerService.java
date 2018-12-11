@@ -142,7 +142,7 @@ public class NokeDeviceManagerService extends Service {
      */
     private int bluetoothScanDuration;
 
-    private String apiKey;
+    private String apiKey = NokeDefines.NOKE_MOBILE_API_KEY;
 
     /**
      * A LinkedHashMap that stores a list of NokeDevices linked my MAC address.
@@ -1123,8 +1123,7 @@ public class NokeDeviceManagerService extends Service {
                         PackageManager pm = getApplicationContext().getPackageManager();
                         ApplicationInfo ai = pm.getApplicationInfo(getApplicationContext().getPackageName(), PackageManager.GET_META_DATA);
                         Bundle bundle = ai.metaData;
-                        // String nokeMobileApiKey = bundle.getString(NokeDefines.NOKE_MOBILE_API_KEY);
-                        this.uploadDataCallback(NokeMobileApiClient.POST(NokeDefines.uploadURL, jsonObject.toString(), this.apiKey));
+                        this.uploadDataCallback(NokeMobileApiClient.POST(NokeDefines.uploadURL, jsonObject.toString(), this.getApiKey()));
                     } catch (PackageManager.NameNotFoundException | NullPointerException e) {
                         e.printStackTrace();
                         mGlobalNokeListener.onError(null, NokeMobileError.ERROR_MISSING_API_KEY, "No API Key found. Have you set it in your Android Manifest?");
