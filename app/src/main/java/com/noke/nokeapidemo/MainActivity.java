@@ -86,7 +86,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
             Log.w(TAG, "ON SERVICE CONNECTED");
 
             //Store reference to service
-            mNokeService = ((NokeDeviceManagerService.LocalBinder) rawBinder).getService(NokeDefines.NOKE_LIBRARY_SANDBOX);
+            mNokeService = ((NokeDeviceManagerService.LocalBinder) rawBinder).getService(NokeDefines.NOKE_LIBRARY_DEVELOP);
 
             //Uncomment to allow devices that aren't in the device array
             //mNokeService.setAllowAllDevices(true);
@@ -141,7 +141,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
                     break;
             }
 
-
+            currentNoke = noke;
             setStatusText("NOKE DISCOVERED: " + noke.getName() + " (" + lockState + ")");
             mNokeService.connectToNoke(currentNoke);
 

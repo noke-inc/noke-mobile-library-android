@@ -31,7 +31,7 @@ import javax.net.ssl.SSLContext;
 class DemoWebClient {
 
     private final static String TAG = DemoWebClient.class.getSimpleName();
-    private String serverUrl = "DEMO_SERVER_URL_HERE";
+    private String serverUrl = "URL_HERE";
     private DemoWebClientCallback mDemoWebClientCallback;
 
     private static String POST(String urlStr, JSONObject jsonObject)
@@ -115,6 +115,8 @@ class DemoWebClient {
                     jsonObject.accumulate("session", noke.getSession());
                     jsonObject.accumulate("mac", noke.getMac());
                     String url = serverUrl + "unlock/";
+
+                    Log.w(TAG, "JSON: " + jsonObject.toString());
 
                     mDemoWebClientCallback.onUnlockReceived(POST(url, jsonObject), noke);
 
