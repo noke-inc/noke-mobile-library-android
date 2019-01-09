@@ -141,7 +141,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
                     break;
             }
 
-
+            currentNoke = noke;
             setStatusText("NOKE DISCOVERED: " + noke.getName() + " (" + lockState + ")");
             mNokeService.connectToNoke(currentNoke);
 

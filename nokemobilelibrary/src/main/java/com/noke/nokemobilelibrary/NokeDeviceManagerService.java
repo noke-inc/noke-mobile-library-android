@@ -208,6 +208,9 @@ public class NokeDeviceManagerService extends Service {
         setBluetoothDelayDefault(NokeDefines.BLUETOOTH_DEFAULT_SCAN_TIME);
         setBluetoothDelayBackgroundDefault(NokeDefines.BLUETOOTH_DEFAULT_SCAN_TIME_BACKGROUND);
         setBluetoothScanDuration(NokeDefines.BLUETOOTH_DEFAULT_SCAN_DURATION);
+
+
+        //
     }
 
     public String getApiKey() {
@@ -338,7 +341,7 @@ public class NokeDeviceManagerService extends Service {
                 return false;
             }
         }
-
+        mGlobalNokeListener.onBluetoothStatusChanged(mBluetoothAdapter.getState());
         mBluetoothAdapter = mBluetoothManager.getAdapter();
         return mBluetoothAdapter != null;
     }
