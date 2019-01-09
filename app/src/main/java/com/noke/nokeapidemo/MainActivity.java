@@ -86,7 +86,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
             Log.w(TAG, "ON SERVICE CONNECTED");
 
             //Store reference to service
-            mNokeService = ((NokeDeviceManagerService.LocalBinder) rawBinder).getService(NokeDefines.NOKE_LIBRARY_DEVELOP);
+            mNokeService = ((NokeDeviceManagerService.LocalBinder) rawBinder).getService(NokeDefines.NOKE_LIBRARY_SANDBOX);
 
             //Uncomment to allow devices that aren't in the device array
             //mNokeService.setAllowAllDevices(true);
