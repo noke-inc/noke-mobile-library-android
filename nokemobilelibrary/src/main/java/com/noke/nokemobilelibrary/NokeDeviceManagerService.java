@@ -217,6 +217,11 @@ public class NokeDeviceManagerService extends Service {
      */
     public void registerNokeListener(NokeServiceListener listener) {
         this.mGlobalNokeListener = listener;
+        if(mBluetoothAdapter != null) {
+            mGlobalNokeListener.onBluetoothStatusChanged(mBluetoothAdapter.getState());
+        }else{
+            mGlobalNokeListener.onBluetoothStatusChanged(BluetoothAdapter.STATE_OFF);
+        }
     }
 
     /**
@@ -330,7 +335,6 @@ public class NokeDeviceManagerService extends Service {
                 return false;
             }
         }
-        mGlobalNokeListener.onBluetoothStatusChanged(mBluetoothAdapter.getState());
         mBluetoothAdapter = mBluetoothManager.getAdapter();
         return mBluetoothAdapter != null;
     }
@@ -764,9 +768,11 @@ public class NokeDeviceManagerService extends Service {
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
-                            noke.gatt.disconnect();
-                            noke.gatt.close();
-                            noke.gatt = null;
+                            if (noke.gatt != null){
+                                noke.gatt.disconnect();
+                                noke.gatt.close();
+                                noke.gatt = null;
+                            }
                             noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
                             mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_BLUETOOTH_GATT, "Bluetooth Gatt Error: 133");
                         }
