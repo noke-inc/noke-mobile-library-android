@@ -217,10 +217,8 @@ public class NokeDeviceManagerService extends Service {
      */
     public void registerNokeListener(NokeServiceListener listener) {
         this.mGlobalNokeListener = listener;
-        if(mBluetoothAdapter != null) {
+        if (mBluetoothAdapter != null && mGlobalNokeListener != null) {
             mGlobalNokeListener.onBluetoothStatusChanged(mBluetoothAdapter.getState());
-        }else{
-            mGlobalNokeListener.onBluetoothStatusChanged(BluetoothAdapter.STATE_OFF);
         }
     }
 
@@ -336,6 +334,9 @@ public class NokeDeviceManagerService extends Service {
             }
         }
         mBluetoothAdapter = mBluetoothManager.getAdapter();
+        if (mBluetoothAdapter != null && mGlobalNokeListener != null) {
+            mGlobalNokeListener.onBluetoothStatusChanged(mBluetoothAdapter.getState());
+        }
         return mBluetoothAdapter != null;
     }
 
@@ -563,7 +564,7 @@ public class NokeDeviceManagerService extends Service {
                     NokeDevice noke = nokeDevices.get(bluetoothDevice.getAddress());
                     if (noke != null || mAllowAllDevices) {
                         if (noke == null) {
-                          noke = new NokeDevice(btDeviceName, bluetoothDevice.getAddress());
+                            noke = new NokeDevice(btDeviceName, bluetoothDevice.getAddress());
                         }
                         noke.bluetoothDevice = bluetoothDevice;
                         noke.setLastSeen(new Date().getTime());
@@ -583,12 +584,12 @@ public class NokeDeviceManagerService extends Service {
                             noke.setVersion(version);
 
                             int lockState = NokeDefines.NOKE_LOCK_STATE_LOCKED;
-                            if(noke.getHardwareVersion().equals(NokeDefines.NOKE_HW_TYPE_HD_LOCK)) {
-                                if(Integer.parseInt(noke.getSoftwareVersion().substring(2)) >= 13){
+                            if (noke.getHardwareVersion().equals(NokeDefines.NOKE_HW_TYPE_HD_LOCK)) {
+                                if (Integer.parseInt(noke.getSoftwareVersion().substring(2)) >= 13) {
                                     int lockStateBroadcast = (broadcastData[0] >> 5) & 0x01;
                                     int lockStateBroadcast2 = (broadcastData[0] >> 6) & 0x01;
                                     lockState = lockStateBroadcast + lockStateBroadcast2;
-                                }else{
+                                } else {
                                     lockState = NokeDefines.NOKE_LOCK_STATE_UNKNOWN;
                                 }
                             }
@@ -768,7 +769,7 @@ public class NokeDeviceManagerService extends Service {
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
-                            if (noke.gatt != null){
+                            if (noke.gatt != null) {
                                 noke.gatt.disconnect();
                                 noke.gatt.close();
                                 noke.gatt = null;
@@ -943,7 +944,6 @@ public class NokeDeviceManagerService extends Service {
     public void onReceivedDataFromLock(byte[] data, NokeDevice noke) {
 
 
-
         byte destination = data[0];
         if (destination == NokeDefines.SERVER_Dest) {
             if (noke.session != null) {
@@ -954,13 +954,13 @@ public class NokeDeviceManagerService extends Service {
             switch (resulttype) {
                 case NokeDefines.SUCCESS_ResultType: {
                     int commandid = data[2];
-                    if(noke.isRestoring) {
+                    if (noke.isRestoring) {
                         noke.commands.clear();
                         globalUploadQueue.clear();
                         noke.isRestoring = false;
                         confirmRestore(noke.getMac(), commandid);
                         disconnectNoke(noke);
-                    }else {
+                    } else {
                         moveToNext(noke);
                         if (noke.commands.size() == 0) {
                             noke.connectionState = NokeDefines.NOKE_STATE_UNLOCKED;
@@ -973,7 +973,7 @@ public class NokeDeviceManagerService extends Service {
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_KEY, "Invalid Key Result");
                     moveToNext(noke);
 //                    if (noke.commands.size() == 0) {
-                        //If library receives an invalid key error, it will attempt to restore the key by working with the API
+                    //If library receives an invalid key error, it will attempt to restore the key by working with the API
 //                        if(!noke.isRestoring) {
 //                            restoreDevice(noke);
 //                        }
@@ -994,7 +994,7 @@ public class NokeDeviceManagerService extends Service {
                     moveToNext(noke);
                     byte lockstate = data[2];
                     Boolean isLocked = true;
-                    if (lockstate == (byte)0) {
+                    if (lockstate == (byte) 0) {
                         noke.lockState = NokeDefines.NOKE_LOCK_STATE_UNLOCKED;
                         isLocked = false;
                     } else {
@@ -1003,7 +1003,7 @@ public class NokeDeviceManagerService extends Service {
 
                     byte timeoutstate = data[3];
                     Boolean didTimeout = true;
-                    if(timeoutstate == (byte)1){
+                    if (timeoutstate == (byte) 1) {
                         didTimeout = false;
                     }
 
@@ -1021,17 +1021,17 @@ public class NokeDeviceManagerService extends Service {
                     moveToNext(noke);
                     break;
                 }
-                case NokeDefines.FAILEDTOLOCK_ResultType:{
+                case NokeDefines.FAILEDTOLOCK_ResultType: {
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_FAILED_TO_LOCK, "Device Failed to Lock");
                     moveToNext(noke);
                     break;
                 }
-                case NokeDefines.FAILEDTOUNLOCK_ResultType:{
+                case NokeDefines.FAILEDTOUNLOCK_ResultType: {
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_RESULT, "Device Failed to Unlock");
                     moveToNext(noke);
                     break;
                 }
-                case NokeDefines.FAILEDTOUNSHACKLE_ResultType:{
+                case NokeDefines.FAILEDTOUNSHACKLE_ResultType: {
                     mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_INVALID_RESULT, "Device Failed to Unlock Shackle");
                     moveToNext(noke);
                     break;
@@ -1312,7 +1312,7 @@ public class NokeDeviceManagerService extends Service {
 
     void writeRXCharacteristic(final NokeDevice noke) {
 
-        try{
+        try {
             if (noke.gatt == null) {
                 return;
             }
@@ -1341,8 +1341,7 @@ public class NokeDeviceManagerService extends Service {
             });
 
 
-        }
-        catch (NullPointerException e){
+        } catch (NullPointerException e) {
             mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
         }
     }
@@ -1442,13 +1441,12 @@ public class NokeDeviceManagerService extends Service {
         }
     }
 
-    private void restoreDevice(NokeDevice noke){
+    private void restoreDevice(NokeDevice noke) {
         noke.isRestoring = true;
         restoreKey(noke);
     }
 
-    private void restoreKey(final NokeDevice noke)
-    {
+    private void restoreKey(final NokeDevice noke) {
         Thread thread = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -1457,7 +1455,7 @@ public class NokeDeviceManagerService extends Service {
                     JSONObject jsonObject = new JSONObject();
                     jsonObject.accumulate("session", noke.getSession());
                     jsonObject.accumulate("mac", noke.getMac());
-                    String url = NokeDefines.uploadURL.replace("upload/","restore/");
+                    String url = NokeDefines.uploadURL.replace("upload/", "restore/");
                     try {
                         PackageManager pm = getApplicationContext().getPackageManager();
                         ApplicationInfo ai = pm.getApplicationInfo(getApplicationContext().getPackageName(), PackageManager.GET_META_DATA);
@@ -1481,25 +1479,25 @@ public class NokeDeviceManagerService extends Service {
 
     }
 
-    private void restoreKeyCallback(String response, NokeDevice noke){
-        try{
+    private void restoreKeyCallback(String response, NokeDevice noke) {
+        try {
             JSONObject obj = new JSONObject(response);
             String result = obj.getString("result");
-            if(result.equals("success")){
+            if (result.equals("success")) {
                 JSONObject data = obj.getJSONObject("data");
                 String commandString = data.getString("commands");
                 noke.sendCommands(commandString);
-            }else{
+            } else {
                 noke.isRestoring = false;
             }
-        }catch (JSONException e){
+        } catch (JSONException e) {
             Log.e(TAG, e.toString());
             noke.isRestoring = false;
         }
     }
 
 
-    private void confirmRestore(final String mac, final int commandid){
+    private void confirmRestore(final String mac, final int commandid) {
         Thread thread = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -1508,7 +1506,7 @@ public class NokeDeviceManagerService extends Service {
                     JSONObject jsonObject = new JSONObject();
                     jsonObject.accumulate("mac", mac);
                     jsonObject.accumulate("command_id", commandid);
-                    String url = NokeDefines.uploadURL.replace("upload/","restore/confirm/");
+                    String url = NokeDefines.uploadURL.replace("upload/", "restore/confirm/");
                     try {
                         PackageManager pm = getApplicationContext().getPackageManager();
                         ApplicationInfo ai = pm.getApplicationInfo(getApplicationContext().getPackageName(), PackageManager.GET_META_DATA);
