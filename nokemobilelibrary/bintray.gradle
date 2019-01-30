@@ -1,6 +1,6 @@
 apply plugin: 'com.jfrog.bintray'
 
-version = '0.6.4' //YOUR LIBRARY VERSION
+version = '1.0.0' //YOUR LIBRARY VERSION
 
 /*
  * Comment the following part if you only want to distribute .aar files.
