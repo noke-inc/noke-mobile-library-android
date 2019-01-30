@@ -200,6 +200,11 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
         }
 
         @Override
+        public void onLocationStatusChanged(Boolean enabled) {
+
+        }
+
+        @Override
         public void onError(NokeDevice noke, int error, String message) {
             Log.e(TAG, "NOKE SERVICE ERROR " + error + ": " + message);
             switch (error){

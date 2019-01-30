@@ -23,7 +23,9 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.location.LocationListener;
 import android.location.LocationManager;
+import android.location.Location;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
@@ -70,6 +72,15 @@ import java.util.Set;
 public class NokeDeviceManagerService extends Service {
 
     private final static String TAG = NokeDeviceManagerService.class.getSimpleName();
+
+    /**
+     * High level manager used to interact with Location services
+     */
+    private LocationManager mLocationManager;
+    /**
+     * Location listener used to detect when the location service is enabled or disabled
+     */
+    private LocationListener mLocationListener;
 
     /**
      * High level manager used to obtain an instance of BluetoothAdapter and to conduct overall
@@ -338,6 +349,7 @@ public class NokeDeviceManagerService extends Service {
      * @return boolean after initialization
      */
     public boolean initialize() {
+        initializeLocation();
         if (mBluetoothManager == null) {
             mBluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
             if (mBluetoothManager == null) {
@@ -349,6 +361,40 @@ public class NokeDeviceManagerService extends Service {
             mGlobalNokeListener.onBluetoothStatusChanged(mBluetoothAdapter.getState());
         }
         return mBluetoothAdapter != null;
+    }
+
+    private boolean initializeLocation() {
+        if (mLocationManager == null) {
+            mLocationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
+            if (mLocationManager == null) {
+                return false;
+            }
+
+            // Define a listener that responds to location updates
+            mLocationListener = new LocationListener() {
+                public void onStatusChanged(String provider, int status, Bundle extras) {
+                }
+
+                public void onLocationChanged(Location location) {
+                }
+
+                public void onProviderEnabled(String provider) {
+                    Boolean enabled = true;
+                    mGlobalNokeListener.onLocationStatusChanged(enabled);
+                }
+
+                public void onProviderDisabled(String provider) {
+                    Boolean enabled = false;
+                    mGlobalNokeListener.onLocationStatusChanged(enabled);
+                }
+            };
+
+            // Register the listener with the Location Manager to receive location updates
+            // minTime:    minimum time interval between location updates (in milliseconds).
+            // minDistance:    minimum distance between location updates (in meters).
+            mLocationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 5, mLocationListener);
+        }
+        return true;
     }
 
     /**
@@ -379,7 +425,7 @@ public class NokeDeviceManagerService extends Service {
             if (!gps_enabled && !network_enabled) {
                 mGlobalNokeListener.onError(null, NokeMobileError.ERROR_LOCATION_SERVICES_DISABLED, "Location services are disabled");
             } else if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
-                mGlobalNokeListener.onError(null, NokeMobileError.ERROR_LOCATION_SERVICES_DISABLED, "Location services are disabled");
+                mGlobalNokeListener.onError(null, NokeMobileError.ERROR_LOCATION_PERMISSIONS_NEEDED, "Location services permission needed");
             } else if (mBluetoothAdapter != null) {
                 if (!mBluetoothAdapter.isEnabled()) {
                     mGlobalNokeListener.onError(null, NokeMobileError.ERROR_BLUETOOTH_DISABLED, "Bluetooth is disabled");
@@ -402,6 +448,21 @@ public class NokeDeviceManagerService extends Service {
         }
     }
 
+    public boolean isBluetoothEnabled() {
+        boolean bluetoothEnabled = false;
+        if (mBluetoothManager != null) {
+            mBluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+        }
+        if (mBluetoothManager != null && mBluetoothAdapter == null) {
+            mBluetoothAdapter = mBluetoothManager.getAdapter();
+        }
+        if (mBluetoothAdapter == null || !mBluetoothAdapter.isEnabled()) {
+            mGlobalNokeListener.onError(null, NokeMobileError.ERROR_BLUETOOTH_DISABLED, "Bluetooth is disabled");
+        } else {
+            bluetoothEnabled = true;
+        }
+        return bluetoothEnabled;
+    }
 
     boolean scanLoopOn = false;
     boolean scanLoopOff = false;
