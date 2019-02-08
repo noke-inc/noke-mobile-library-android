@@ -588,6 +588,7 @@ public class NokeDeviceManagerService extends Service {
                                 if (Integer.parseInt(noke.getSoftwareVersion().substring(2)) >= 13) {
                                     int lockStateBroadcast = (broadcastData[0] >> 5) & 0x01;
                                     int lockStateBroadcast2 = (broadcastData[0] >> 6) & 0x01;
+                                    Log.w(TAG, "STATE: " + lockStateBroadcast + " " + lockStateBroadcast2);
                                     lockState = lockStateBroadcast + lockStateBroadcast2;
                                 } else {
                                     lockState = NokeDefines.NOKE_LOCK_STATE_UNKNOWN;

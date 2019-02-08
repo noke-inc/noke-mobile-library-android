@@ -292,6 +292,20 @@ public class NokeDevice {
     }
 
     /**
+     * Sends an arrayList of commands to the lock
+     *
+     * @param commands an arrayList of strings (NOT USED WITH THE CORE API)
+     */
+    public void sendCommands(ArrayList<String> commands){
+        this.commands = commands;
+        if (this.commands.size() > 1) {
+            this.connectionState = NokeDefines.NOKE_STATE_SYNCING;
+            mService.getNokeListener().onNokeSyncing(this);
+        }
+        mService.writeRXCharacteristic(this);
+    }
+
+    /**
      * Checks for a valid offline key and offline unlock and unlocks the lock without a network connection
      */
     public void offlineUnlock() {
