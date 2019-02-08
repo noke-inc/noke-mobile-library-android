@@ -94,7 +94,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
             //Register callback listener
             mNokeService.registerNokeListener(mNokeServiceListener);
 
-            String[] macs = {"XX:XX:XX:XX:XX"};
+            String[] macs = {"XX:XX:XX:XX:XX:XX"};
 
             for (String mac:macs
                  ) {

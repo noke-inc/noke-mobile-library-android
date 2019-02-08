@@ -31,7 +31,7 @@ import javax.net.ssl.SSLContext;
 class DemoWebClient {
 
     private final static String TAG = DemoWebClient.class.getSimpleName();
-    private String serverUrl = "http://spencer.noke:8080/";
+    private String serverUrl = "CLIENT_URL_HERE";
     private DemoWebClientCallback mDemoWebClientCallback;
 
     private static String POST(String urlStr, JSONObject jsonObject)
@@ -60,8 +60,7 @@ class DemoWebClient {
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("Connection", "close");
             conn.setRequestProperty("charset", "utf-8");
-            String apiKey = "eyJhbGciOiJOT0tFX1BSSVZBVEUiLCJ0eXAiOiJKV1QifQ.eyJhbGciOiJOT0tFX1BSSVZBVEUiLCJjb21wYW55X3V1aWQiOiIzNDhiYmQ2OS0yYzc3LTQ4YWMtOTNmMi03ZjlmZERhYzZhNDUiLCJpc3MiOiJub2tlLmNvbSJ9.6a28bc81625af75b327dc214cb589d86500a5dd7";
-            conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+
 
             DataOutputStream wr = new DataOutputStream( conn.getOutputStream());
             wr.writeBytes(jsonObject.toString());
