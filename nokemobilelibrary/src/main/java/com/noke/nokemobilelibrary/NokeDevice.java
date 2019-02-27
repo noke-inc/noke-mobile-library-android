@@ -308,7 +308,7 @@ public class NokeDevice {
     /**
      * Checks for a valid offline key and offline unlock and unlocks the lock without a network connection
      */
-    public void offlineUnlock() {
+    public String offlineUnlock() {
         if (this.offlineUnlockCmd.length() == NokeDefines.UNLOCK_COMMAND_LENGTH && this.offlineKey.length() == NokeDefines.OFFLINE_KEY_LENGTH) {
             byte unlockCommand[] = NokeDefines.hexToBytes(this.offlineUnlockCmd);
 
@@ -351,10 +351,14 @@ public class NokeDevice {
             cmddata[15] = checksum;
             System.arraycopy(encryptPacket(preSessionKey, cmddata), 0, commandpacket, 4, 16);
 
+
             this.commands.add(NokeDefines.bytesToHex(commandpacket));
             mService.writeRXCharacteristic(this);
+            return String.valueOf(unixTime);
         } else {
+
             mService.getNokeListener().onError(this, NokeMobileError.ERROR_INVALID_OFFLINE_KEY, "Offline key/command is invalid.");
+            return "";
         }
     }
 
