@@ -282,6 +282,7 @@ public class NokeDevice {
      * @param commands + delimited string returned from the unlock request
      */
     public void sendCommands(String commands) {
+        clearCommands();
         List<String> commandArr = Arrays.asList(commands.split("\\+"));
         this.commands.addAll(commandArr);
         if (this.commands.size() > 1) {
@@ -303,6 +304,15 @@ public class NokeDevice {
             mService.getNokeListener().onNokeSyncing(this);
         }
         mService.writeRXCharacteristic(this);
+    }
+
+    /**
+     * Clears the command array. Used to prevent invalid commands from being sent to the lock and causing errors
+     */
+    public void clearCommands(){
+        if(this.commands != null){
+            this.commands.clear();
+        }
     }
 
     /**

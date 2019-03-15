@@ -815,6 +815,7 @@ public class NokeDeviceManagerService extends Service {
                 noke.connectionAttempts = 0;
                 noke.connectionState = NokeDefines.NOKE_STATE_CONNECTING;
                 noke.isRestoring = false;
+                noke.clearCommands();
                 mGlobalNokeListener.onNokeConnecting(noke);
 
                 Handler handler = new Handler(Looper.getMainLooper());
