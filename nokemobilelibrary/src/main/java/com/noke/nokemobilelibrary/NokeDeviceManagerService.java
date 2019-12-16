@@ -146,6 +146,14 @@ public class NokeDeviceManagerService extends Service {
      * Only devices that are in this array will be discovered when scanning
      */
     public LinkedHashMap<String, NokeDevice> nokeDevices;
+    /**
+     * Address for proxy used for making upload requests to the mobile API (optional)
+     */
+    private String proxyAddress = "";
+    /**
+     * Port for proxy used for making upload requests to the mobile API
+     */
+    private int port = 0;
 
     /**
      * Class for binding service to activity
@@ -264,6 +272,7 @@ public class NokeDeviceManagerService extends Service {
             nokeDevices.remove(noke.getMac());
         }
     }
+
 
     /**
      * Removes noke device from the device array.  These devices can be discovered and connected to by the service
@@ -1125,7 +1134,7 @@ public class NokeDeviceManagerService extends Service {
                         ApplicationInfo ai = pm.getApplicationInfo(getApplicationContext().getPackageName(), PackageManager.GET_META_DATA);
                         Bundle bundle = ai.metaData;
                         String nokeMobileApiKey = bundle.getString(NokeDefines.NOKE_MOBILE_API_KEY);
-                        this.uploadDataCallback(NokeMobileApiClient.POST(NokeDefines.uploadURL, jsonObject.toString(), nokeMobileApiKey));
+                        this.uploadDataCallback(NokeMobileApiClient.POST(NokeDefines.uploadURL, jsonObject.toString(), nokeMobileApiKey, proxyAddress, port));
                     } catch (PackageManager.NameNotFoundException | NullPointerException e) {
                         e.printStackTrace();
                         mGlobalNokeListener.onError(null, NokeMobileError.ERROR_MISSING_API_KEY, "No API Key found. Have you set it in your Android Manifest?");
@@ -1464,7 +1473,7 @@ public class NokeDeviceManagerService extends Service {
                         ApplicationInfo ai = pm.getApplicationInfo(getApplicationContext().getPackageName(), PackageManager.GET_META_DATA);
                         Bundle bundle = ai.metaData;
                         String nokeMobileApiKey = bundle.getString(NokeDefines.NOKE_MOBILE_API_KEY);
-                        NokeDeviceManagerService.this.restoreKeyCallback(NokeMobileApiClient.POST(url, jsonObject.toString(), nokeMobileApiKey), noke);
+                        NokeDeviceManagerService.this.restoreKeyCallback(NokeMobileApiClient.POST(url, jsonObject.toString(), nokeMobileApiKey, proxyAddress, port), noke);
                     } catch (PackageManager.NameNotFoundException | NullPointerException e) {
                         e.printStackTrace();
                         mGlobalNokeListener.onError(null, NokeMobileError.ERROR_MISSING_API_KEY, "No API Key found. Have you set it in your Android Manifest?");
@@ -1515,7 +1524,7 @@ public class NokeDeviceManagerService extends Service {
                         ApplicationInfo ai = pm.getApplicationInfo(getApplicationContext().getPackageName(), PackageManager.GET_META_DATA);
                         Bundle bundle = ai.metaData;
                         String nokeMobileApiKey = bundle.getString(NokeDefines.NOKE_MOBILE_API_KEY);
-                        NokeDeviceManagerService.this.confirmRestoreCallback(NokeMobileApiClient.POST(url, jsonObject.toString(), nokeMobileApiKey));
+                        NokeDeviceManagerService.this.confirmRestoreCallback(NokeMobileApiClient.POST(url, jsonObject.toString(), nokeMobileApiKey, proxyAddress, port));
                     } catch (PackageManager.NameNotFoundException | NullPointerException e) {
                         e.printStackTrace();
                         mGlobalNokeListener.onError(null, NokeMobileError.ERROR_MISSING_API_KEY, "No API Key found. Have you set it in your Android Manifest?");
@@ -1542,6 +1551,11 @@ public class NokeDeviceManagerService extends Service {
         } catch (JSONException e) {
             this.getNokeListener().onDataUploaded(NokeMobileError.ERROR_JSON_UPLOAD, e.toString());
         }
+    }
+
+    public void useProxy(String address, int port){
+        this.proxyAddress = address;
+        this.port = port;
     }
 
 }
