@@ -586,24 +586,14 @@ public class NokeDeviceManagerService extends Service {
                             int lockState = NokeDefines.NOKE_LOCK_STATE_LOCKED;
 
                             if (noke.getHardwareVersion().equals(NokeDefines.NOKE_HW_TYPE_HD_LOCK)) {
-                                if (Integer.parseInt(noke.getSoftwareVersion().substring(2)) >= 13) {
-                                    int lockStateBroadcast = (broadcastData[0] >> 5) & 0x01;
-                                    int lockStateBroadcast2 = (broadcastData[0] >> 6) & 0x01;
-                                    lockState = lockStateBroadcast + lockStateBroadcast2;
-                                } else {
-                                    lockState = NokeDefines.NOKE_LOCK_STATE_UNKNOWN;
-                                }
+
                             }else if(noke.getHardwareVersion().equals(NokeDefines.NOKE_HW_TYPE_ULOCK)){
+                                Log.d(TAG, "HD BROADCAST: " + NokeDefines.bytesToHex(broadcastData));
                                 int lockStateBroadcast = (broadcastData[0] >> 5) & 0x01;
                                 int lockStateBroadcast2 = (broadcastData[0] >> 6) & 0x01;
-                                int addlockState = lockStateBroadcast + lockStateBroadcast2;
-                                if(addlockState == 1){
-                                    lockState = NokeDefines.NOKE_LOCK_STATE_LOCKED;
-                                }else if(addlockState == 0){
-                                    lockState = NokeDefines.NOKE_LOCK_STATE_UNLOCKED;
-                                }else{
-                                    lockState = NokeDefines.NOKE_LOCK_STATE_UNKNOWN;;
-                                }
+                                int lockStateBroadcast3 = (broadcastData[0] >> 7) & 0x01;
+                                String lockstateString = "" + lockStateBroadcast3 + lockStateBroadcast2 + lockStateBroadcast;
+                                lockState = Integer.parseInt(lockstateString,2);
                             }
 
                             noke.bluetoothDevice = bluetoothDevice;
