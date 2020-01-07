@@ -602,7 +602,7 @@ public class NokeDeviceManagerService extends Service {
                                 }else if(addlockState == 0){
                                     lockState = NokeDefines.NOKE_LOCK_STATE_UNLOCKED;
                                 }else{
-                                    lockState = NokeDefines.NOKE_LOCK_STATE_UNKNOWN;;
+                                    lockState = NokeDefines.NOKE_LOCK_STATE_UNKNOWN;
                                 }
                             }
 
@@ -613,6 +613,7 @@ public class NokeDeviceManagerService extends Service {
                                 nokeDevices.put(noke.getMac(), noke);
                             }
                             noke.lockState = lockState;
+                            noke.rssi = rssi;
                             mGlobalNokeListener.onNokeDiscovered(noke);
                         }
                     }
