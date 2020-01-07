@@ -612,6 +612,7 @@ public class NokeDeviceManagerService extends Service {
                                 nokeDevices.put(noke.getMac(), noke);
                             }
                             noke.lockState = lockState;
+                            noke.rssi = rssi;
                             mGlobalNokeListener.onNokeDiscovered(noke);
                         }
                     }
