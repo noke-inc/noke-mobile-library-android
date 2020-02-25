@@ -276,6 +276,10 @@ public class NokeDevice {
         this.connectionState = connectionState;
     }
 
+    public int getRssi() { return rssi; }
+
+    public void setRssi(int rssi) { this.rssi = rssi; }
+
     /**
      * Sends a + delimited string of commands to the lock
      *
