@@ -594,13 +594,15 @@ public class NokeDeviceManagerService extends Service {
 
                             int lockState = NokeDefines.NOKE_LOCK_STATE_LOCKED;
 
-                            if (noke.getHardwareVersion().equals(NokeDefines.NOKE_HW_TYPE_HD_LOCK)) {
-                                Log.d(TAG, "HD BROADCAST: " + NokeDefines.bytesToHex(broadcastData));
+                            if (noke.getHardwareVersion().contains(NokeDefines.NOKE_HW_TYPE_HD_LOCK)) {
+
+                                //Log.d(TAG, "HD BROADCAST: " + NokeDefines.bytesToHex(broadcastData));
                                 int lockStateBroadcast = (broadcastData[0] >> 5) & 0x01;
                                 int lockStateBroadcast2 = (broadcastData[0] >> 6) & 0x01;
                                 int lockStateBroadcast3 = (broadcastData[0] >> 7) & 0x01;
                                 String lockstateString = "" + lockStateBroadcast3 + lockStateBroadcast2 + lockStateBroadcast;
                                 lockState = Integer.parseInt(lockstateString,2);
+
                             }else if(noke.getHardwareVersion().equals(NokeDefines.NOKE_HW_TYPE_ULOCK)){
                                 int lockStateBroadcast = (broadcastData[0] >> 5) & 0x01;
                                 int lockStateBroadcast2 = (broadcastData[0] >> 6) & 0x01;
