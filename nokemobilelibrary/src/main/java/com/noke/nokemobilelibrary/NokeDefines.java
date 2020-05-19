@@ -104,8 +104,11 @@ public class NokeDefines {
      */
     public static final int NOKE_LOCK_STATE_UNKNOWN         = -1;
     public static final int NOKE_LOCK_STATE_UNLOCKED        = 0;
-    public static final int NOKE_LOCK_STATE_UNSHACKLED      = 1;
-    public static final int NOKE_LOCK_STATE_LOCKED          = 2;
+    public static final int NOKE_LOCK_STATE_UNSHACKLED      = 2;
+    public static final int NOKE_LOCK_STATE_LOCKED          = 3;
+    public static final int NOKE_LOCK_STATE_UNSHACKLING     = 4;
+    public static final int NOKE_LOCK_STATE_UNLOCKING       = 5;
+    public static final int NOKE_LOCK_STATE_LOCKED_NO_MAGNET = 7;
 
     /**
      * Hardware Types
@@ -113,7 +116,7 @@ public class NokeDefines {
     public static final String NOKE_HW_TYPE_1ST_GEN_PADLOCK         = "2P";
     public static final String NOKE_HW_TYPE_2ND_GEN_PADLOCK         = "3P";
     public static final String NOKE_HW_TYPE_ULOCK                   = "2U";
-    public static final String NOKE_HW_TYPE_HD_LOCK                 = "2I";
+    public static final String NOKE_HW_TYPE_HD_LOCK                 = "I";
     public static final String NOKE_HW_TYPE_DOOR_CONTROLLER         = "2E";
     public static final String NOKE_HW_TYPE_PB12                    = "1C";
 
