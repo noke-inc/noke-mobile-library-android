@@ -47,6 +47,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
+import static com.noke.nokemobilelibrary.NokeMobileError.DEVICE_SHUTDOWN_RESULT;
+
 
 /************************************************************************************************************************************************
  * Copyright © 2018 Nokē Inc. All rights reserved.
@@ -112,7 +114,18 @@ public class NokeDeviceManagerService extends Service {
      * A boolean that allows the device manager to discover devices that are not in the array
      */
     private boolean mAllowAllDevices;
-
+    /**
+     *property used to detect if a connection fails when a device that is not available tries to create a connection
+     */
+    public Handler connectionTimer;
+    /**
+     *number of seconds the connection process will wait until return an error connection
+     */
+    public long numberOfSecondsToDetectTheConnectionError = 2;
+    /**
+     * This propeerty is filled when the connection starts
+     */
+    private NokeDevice currentNoke;
 
     /**
      * Listener for Noke device events.  Triggered on various events including:
@@ -712,6 +725,9 @@ public class NokeDeviceManagerService extends Service {
      * @param noke - The device to which to connect
      */
     public void connectToNoke(NokeDevice noke) {
+        invalidateConnectionTimer();
+        initializeConnectionTimer();
+        currentNoke = noke;
         connectToDevice(noke.bluetoothDevice, noke.rssi);
     }
 
@@ -829,6 +845,7 @@ public class NokeDeviceManagerService extends Service {
         @Override
         public void onConnectionStateChange(final BluetoothGatt gatt, int status, int newState) {
             final NokeDevice noke = nokeDevices.get(gatt.getDevice().getAddress());
+            invalidateConnectionTimer();
             if (status == NokeDefines.NOKE_GATT_ERROR) {
                 if (noke.connectionAttempts > 4) {
                     Handler handler = new Handler(Looper.getMainLooper());
@@ -1412,6 +1429,7 @@ public class NokeDeviceManagerService extends Service {
      * callback.
      */
     public void disconnectNoke(final NokeDevice noke) {
+        invalidateConnectionTimer();
         if (mBluetoothAdapter == null || noke.gatt == null) {
             return;
         }
@@ -1586,6 +1604,26 @@ public class NokeDeviceManagerService extends Service {
     public void useProxy(String address, int port){
         this.proxyAddress = address;
         this.port = port;
+    }
+
+    private void invalidateConnectionTimer(){
+        currentNoke = null;
+        if(connectionTimer!=null) {
+            connectionTimer.removeCallbacksAndMessages(null);
+        }
+    }
+    private void initializeConnectionTimer(){
+        connectionTimer = new Handler(Looper.getMainLooper());
+        connectionTimer.postDelayed(connectionTimerRunnable(), numberOfSecondsToDetectTheConnectionError*1000);
+    }
+    private Runnable connectionTimerRunnable() {
+        return new Runnable() {
+            @Override
+            public void run() {
+                mGlobalNokeListener.onError(currentNoke, DEVICE_SHUTDOWN_RESULT, "Connection error");
+                disconnectNoke(currentNoke);
+            }
+        };
     }
 
 }
