@@ -122,7 +122,7 @@ public class NokeDeviceManagerService extends Service {
     /**
      *number of seconds the connection process will wait until return an error connection
      */
-    public long numberOfSecondsToDetectTheConnectionError = 2;
+    public long numberOfSecondsToDetectTheConnectionError = 6;
     /**
      * This propeerty is filled when the connection starts
      */
