@@ -63,6 +63,7 @@ public class NokeMobileError {
     public static final int ERROR_INVALID_OFFLINE_KEY           = 309;
     public static final int ERROR_JSON_UPLOAD                   = 315;
     public static final int ERROR_MISSING_UPLOAD_URL            = 316;
+    public static final int ERROR_CONNECTION_TIMEOUT            = 317;
 
 
 

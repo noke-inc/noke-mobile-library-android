@@ -48,6 +48,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static com.noke.nokemobilelibrary.NokeMobileError.DEVICE_SHUTDOWN_RESULT;
+import static com.noke.nokemobilelibrary.NokeMobileError.ERROR_CONNECTION_TIMEOUT;
 
 
 /************************************************************************************************************************************************
@@ -1620,7 +1621,7 @@ public class NokeDeviceManagerService extends Service {
         return new Runnable() {
             @Override
             public void run() {
-                mGlobalNokeListener.onError(currentNoke, DEVICE_SHUTDOWN_RESULT, "Connection error");
+                mGlobalNokeListener.onError(currentNoke, ERROR_CONNECTION_TIMEOUT, "Connection error");
                 disconnectNoke(currentNoke);
             }
         };
