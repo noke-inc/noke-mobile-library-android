@@ -163,6 +163,40 @@ class DemoWebClient {
         thread.start();
     }
 
+    void requestFobSync(final NokeDevice noke)
+    {
+        /* Note: This is an example request to a demo server, it does not represent a request to the Noke Core API.
+         * Requests should not be made to the Core API directly from the mobile app.
+         * Please refer to the documentation for more details
+         * (https://github.com/noke-inc/noke-mobile-library-android#nok%C4%93-mobile-library-for-android)
+         */
+
+        Thread thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+                try {
+
+                    JSONObject jsonObject = new JSONObject();
+
+                    jsonObject.accumulate("session", noke.getSession());
+                    jsonObject.accumulate("mac", noke.getMac());
+                    String url = serverUrl + "fobs/sync/";
+
+                    mDemoWebClientCallback.onUnlockReceived(POST(url, jsonObject), noke);
+
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+
+        thread.start();
+    }
+
+
+
     void setWebClientCallback(DemoWebClientCallback callback){
         this.mDemoWebClientCallback = callback;
     }

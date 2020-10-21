@@ -63,7 +63,11 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
                 else{
                     DemoWebClient demoWebClient = new DemoWebClient();
                     demoWebClient.setWebClientCallback(MainActivity.this);
-                    demoWebClient.requestUnlock(currentNoke, emailEditText.getText().toString());
+                    if(currentNoke.getHardwareVersion().toLowerCase().contains("f")) {
+                        demoWebClient.requestFobSync(currentNoke);
+                    }else{
+                        demoWebClient.requestUnlock(currentNoke, emailEditText.getText().toString());
+                    }
                 }
             }
         });
