@@ -319,6 +319,51 @@ public class NokeDevice {
         }
     }
 
+    public Integer getCommandCount(){
+        if(this.commands != null){
+            return this.commands.size();
+        }else{
+            return 0;
+        }
+    }
+
+    public String scheduledOfflineUnlock() {
+        if (this.offlineUnlockCmd.length() == NokeDefines.UNLOCK_COMMAND_LENGTH && this.offlineKey.length() == NokeDefines.OFFLINE_KEY_LENGTH) {
+            byte unlockCommand[] = NokeDefines.hexToBytes(this.offlineUnlockCmd);
+
+            byte header[] = new byte[4];
+            header[0] = unlockCommand[0];
+            header[1] = unlockCommand[1];
+            header[2] = unlockCommand[2];
+            header[3] = unlockCommand[3];
+
+            byte commandpacket[] = new byte[20];
+            System.arraycopy(header, 0, commandpacket, 0, header.length);
+
+            byte cmddata[] = new byte[16];
+            System.arraycopy(unlockCommand, 4, cmddata, 0, 16);
+
+            long unixTime = System.currentTimeMillis() / 1000L;
+
+            byte preSessionKey[] = NokeDefines.hexToBytes(this.offlineKey);
+            byte sessionBytes[] = NokeDefines.hexToBytes(this.session);
+
+            for (int x = 0; x < preSessionKey.length; x++) {
+                int total = NokeDefines.toUnsigned(preSessionKey[x]) + NokeDefines.toUnsigned(sessionBytes[x]);
+                preSessionKey[x] = (byte) total;
+            }
+
+
+            System.arraycopy(encryptPacket(preSessionKey, cmddata), 0, commandpacket, 4, 16);
+            this.commands.add(NokeDefines.bytesToHex(commandpacket));
+            mService.writeRXCharacteristic(this);
+            return String.valueOf(unixTime);
+        } else {
+            mService.getNokeListener().onError(this, NokeMobileError.ERROR_INVALID_OFFLINE_KEY, "Offline key/command is invalid.");
+            return "";
+        }
+    }
+
     /**
      * Checks for a valid offline key and offline unlock and unlocks the lock without a network connection
      */
