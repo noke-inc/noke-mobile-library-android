@@ -50,8 +50,8 @@ public class NokeDefines {
     static final String NOKE_MOBILE_API_KEY                        = "noke-core-api-mobile-key";
 
 
-    static final int OFFLINE_KEY_LENGTH                       = 32;
-    static final int UNLOCK_COMMAND_LENGTH                    = 40;
+    public static final int OFFLINE_KEY_LENGTH                       = 32;
+    public static final int UNLOCK_COMMAND_LENGTH                    = 40;
 
     /**
      * Lock response types
