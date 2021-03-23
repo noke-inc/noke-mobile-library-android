@@ -63,7 +63,11 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
                 else{
                     DemoWebClient demoWebClient = new DemoWebClient();
                     demoWebClient.setWebClientCallback(MainActivity.this);
-                    demoWebClient.requestUnlock(currentNoke, emailEditText.getText().toString());
+                    if(currentNoke.getHardwareVersion().toLowerCase().contains("f")) {
+                        demoWebClient.requestFobSync(currentNoke);
+                    }else{
+                        demoWebClient.requestUnlock(currentNoke, emailEditText.getText().toString());
+                    }
                 }
             }
         });
@@ -94,7 +98,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
             //Register callback listener
             mNokeService.registerNokeListener(mNokeServiceListener);
 
-            String[] macs = {"XX:XX:XX:XX:XX"};
+            String[] macs = {"XX:XX:XX:XX:XX:XX"};
 
             for (String mac:macs
                  ) {

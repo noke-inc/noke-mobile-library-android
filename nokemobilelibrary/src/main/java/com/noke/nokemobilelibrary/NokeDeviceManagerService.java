@@ -49,6 +49,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
+import static com.noke.nokemobilelibrary.NokeMobileError.DEVICE_SHUTDOWN_RESULT;
+import static com.noke.nokemobilelibrary.NokeMobileError.ERROR_CONNECTION_TIMEOUT;
+
 
 /************************************************************************************************************************************************
  * Copyright © 2018 Nokē Inc. All rights reserved.
@@ -123,7 +126,18 @@ public class NokeDeviceManagerService extends Service {
      * A boolean that allows the device manager to discover devices that are not in the array
      */
     private boolean mAllowAllDevices;
-
+    /**
+     *property used to detect if a connection fails when a device that is not available tries to create a connection
+     */
+    public Handler connectionTimer;
+    /**
+     *number of seconds the connection process will wait until return an error connection
+     */
+    public long numberOfSecondsToDetectTheConnectionError = 6;
+    /**
+     * This propeerty is filled when the connection starts
+     */
+    private NokeDevice currentNoke;
 
     /**
      * Listener for Noke device events.  Triggered on various events including:
@@ -160,6 +174,14 @@ public class NokeDeviceManagerService extends Service {
      * Only devices that are in this array will be discovered when scanning
      */
     public LinkedHashMap<String, NokeDevice> nokeDevices;
+    /**
+     * Address for proxy used for making upload requests to the mobile API (optional)
+     */
+    private String proxyAddress = "";
+    /**
+     * Port for proxy used for making upload requests to the mobile API
+     */
+    private int port = 0;
 
     /**
      * Class for binding service to activity
@@ -194,6 +216,24 @@ public class NokeDeviceManagerService extends Service {
 
             return NokeDeviceManagerService.this;
         }
+
+        /**
+         * Returns reference to the NokeDeviceManagerService
+         *
+         * @param mode must be set upon initialization. Determines the upload url used for uploading
+         *             responses from the lock to the Core API.  Mode types can be found in NokeDefines
+         *             file:
+         *             - Sandbox (NOKE_LIBRARY_SANDBOX)
+         *             - Production (NOKE_LIBRARY_PRODUCTION)
+         *             - Develop (NOKE_LIBRARY_DEVELOP)
+         * @param mobileApiKey Mobile API key. If not set here it must instead be specified in
+         *                     the Android manifest.
+         */
+        public NokeDeviceManagerService getService(int mode, String mobileApiKey) {
+            NokeDeviceManagerService service = getService(mode);
+            service.setMobileApiKey(mobileApiKey);
+            return service;
+        }
     }
 
     /**
@@ -204,6 +244,31 @@ public class NokeDeviceManagerService extends Service {
     @Override
     public IBinder onBind(Intent intent) {
         return mBinder;
+    }
+
+    private String mMobileApiKey;
+
+    private String getMobileApiKey() {
+        if (mMobileApiKey != null) {
+            return mMobileApiKey;
+        }
+
+        try {
+            PackageManager pm = getApplicationContext().getPackageManager();
+            ApplicationInfo ai = pm.getApplicationInfo(getApplicationContext().getPackageName(), PackageManager.GET_META_DATA);
+            Bundle bundle = ai.metaData;
+            return bundle.getString(NokeDefines.NOKE_MOBILE_API_KEY);
+        } catch (PackageManager.NameNotFoundException | NullPointerException e) {
+            e.printStackTrace();
+            String message = "No API Key found. Have you set it in your Android Manifest or through setMobileApiKey()?";
+            mGlobalNokeListener.onError(null, NokeMobileError.ERROR_MISSING_API_KEY, message);
+
+            throw new IllegalStateException(message, e);
+        }
+    }
+
+    private void setMobileApiKey(String mobileApiKey) {
+        mMobileApiKey = mobileApiKey;
     }
 
     @Override
@@ -286,6 +351,7 @@ public class NokeDeviceManagerService extends Service {
             nokeDevices.remove(noke.getMac());
         }
     }
+
 
     /**
      * Removes noke device from the device array.  These devices can be discovered and connected to by the service
@@ -656,11 +722,24 @@ public class NokeDeviceManagerService extends Service {
                             noke.setVersion(version);
 
                             int lockState = NokeDefines.NOKE_LOCK_STATE_LOCKED;
-                            if (noke.getHardwareVersion().equals(NokeDefines.NOKE_HW_TYPE_HD_LOCK)) {
-                                if (Integer.parseInt(noke.getSoftwareVersion().substring(2)) >= 13) {
-                                    int lockStateBroadcast = (broadcastData[0] >> 5) & 0x01;
-                                    int lockStateBroadcast2 = (broadcastData[0] >> 6) & 0x01;
-                                    lockState = lockStateBroadcast + lockStateBroadcast2;
+
+                            if (noke.getHardwareVersion().contains(NokeDefines.NOKE_HW_TYPE_HD_LOCK)) {
+
+                                //Log.d(TAG, "HD BROADCAST: " + NokeDefines.bytesToHex(broadcastData));
+                                int lockStateBroadcast = (broadcastData[0] >> 5) & 0x01;
+                                int lockStateBroadcast2 = (broadcastData[0] >> 6) & 0x01;
+                                int lockStateBroadcast3 = (broadcastData[0] >> 7) & 0x01;
+                                String lockstateString = "" + lockStateBroadcast3 + lockStateBroadcast2 + lockStateBroadcast;
+                                lockState = Integer.parseInt(lockstateString,2);
+
+                            }else if(noke.getHardwareVersion().equals(NokeDefines.NOKE_HW_TYPE_ULOCK)){
+                                int lockStateBroadcast = (broadcastData[0] >> 5) & 0x01;
+                                int lockStateBroadcast2 = (broadcastData[0] >> 6) & 0x01;
+                                int addlockState = lockStateBroadcast + lockStateBroadcast2;
+                                if (addlockState == 1) {
+                                    lockState = NokeDefines.NOKE_LOCK_STATE_LOCKED;
+                                } else if (addlockState == 0) {
+                                    lockState = NokeDefines.NOKE_LOCK_STATE_UNLOCKED;
                                 } else {
                                     lockState = NokeDefines.NOKE_LOCK_STATE_UNKNOWN;
                                 }
@@ -673,6 +752,7 @@ public class NokeDeviceManagerService extends Service {
                                 nokeDevices.put(noke.getMac(), noke);
                             }
                             noke.lockState = lockState;
+                            noke.rssi = rssi;
                             mGlobalNokeListener.onNokeDiscovered(noke);
                         }
                     }
@@ -718,6 +798,9 @@ public class NokeDeviceManagerService extends Service {
      * @param noke - The device to which to connect
      */
     public void connectToNoke(NokeDevice noke) {
+        invalidateConnectionTimer();
+        initializeConnectionTimer();
+        currentNoke = noke;
         connectToDevice(noke.bluetoothDevice, noke.rssi);
     }
 
@@ -835,6 +918,7 @@ public class NokeDeviceManagerService extends Service {
         @Override
         public void onConnectionStateChange(final BluetoothGatt gatt, int status, int newState) {
             final NokeDevice noke = nokeDevices.get(gatt.getDevice().getAddress());
+            invalidateConnectionTimer();
             if (status == NokeDefines.NOKE_GATT_ERROR) {
                 if (noke.connectionAttempts > 4) {
                     Handler handler = new Handler(Looper.getMainLooper());
@@ -875,6 +959,7 @@ public class NokeDeviceManagerService extends Service {
                 noke.connectionAttempts = 0;
                 noke.connectionState = NokeDefines.NOKE_STATE_CONNECTING;
                 noke.isRestoring = false;
+                noke.clearCommands();
                 mGlobalNokeListener.onNokeConnecting(noke);
 
                 Handler handler = new Handler(Looper.getMainLooper());
@@ -1189,15 +1274,8 @@ public class NokeDeviceManagerService extends Service {
                         data.put(globalUploadQueue.get(i));
                     }
                     jsonObject.accumulate("logs", data);
-                    try {
-                        PackageManager pm = getApplicationContext().getPackageManager();
-                        ApplicationInfo ai = pm.getApplicationInfo(getApplicationContext().getPackageName(), PackageManager.GET_META_DATA);
-                        Bundle bundle = ai.metaData;
-                        this.uploadDataCallback(NokeMobileApiClient.POST(NokeDefines.uploadURL, jsonObject.toString(), this.getApiKey()));
-                    } catch (PackageManager.NameNotFoundException | NullPointerException e) {
-                        e.printStackTrace();
-                        mGlobalNokeListener.onError(null, NokeMobileError.ERROR_MISSING_API_KEY, "No API Key found. Have you set it in your Android Manifest?");
-                    }
+                    String nokeMobileApiKey = getMobileApiKey();
+                    this.uploadDataCallback(NokeMobileApiClient.POST(NokeDefines.uploadURL, jsonObject.toString(), nokeMobileApiKey, proxyAddress, port));
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -1424,6 +1502,7 @@ public class NokeDeviceManagerService extends Service {
      * callback.
      */
     public void disconnectNoke(final NokeDevice noke) {
+        invalidateConnectionTimer();
         if (mBluetoothAdapter == null || noke.gatt == null) {
             return;
         }
@@ -1527,17 +1606,8 @@ public class NokeDeviceManagerService extends Service {
                     jsonObject.accumulate("session", noke.getSession());
                     jsonObject.accumulate("mac", noke.getMac());
                     String url = NokeDefines.uploadURL.replace("upload/", "restore/");
-                    try {
-                        PackageManager pm = getApplicationContext().getPackageManager();
-                        ApplicationInfo ai = pm.getApplicationInfo(getApplicationContext().getPackageName(), PackageManager.GET_META_DATA);
-                        Bundle bundle = ai.metaData;
-                        String nokeMobileApiKey = bundle.getString(NokeDefines.NOKE_MOBILE_API_KEY);
-                        NokeDeviceManagerService.this.restoreKeyCallback(NokeMobileApiClient.POST(url, jsonObject.toString(), nokeMobileApiKey), noke);
-                    } catch (PackageManager.NameNotFoundException | NullPointerException e) {
-                        e.printStackTrace();
-                        mGlobalNokeListener.onError(null, NokeMobileError.ERROR_MISSING_API_KEY, "No API Key found. Have you set it in your Android Manifest?");
-                        noke.isRestoring = false;
-                    }
+                    String nokeMobileApiKey = getMobileApiKey();
+                    NokeDeviceManagerService.this.restoreKeyCallback(NokeMobileApiClient.POST(url, jsonObject.toString(), nokeMobileApiKey, proxyAddress, port), noke);
                 } catch (Exception e) {
                     e.printStackTrace();
                     noke.isRestoring = false;
@@ -1578,16 +1648,8 @@ public class NokeDeviceManagerService extends Service {
                     jsonObject.accumulate("mac", mac);
                     jsonObject.accumulate("command_id", commandid);
                     String url = NokeDefines.uploadURL.replace("upload/", "restore/confirm/");
-                    try {
-                        PackageManager pm = getApplicationContext().getPackageManager();
-                        ApplicationInfo ai = pm.getApplicationInfo(getApplicationContext().getPackageName(), PackageManager.GET_META_DATA);
-                        Bundle bundle = ai.metaData;
-                        String nokeMobileApiKey = bundle.getString(NokeDefines.NOKE_MOBILE_API_KEY);
-                        NokeDeviceManagerService.this.confirmRestoreCallback(NokeMobileApiClient.POST(url, jsonObject.toString(), nokeMobileApiKey));
-                    } catch (PackageManager.NameNotFoundException | NullPointerException e) {
-                        e.printStackTrace();
-                        mGlobalNokeListener.onError(null, NokeMobileError.ERROR_MISSING_API_KEY, "No API Key found. Have you set it in your Android Manifest?");
-                    }
+                    String nokeMobileApiKey = getMobileApiKey();
+                    NokeDeviceManagerService.this.confirmRestoreCallback(NokeMobileApiClient.POST(url, jsonObject.toString(), nokeMobileApiKey, proxyAddress, port));
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -1610,6 +1672,31 @@ public class NokeDeviceManagerService extends Service {
         } catch (JSONException e) {
             this.getNokeListener().onDataUploaded(NokeMobileError.ERROR_JSON_UPLOAD, e.toString());
         }
+    }
+
+    public void useProxy(String address, int port){
+        this.proxyAddress = address;
+        this.port = port;
+    }
+
+    private void invalidateConnectionTimer(){
+        currentNoke = null;
+        if(connectionTimer!=null) {
+            connectionTimer.removeCallbacksAndMessages(null);
+        }
+    }
+    private void initializeConnectionTimer(){
+        connectionTimer = new Handler(Looper.getMainLooper());
+        connectionTimer.postDelayed(connectionTimerRunnable(), numberOfSecondsToDetectTheConnectionError*1000);
+    }
+    private Runnable connectionTimerRunnable() {
+        return new Runnable() {
+            @Override
+            public void run() {
+                mGlobalNokeListener.onError(currentNoke, ERROR_CONNECTION_TIMEOUT, "Connection error");
+                disconnectNoke(currentNoke);
+            }
+        };
     }
 
 }

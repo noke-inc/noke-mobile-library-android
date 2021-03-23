@@ -31,7 +31,7 @@ import javax.net.ssl.SSLContext;
 class DemoWebClient {
 
     private final static String TAG = DemoWebClient.class.getSimpleName();
-    private String serverUrl = "http://spencer.noke:8080/";
+    private String serverUrl = "CLIENT_URL_HERE";
     private DemoWebClientCallback mDemoWebClientCallback;
 
     private static String POST(String urlStr, JSONObject jsonObject)
@@ -60,8 +60,7 @@ class DemoWebClient {
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("Connection", "close");
             conn.setRequestProperty("charset", "utf-8");
-            String apiKey = "eyJhbGciOiJOT0tFX1BSSVZBVEUiLCJ0eXAiOiJKV1QifQ.eyJhbGciOiJOT0tFX1BSSVZBVEUiLCJjb21wYW55X3V1aWQiOiIzNDhiYmQ2OS0yYzc3LTQ4YWMtOTNmMi03ZjlmZERhYzZhNDUiLCJpc3MiOiJub2tlLmNvbSJ9.6a28bc81625af75b327dc214cb589d86500a5dd7";
-            conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+
 
             DataOutputStream wr = new DataOutputStream( conn.getOutputStream());
             wr.writeBytes(jsonObject.toString());
@@ -163,6 +162,40 @@ class DemoWebClient {
 
         thread.start();
     }
+
+    void requestFobSync(final NokeDevice noke)
+    {
+        /* Note: This is an example request to a demo server, it does not represent a request to the Noke Core API.
+         * Requests should not be made to the Core API directly from the mobile app.
+         * Please refer to the documentation for more details
+         * (https://github.com/noke-inc/noke-mobile-library-android#nok%C4%93-mobile-library-for-android)
+         */
+
+        Thread thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+                try {
+
+                    JSONObject jsonObject = new JSONObject();
+
+                    jsonObject.accumulate("session", noke.getSession());
+                    jsonObject.accumulate("mac", noke.getMac());
+                    String url = serverUrl + "fobs/sync/";
+
+                    mDemoWebClientCallback.onUnlockReceived(POST(url, jsonObject), noke);
+
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+
+        thread.start();
+    }
+
+
 
     void setWebClientCallback(DemoWebClientCallback callback){
         this.mDemoWebClientCallback = callback;
