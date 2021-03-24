@@ -167,8 +167,6 @@ public class NokeDeviceManagerService extends Service {
      */
     private int bluetoothScanDuration;
 
-    private String apiKey = NokeDefines.NOKE_MOBILE_API_KEY;
-
     /**
      * A LinkedHashMap that stores a list of NokeDevices linked my MAC address.
      * Only devices that are in this array will be discovered when scanning
@@ -287,14 +285,6 @@ public class NokeDeviceManagerService extends Service {
 
 
         //
-    }
-
-    public String getApiKey() {
-        return apiKey;
-    }
-
-    public void setApiKey(String apiKey) {
-        this.apiKey = apiKey;
     }
 
     /**
