@@ -147,6 +147,8 @@ public class NokeDeviceManagerService extends Service {
      */
     public LinkedHashMap<String, NokeDevice> nokeDevices;
 
+    public Boolean firmwareScanning = false;
+
     /**
      * Class for binding service to activity
      */
@@ -560,7 +562,7 @@ public class NokeDeviceManagerService extends Service {
             @Override
             public void onLeScan(final BluetoothDevice bluetoothDevice, final int rssi, byte[] scanRecord) {
                 String btDeviceName = bluetoothDevice.getName();
-                if (btDeviceName != null && btDeviceName.contains(NokeDefines.NOKE_DEVICE_IDENTIFER_STRING)) {
+                if (btDeviceName != null && btDeviceName.contains(NokeDefines.NOKE_DEVICE_IDENTIFER_STRING) || (btDeviceName != null && btDeviceName.toLowerCase().contains(NokeDefines.NOKE_FIRMWARE_DEVICE_IDENTIFIER_STRING) && firmwareScanning)) {
                     NokeDevice noke = nokeDevices.get(bluetoothDevice.getAddress());
                     if (noke != null || mAllowAllDevices) {
                         if (noke == null) {
@@ -1283,17 +1285,18 @@ public class NokeDeviceManagerService extends Service {
 
 
     private void enableFirmwareTXNotification(NokeDevice noke) {
+        // TODO: - 2i support
         if (noke.gatt == null) {
             mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
             return;
         }
 
-        BluetoothGattService RxService = noke.gatt.getService(NokeDefines.FIRMWARE_RX_SERVICE_UUID);
+        BluetoothGattService RxService = noke.gatt.getService(NokeDefines.FIRMWARE_4I_RX_SERVICE_UUID);
         if (RxService == null) {
             mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
             return;
         }
-        BluetoothGattCharacteristic TxChar = RxService.getCharacteristic(NokeDefines.FIRMWARE_TX_CHAR_UUID);
+        BluetoothGattCharacteristic TxChar = RxService.getCharacteristic(NokeDefines.FIRMWARE_4I_TX_CHAR_UUID);
         if (TxChar == null) {
             mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
             return;
