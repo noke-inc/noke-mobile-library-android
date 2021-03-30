@@ -21,7 +21,7 @@ import javax.net.ssl.SSLContext;
 
 class NokeMobileApiClient {
 
-    static String POST(String urlStr, String jsonString, String apiKey, String proxyAddress, int port)
+    static String POST(String urlStr, String jsonString, String apiKey)
     {
         HttpURLConnection conn;
         InputStream inputStream;
@@ -31,13 +31,7 @@ class NokeMobileApiClient {
         try {
 
             URL url = new URL(urlStr);
-            if(!proxyAddress.equals("")){
-                Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxyAddress, port));
-                conn = (HttpURLConnection) url.openConnection(proxy);
-            }else{
-                conn = (HttpURLConnection) url.openConnection();
-            }
-
+            conn = (HttpURLConnection) url.openConnection();
             //Create the SSL connection
             SSLContext sc;
             sc = SSLContext.getInstance("TLS");
