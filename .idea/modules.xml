@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/app.iml" filepath="$PROJECT_DIR$/.idea/modules/app/app.iml" group="noke-mobile-library-android/app" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/noke-mobile-library-android.iml" filepath="$PROJECT_DIR$/.idea/noke-mobile-library-android.iml" group="noke-mobile-library-android" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/nokemobilelibrary/nokemobilelibrary.iml" filepath="$PROJECT_DIR$/.idea/modules/nokemobilelibrary/nokemobilelibrary.iml" group="noke-mobile-library-android/nokemobilelibrary" />
+    </modules>
+  </component>
+</project>
