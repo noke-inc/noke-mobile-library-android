@@ -1,6 +1,5 @@
-
-
 package com.noke.nokemobilelibrary;
+
 import java.util.UUID;
 
 /************************************************************************************************************************************************
@@ -26,52 +25,56 @@ public class NokeDefines {
     /**
      * Default scan off time for foreground scanning
      */
-    static final int BLUETOOTH_DEFAULT_SCAN_TIME                    = 10;
+    static final int BLUETOOTH_DEFAULT_SCAN_TIME = 10;
     /**
      * Default scan off time for background scanning
      */
-    static final int BLUETOOTH_DEFAULT_SCAN_TIME_BACKGROUND         = 2000;
+    static final int BLUETOOTH_DEFAULT_SCAN_TIME_BACKGROUND = 2000;
     /**
      * Default scan off time for background scanning
      */
-    static final int BLUETOOTH_DEFAULT_SCAN_DURATION                = 8000;
+    static final int BLUETOOTH_DEFAULT_SCAN_DURATION = 8000;
     /**
      * Identifer string for Noke hardware devices
      */
-    static final String NOKE_DEVICE_IDENTIFER_STRING                = "NOKE";
+    static final String NOKE_DEVICE_IDENTIFER_STRING = "NOKE";
+    /**
+     * Identifier string for Noke hardware devices in firmware update mode
+     */
+    static final String NOKE_FIRMWARE_DEVICE_IDENTIFIER_STRING = "_fw";
     /**
      * Should force gatt refresh
      */
-    static final boolean SHOULD_FORCE_GATT_REFRESH                  = true;
+    static final boolean SHOULD_FORCE_GATT_REFRESH = true;
 
     /**
      * Identifier for Noke Mobile API Key meta data
      */
-    static final String NOKE_MOBILE_API_KEY                        = "noke-core-api-mobile-key";
+    static final String NOKE_MOBILE_API_KEY = "noke-core-api-mobile-key";
 
 
-    public static final int OFFLINE_KEY_LENGTH                       = 32;
-    public static final int UNLOCK_COMMAND_LENGTH                    = 40;
+    static final int OFFLINE_KEY_LENGTH = 32;
+    static final int UNLOCK_COMMAND_LENGTH = 40;
 
     /**
      * Lock response types
      */
-    static final byte SUCCESS_ResultType							=(byte)0x60;
-    static final byte INVALIDKEY_ResultType						    =(byte)0x61;
-    static final byte INVALIDCMD_ResultType						    =(byte)0x62;
-    static final byte INVALIDPERMISSION_ResultType				    =(byte)0x63;
-    static final byte SHUTDOWN_ResultType						    =(byte)0x64;
-    static final byte INVALIDDATA_ResultType						=(byte)0x65;
-    static final byte FAILEDTOLOCK_ResultType                       =(byte)0x68;
-    static final byte FAILEDTOUNLOCK_ResultType                     =(byte)0x69;
-    static final byte FAILEDTOUNSHACKLE_ResultType                  =(byte)0x6A;
-    static final byte INVALID_ResultType							=(byte)0xFF;
+    static final byte SUCCESS_ResultType = (byte) 0x60;
+    static final byte INVALIDKEY_ResultType = (byte) 0x61;
+    static final byte INVALIDCMD_ResultType = (byte) 0x62;
+    static final byte INVALIDPERMISSION_ResultType = (byte) 0x63;
+    static final byte SHUTDOWN_ResultType = (byte) 0x64;
+    static final byte INVALIDDATA_ResultType = (byte) 0x65;
+    static final byte FAILEDTOLOCK_ResultType = (byte) 0x68;
+    static final byte FAILEDTOUNLOCK_ResultType = (byte) 0x69;
+    static final byte FAILEDTOUNSHACKLE_ResultType = (byte) 0x6A;
+    static final byte INVALID_ResultType = (byte) 0xFF;
 
     /**
      * Lock response destination types
      */
-    static final int SERVER_Dest	                                = 0x50;
-    static final int APP_Dest                                       = 0x51;
+    static final int SERVER_Dest = 0x50;
+    static final int APP_Dest = 0x51;
 
     /**
      * Noke device UUIDs
@@ -89,55 +92,59 @@ public class NokeDefines {
     static final UUID FIRMWARE_TX_CHAR_UUID = UUID.fromString("00001531-1212-efde-1523-785feabcd123");
 
     /**
+     * Noke firmware mode UUIDs
+     */
+    static final UUID FIRMWARE_4I_RX_SERVICE_UUID = UUID.fromString("8ec90002-f315-4f60-9fb8-838830daea50");
+    static final UUID FIRMWARE_4I_TX_CHAR_UUID = UUID.fromString("8ec90001-f315-4f60-9fb8-838830daea50");
+    static final UUID FIRMWARE_2I_RX_SERVICE_UUID = UUID.fromString("8ec90002-f315-4f60-9fb8-838830daea50");
+    static final UUID FIRMWARE_2I_TX_CHAR_UUID = UUID.fromString("8ec90001-f315-4f60-9fb8-838830daea50");
+
+
+    /**
      * Noke Connection States
      */
-    static final int NOKE_STATE_DISCONNECTED         = 0;
-    static final int NOKE_STATE_DISCOVERED           = 1;
-    static final int NOKE_STATE_CONNECTING           = 2;
-    static final int NOKE_STATE_CONNECTED            = 3;
-    static final int NOKE_STATE_SYNCING              = 4;
-    static final int NOKE_STATE_UNLOCKED             = 5;
-    static final int NOKE_GATT_ERROR                 = 133;
+    static final int NOKE_STATE_DISCONNECTED = 0;
+    static final int NOKE_STATE_DISCOVERED = 1;
+    static final int NOKE_STATE_CONNECTING = 2;
+    static final int NOKE_STATE_CONNECTED = 3;
+    static final int NOKE_STATE_SYNCING = 4;
+    static final int NOKE_STATE_UNLOCKED = 5;
+    static final int NOKE_GATT_ERROR = 133;
 
     /**
      * Noke Lock States
      */
-    public static final int NOKE_LOCK_STATE_UNKNOWN         = -1;
-    public static final int NOKE_LOCK_STATE_UNLOCKED        = 0;
-    public static final int NOKE_LOCK_STATE_UNSHACKLED      = 2;
-    public static final int NOKE_LOCK_STATE_LOCKED          = 3;
-    public static final int NOKE_LOCK_STATE_UNSHACKLING     = 4;
-    public static final int NOKE_LOCK_STATE_UNLOCKING       = 5;
-    public static final int NOKE_LOCK_STATE_LOCKED_NO_MAGNET = 7;
+    public static final int NOKE_LOCK_STATE_UNKNOWN = -1;
+    public static final int NOKE_LOCK_STATE_UNLOCKED = 0;
+    public static final int NOKE_LOCK_STATE_UNSHACKLED = 1;
+    public static final int NOKE_LOCK_STATE_LOCKED = 2;
 
     /**
      * Hardware Types
      */
-    public static final String NOKE_HW_TYPE_1ST_GEN_PADLOCK         = "2P";
-    public static final String NOKE_HW_TYPE_2ND_GEN_PADLOCK         = "3P";
-    public static final String NOKE_HW_TYPE_ULOCK                   = "2U";
-    public static final String NOKE_HW_TYPE_HD_LOCK                 = "I";
-    public static final String NOKE_HW_TYPE_DOOR_CONTROLLER         = "2E";
-    public static final String NOKE_HW_TYPE_PB12                    = "1C";
-
+    public static final String NOKE_HW_TYPE_1ST_GEN_PADLOCK = "2P";
+    public static final String NOKE_HW_TYPE_2ND_GEN_PADLOCK = "3P";
+    public static final String NOKE_HW_TYPE_ULOCK = "2U";
+    public static final String NOKE_HW_TYPE_HD_LOCK = "2I";
+    public static final String NOKE_HW_TYPE_DOOR_CONTROLLER = "2E";
+    public static final String NOKE_HW_TYPE_PB12 = "1C";
 
 
     /**
      * Shared Preferences
      */
-    static final String PREFS_NAME                   = "nokeAPILibaryFile";
-    static final String PREF_DEVICES                 = "nokedevices";
-    static final String PREF_UPLOADDATA              = "uploaddata";
+    static final String PREFS_NAME = "nokeAPILibaryFile";
+    static final String PREF_DEVICES = "nokedevices";
+    static final String PREF_UPLOADDATA = "uploaddata";
 
 
     /**
      * Noke Library Modes
      * Determines where the logs from the lock are sent
      */
-    public static final int NOKE_LIBRARY_SANDBOX           = 0;
-    public static final int NOKE_LIBRARY_PRODUCTION        = 1;
-    public static final int NOKE_LIBRARY_DEVELOP           = 2;
-    public static final int NOKE_LIBRARY_OPEN              = 3;
+    public static final int NOKE_LIBRARY_SANDBOX = 0;
+    public static final int NOKE_LIBRARY_PRODUCTION = 1;
+    public static final int NOKE_LIBRARY_DEVELOP = 2;
 
 
     /**
@@ -145,9 +152,9 @@ public class NokeDefines {
      */
     static String uploadURL = "";
 
-    static final String sandboxUploadURL            = "https://coreapi-sandbox.appspot.com/upload/";
-    static final String productionUploadURL         = "https://coreapi-beta.appspot.com/upload/";
-    static final String developUploadURL            = "https://lock-api-dev.appspot.com/upload/";
+    static final String sandboxUploadURL = "https://coreapi-sandbox.appspot.com/upload/";
+    static final String productionUploadURL = "https://coreapi-beta.appspot.com/upload/";
+    static final String developUploadURL = "https://lock-api-dev.appspot.com/upload/";
 
 
     /**
@@ -157,11 +164,12 @@ public class NokeDefines {
 
     /**
      * Converts byte array to hex string
+     *
      * @param bytes byte array to convert
      * @return a hex string
      */
     static String bytesToHex(byte[] bytes) {
-        if(bytes != null) {
+        if (bytes != null) {
             char[] hexChars = new char[bytes.length * 2];
             for (int j = 0; j < bytes.length; j++) {
                 int v = bytes[j] & 0xFF;
@@ -169,30 +177,28 @@ public class NokeDefines {
                 hexChars[j * 2 + 1] = hexArray[v & 0x0F];
             }
             return new String(hexChars);
-        }
-        else
-        {
+        } else {
             return "";
         }
     }
 
     /**
      * Converts hex string to a byte array
+     *
      * @param hexstring String to be converted
      * @return byte array
      */
     static byte[] hexToBytes(String hexstring) {
-        hexstring=hexstring.toUpperCase();
-        int len=hexstring.length()/2;
+        hexstring = hexstring.toUpperCase();
+        int len = hexstring.length() / 2;
         byte[] bytes = new byte[len];
-        for(int x=0;x<len;x++){
-            for(int y=0;y<hexArray.length;y++)
-            {
-                if(hexArray[y]==hexstring.charAt(2*x)){
-                    bytes[x]+=(byte)(y<<4);
+        for (int x = 0; x < len; x++) {
+            for (int y = 0; y < hexArray.length; y++) {
+                if (hexArray[y] == hexstring.charAt(2 * x)) {
+                    bytes[x] += (byte) (y << 4);
                 }
-                if(hexArray[y]==hexstring.charAt(2*x+1)){
-                    bytes[x]+=(byte)y;
+                if (hexArray[y] == hexstring.charAt(2 * x + 1)) {
+                    bytes[x] += (byte) y;
                 }
             }
         }
