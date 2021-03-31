@@ -40,6 +40,10 @@ public class NokeDefines {
      */
     static final String NOKE_DEVICE_IDENTIFER_STRING                = "NOKE";
     /**
+     * Identifier string for Noke devices in firmware update mode
+     */
+    static final String NOKE_FIRMWARE_DEVICE_IDENTIFIER_STRING = "_fw";
+    /**
      * Should force gatt refresh
      */
     static final boolean SHOULD_FORCE_GATT_REFRESH                  = true;
@@ -87,6 +91,11 @@ public class NokeDefines {
      */
     static final UUID FIRMWARE_RX_SERVICE_UUID = UUID.fromString("00001530-1212-efde-1523-785feabcd123");
     static final UUID FIRMWARE_TX_CHAR_UUID = UUID.fromString("00001531-1212-efde-1523-785feabcd123");
+
+    static final UUID FIRMWARE_4I_RX_SERVICE_UUID = UUID.fromString("8ec90002-f315-4f60-9fb8-838830daea50");
+    static final UUID FIRMWARE_4I_TX_CHAR_UUID = UUID.fromString("8ec90001-f315-4f60-9fb8-838830daea50");
+    static final UUID FIRMWARE_2I_RX_SERVICE_UUID = UUID.fromString("8ec90002-f315-4f60-9fb8-838830daea50");
+    static final UUID FIRMWARE_2I_TX_CHAR_UUID = UUID.fromString("8ec90001-f315-4f60-9fb8-838830daea50");
 
     /**
      * Noke Connection States
