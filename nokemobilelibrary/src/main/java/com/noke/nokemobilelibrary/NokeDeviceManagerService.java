@@ -1126,7 +1126,7 @@ public class NokeDeviceManagerService extends Service {
                     break;
                 }
                 default: {
-                    mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_UNKNOWN, "Invalid packet received");
+                    mGlobalNokeListener.onError(noke, NokeMobileError.DEVICE_ERROR_UNKNOWN, "Invalid packet received: " + NokeDefines.bytesToHex(data));
                     moveToNext(noke);
                     break;
                 }
