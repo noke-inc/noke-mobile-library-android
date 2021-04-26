@@ -1,6 +1,6 @@
 # Nokē Mobile Library for Android #
 
-[![Download](https://maven-badges.herokuapp.com/maven-central/com.noke.nokemobilelibrary/noke-mobile-library/badge.png?style={style})
+![Download](https://maven-badges.herokuapp.com/maven-central/com.noke.nokemobilelibrary/noke-mobile-library/badge.svg?style={style})
 
 ## **** Recent Changes (v0.5.0) ****
 * Noke Mobile Library now requires settings a ```mode``` when initializing the ```NokeDeviceManagerService```.  Options are:
