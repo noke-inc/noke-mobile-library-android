@@ -1,14 +1,15 @@
+
 apply plugin: 'com.android.library'
 
 android {
-    compileSdkVersion 28
+    compileSdkVersion 29
 
 
     defaultConfig {
         minSdkVersion 19
-        targetSdkVersion 28
+        targetSdkVersion 29
         versionCode 24
-        versionName "0.8.2"
+        versionName "0.8.3"
 
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
 
@@ -30,7 +31,17 @@ dependencies {
     androidTestImplementation 'com.android.support.test:runner:1.0.2'
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
     implementation 'com.google.code.gson:gson:2.8.2'
+
 }
+
+
+ext {
+    PUBLISH_GROUP_ID = 'com.noke.nokemobilelibrary'
+    PUBLISH_VERSION = '0.8.3'
+    PUBLISH_ARTIFACT_ID = 'noke-mobile-library'
+}
+
+apply from: "${rootProject.projectDir}/scripts/publish-module.gradle"
 
 apply from: 'install.gradle'
 apply from: 'bintray.gradle'

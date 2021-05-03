@@ -434,10 +434,11 @@ public class NokeDeviceManagerService extends Service {
                 mGlobalNokeListener.onError(null, NokeMobileError.ERROR_NETWORK_ENABLED, "Network is not enabled");
             }
 
-            int permissionCheck = ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_COARSE_LOCATION);
+            int permissionCheckCoarse = ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_COARSE_LOCATION);
+            int permissionCheckFine = ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_FINE_LOCATION);
             if (!gps_enabled && !network_enabled) {
                 mGlobalNokeListener.onError(null, NokeMobileError.ERROR_LOCATION_SERVICES_DISABLED, "Location services are disabled");
-            } else if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
+            } else if (permissionCheckCoarse != PackageManager.PERMISSION_GRANTED || permissionCheckFine != PackageManager.PERMISSION_GRANTED) {
                 mGlobalNokeListener.onError(null, NokeMobileError.ERROR_LOCATION_SERVICES_DISABLED, "Location services are disabled");
             } else if (mBluetoothAdapter != null) {
                 if (!mBluetoothAdapter.isEnabled()) {

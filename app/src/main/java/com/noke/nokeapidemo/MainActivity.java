@@ -43,6 +43,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
     EditText emailEditText;
     private NokeDeviceManagerService mNokeService = null;
     private static final int PERMISSION_REQUEST_COARSE_LOCATION = 1;
+    private static final int PERMISSION_REQUEST_FINE_LOCATION = 2 ;
     private NokeDevice currentNoke;
 
     @Override
@@ -229,7 +230,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
                                     @Override
                                     public void onDismiss(DialogInterface dialog)
                                     {
-                                        requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, PERMISSION_REQUEST_COARSE_LOCATION);
+                                        requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION}, PERMISSION_REQUEST_COARSE_LOCATION);
 
                                     }
                                 });
