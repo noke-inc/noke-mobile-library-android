@@ -129,6 +129,11 @@ public class NokeDeviceManagerService extends Service {
     private NokeDevice currentNoke;
 
     /**
+     * Int used to filter out noke devices with a low signal strength
+     */
+    public int rssiThreshold = -127;
+
+    /**
      * Listener for Noke device events.  Triggered on various events including:
      * <ul>
      * <li>Noke device discovery</li>
@@ -259,6 +264,14 @@ public class NokeDeviceManagerService extends Service {
 
     private void setMobileApiKey(String mobileApiKey) {
         mMobileApiKey = mobileApiKey;
+    }
+
+    public int getRssiThreshold() {
+        return rssiThreshold;
+    }
+
+    public void setRssiThreshold(int rssiThreshold) {
+        this.rssiThreshold = rssiThreshold;
     }
 
     @Override
@@ -630,6 +643,11 @@ public class NokeDeviceManagerService extends Service {
         mOldBluetoothScanCallback = new BluetoothAdapter.LeScanCallback() {
             @Override
             public void onLeScan(final BluetoothDevice bluetoothDevice, final int rssi, byte[] scanRecord) {
+
+                if(rssi < rssiThreshold){
+                    return;
+                }
+
                 String btDeviceName = bluetoothDevice.getName();
                 if (btDeviceName != null && btDeviceName.contains(NokeDefines.NOKE_DEVICE_IDENTIFER_STRING)|| (btDeviceName != null && btDeviceName.toLowerCase().contains(NokeDefines.NOKE_FIRMWARE_DEVICE_IDENTIFIER_STRING) && firmwareScanning)) {
                     NokeDevice noke = nokeDevices.get(bluetoothDevice.getAddress());
@@ -1055,6 +1073,7 @@ public class NokeDeviceManagerService extends Service {
                         if (noke.commands.size() == 0) {
                             noke.connectionState = NokeDefines.NOKE_STATE_UNLOCKED;
                             mGlobalNokeListener.onNokeUnlocked(noke);
+                            uploadData();
                         }
                     }
                     break;
