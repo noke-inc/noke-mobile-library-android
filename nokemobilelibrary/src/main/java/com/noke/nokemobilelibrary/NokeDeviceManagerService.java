@@ -1100,7 +1100,6 @@ public class NokeDeviceManagerService extends Service {
                     break;
                 }
                 case NokeDefines.SHUTDOWN_ResultType: {
-                    moveToNext(noke);
                     byte lockstate = data[2];
                     Boolean isLocked = true;
                     if (lockstate == (byte) 0) {
@@ -1436,9 +1435,11 @@ public class NokeDeviceManagerService extends Service {
                         return;
                     }
 
-                    RxChar.setValue(NokeDefines.hexToBytes(noke.commands.get(0)));
-                    boolean status = noke.gatt.writeCharacteristic(RxChar);
-                    Log.d(TAG, "write TXchar - status =" + status);
+                    if(noke.commands.size() > 0) {
+                        RxChar.setValue(NokeDefines.hexToBytes(noke.commands.get(0)));
+                        boolean status = noke.gatt.writeCharacteristic(RxChar);
+                        Log.d(TAG, "write TXchar - status =" + status);
+                    }
                 }
             });
 
