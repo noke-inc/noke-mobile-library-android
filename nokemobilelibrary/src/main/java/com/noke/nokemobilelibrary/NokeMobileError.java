@@ -23,14 +23,14 @@ public class NokeMobileError {
 
     //API Errors
     public static final int SUCCESS                             = 0; //that's not an error
-    public static final int API_ERROR_INTERNAL_SERVER           = 1;
-    public static final int API_ERROR_API_KEY                   = 2;
-    public static final int API_ERROR_INPUT                     = 3;
-    public static final int API_ERROR_REQUEST_METHOD            = 4;
-    public static final int API_ERROR_INVALID_ENPOINT           = 5;
-    public static final int API_ERROR_COMPANY_NOT_FOUND         = 6;
-    public static final int API_ERROR_LOCK_NOT_FOUND            = 7;
-    public static final int API_ERROR_UNKNOWN                   = 99;
+    public static final int API_ERROR_INTERNAL_SERVER           = 1; //There is an error with Nokē's servers. Contact Nokē support
+    public static final int API_ERROR_API_KEY                   = 2; //API key is invalid or missing. Check that the proper API key is being used
+    public static final int API_ERROR_INPUT                     = 3; //The JSON payload is not formatted correctly or the input is invalid or unexpected. Review documentation.
+    public static final int API_ERROR_REQUEST_METHOD            = 4; //Request method is invalid, use POST
+    public static final int API_ERROR_INVALID_ENPOINT           = 5; //Endpoint is invalid, review documentation.
+    public static final int API_ERROR_COMPANY_NOT_FOUND         = 6; //Lock is not associated with the company, check API key or contact Nokē support
+    public static final int API_ERROR_LOCK_NOT_FOUND            = 7; //Lock has not been added to the Core API. Contact Nokē support
+    public static final int API_ERROR_UNKNOWN                   = 99; //Unknown error
 
     //GO Library Errors
     public static final int GO_ERROR_UNLOCK                     = 100;
@@ -38,9 +38,9 @@ public class NokeMobileError {
 
     //Noke Device Errors (200 + error code)
     //public static final int DEVICE_SUCCESS                        = 260; //that's not an error
-    public static final int DEVICE_ERROR_INVALID_KEY                = 261;
-    public static final int DEVICE_ERROR_INVALID_CMD                = 262;
-    public static final int DEVICE_ERROR_INVALID_PERMISSION         = 263;
+    public static final int DEVICE_ERROR_INVALID_KEY                = 261; //Key used is invalid, contact Nokē support.
+    public static final int DEVICE_ERROR_INVALID_CMD                = 262; 
+    public static final int DEVICE_ERROR_INVALID_PERMISSION         = 263; 
     public static final int DEVICE_SHUTDOWN_RESULT                  = 264;
     public static final int DEVICE_ERROR_INVALID_DATA               = 265;
     public static final int DEVICE_BATTERY_RESULT                   = 266;
