@@ -12,8 +12,8 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
-import android.support.annotation.NonNull;
-import android.support.v7.app.AppCompatActivity;
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -30,10 +30,6 @@ import com.noke.nokemobilelibrary.NokeServiceListener;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.List;
-
 public class MainActivity extends AppCompatActivity implements DemoWebClient.DemoWebClientCallback {
 
     public static final String TAG = MainActivity.class.getSimpleName();
@@ -44,6 +40,8 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
     private NokeDeviceManagerService mNokeService = null;
     private static final int PERMISSION_REQUEST_COARSE_LOCATION = 1;
     private static final int PERMISSION_REQUEST_FINE_LOCATION = 2 ;
+    private static final int PERMISSION_REQUEST_BLUETOOTH_SCAN = 3;
+
     private NokeDevice currentNoke;
 
     @Override
@@ -217,10 +215,10 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
                         handler.post(new Runnable() {
                             @Override @TargetApi(23)
                             public void run() {
-                                android.support.v7.app.AlertDialog alertDialog = new android.support.v7.app.AlertDialog.Builder(MainActivity.this).create();
+                                androidx.appcompat.app.AlertDialog alertDialog = new androidx.appcompat.app.AlertDialog.Builder(MainActivity.this).create();
                                 alertDialog.setTitle(getString(R.string.location_access_required));
                                 alertDialog.setMessage(getString(R.string.location_permission_request_message));
-                                alertDialog.setButton(android.support.v7.app.AlertDialog.BUTTON_NEUTRAL, "OK",
+                                alertDialog.setButton(androidx.appcompat.app.AlertDialog.BUTTON_NEUTRAL, "OK",
                                         new DialogInterface.OnClickListener() {
                                             public void onClick(DialogInterface dialog, int which) {
                                                 dialog.dismiss();
@@ -244,6 +242,35 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
                 case NokeMobileError.ERROR_BLUETOOTH_GATT:
                     break;
                 case NokeMobileError.DEVICE_ERROR_INVALID_KEY:
+                    break;
+                case NokeMobileError.ERROR_BLUETOOTH_SCAN_PERMISSION:
+                    if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+                    {
+                        Handler handler = new Handler(Looper.getMainLooper());
+                        handler.post(new Runnable() {
+                            @Override @TargetApi(31)
+                            public void run() {
+                                androidx.appcompat.app.AlertDialog alertDialog = new androidx.appcompat.app.AlertDialog.Builder(MainActivity.this).create();
+                                alertDialog.setTitle(getString(R.string.bluetooth_access_required));
+                                alertDialog.setMessage(getString(R.string.bluetooth_permission_request_message));
+                                alertDialog.setButton(androidx.appcompat.app.AlertDialog.BUTTON_NEUTRAL, "OK",
+                                        new DialogInterface.OnClickListener() {
+                                            public void onClick(DialogInterface dialog, int which) {
+                                                dialog.dismiss();
+                                            }
+                                        });
+                                alertDialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                                    @Override
+                                    public void onDismiss(DialogInterface dialog)
+                                    {
+                                        requestPermissions(new String[]{Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT}, PERMISSION_REQUEST_BLUETOOTH_SCAN);
+
+                                    }
+                                });
+                                alertDialog.show();
+                            }
+                        });
+                    }
                     break;
             }
         }
@@ -290,7 +317,7 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
                 {
                     mNokeService.startScanningForNokeDevices();
                 } else {
-                    final android.support.v7.app.AlertDialog.Builder builder = new android.support.v7.app.AlertDialog.Builder(this);
+                    final androidx.appcompat.app.AlertDialog.Builder builder = new androidx.appcompat.app.AlertDialog.Builder(this);
                     builder.setTitle(getString(R.string.functionality_limited));
                     builder.setMessage(getString(R.string.no_location_message));
                     builder.setPositiveButton(android.R.string.ok, null);
@@ -306,7 +333,32 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
                     builder.show();
                 }
             }
+            case PERMISSION_REQUEST_BLUETOOTH_SCAN:{
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED)
+                {
+                    mNokeService.startScanningForNokeDevices();
+                }
+                else {
+                    final androidx.appcompat.app.AlertDialog.Builder builder = new androidx.appcompat.app.AlertDialog.Builder(this);
+                    builder.setTitle(getString(R.string.functionality_limited));
+                    builder.setMessage(getString(R.string.no_bluetooth_message));
+                    builder.setPositiveButton(android.R.string.ok, null);
+                    builder.setOnDismissListener(new DialogInterface.OnDismissListener() {
+
+                        @Override
+                        public void onDismiss(DialogInterface dialog) {
+
+                            //showLocationSnackbar(getString(R.string.enable_location_permissions));
+                        }
+
+                    });
+                    builder.show();
+                }
+            }
         }
+
+
+
     }
 
     @Override

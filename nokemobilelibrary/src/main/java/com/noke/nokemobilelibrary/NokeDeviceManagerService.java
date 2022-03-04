@@ -30,8 +30,9 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
-import android.support.v4.content.ContextCompat;
 import android.util.Log;
+
+import androidx.core.content.ContextCompat;
 
 import com.google.gson.Gson;
 
@@ -438,7 +439,6 @@ public class NokeDeviceManagerService extends Service {
             } catch (Exception e) {
                 mGlobalNokeListener.onError(null, NokeMobileError.ERROR_GPS_ENABLED, "GPS is not enabled");
             }
-
             try {
                 if (lm != null) {
                     network_enabled = lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
@@ -446,13 +446,23 @@ public class NokeDeviceManagerService extends Service {
             } catch (Exception e) {
                 mGlobalNokeListener.onError(null, NokeMobileError.ERROR_NETWORK_ENABLED, "Network is not enabled");
             }
-
-            int permissionCheckCoarse = ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_COARSE_LOCATION);
-            int permissionCheckFine = ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_FINE_LOCATION);
+            int permissionCheck = ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_COARSE_LOCATION);
+            boolean checkBluetooth = false;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && permissionCheck == PackageManager.PERMISSION_GRANTED) {
+                checkBluetooth = true;
+                permissionCheck = ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.BLUETOOTH_SCAN);
+                if (permissionCheck == PackageManager.PERMISSION_GRANTED) {
+                    permissionCheck = ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.BLUETOOTH_CONNECT);
+                }
+            }
             if (!gps_enabled && !network_enabled) {
                 mGlobalNokeListener.onError(null, NokeMobileError.ERROR_LOCATION_SERVICES_DISABLED, "Location services are disabled");
-            } else if (permissionCheckCoarse != PackageManager.PERMISSION_GRANTED || permissionCheckFine != PackageManager.PERMISSION_GRANTED) {
-                mGlobalNokeListener.onError(null, NokeMobileError.ERROR_LOCATION_SERVICES_DISABLED, "Location services are disabled");
+            } else if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && checkBluetooth) {
+                    mGlobalNokeListener.onError(null, NokeMobileError.ERROR_BLUETOOTH_SCAN_PERMISSION, "Bluetooth scan permission needed");
+                } else {
+                    mGlobalNokeListener.onError(null, NokeMobileError.ERROR_LOCATION_SERVICES_DISABLED, "Location services are disabled");
+                }
             } else if (mBluetoothAdapter != null) {
                 if (!mBluetoothAdapter.isEnabled()) {
                     mGlobalNokeListener.onError(null, NokeMobileError.ERROR_BLUETOOTH_DISABLED, "Bluetooth is disabled");

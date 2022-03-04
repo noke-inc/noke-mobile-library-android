@@ -1,7 +1,10 @@
 <resources>
     <string name="app_name">Nokē Mobile Library Demo</string>
     <string name="location_access_required" translatable="false">Location Access Required</string>
-    <string name="location_permission_request_message" translatable="false">The Noke Mobile Library requires location access in order to scan for Noke devices</string>
+    <string name="location_permission_request_message" translatable="false">The Noke Mobile Library requires Bluetooth access in order to scan for Noke devices</string>
+    <string name="bluetooth_access_required" translatable="false">Location Access Required</string>
+    <string name="bluetooth_permission_request_message" translatable="false">The Noke Mobile Library requires Bluetooth access in order to scan for Noke devices</string>
     <string name="functionality_limited" translatable="false">Functionality Limited</string>
     <string name="no_location_message" translatable="false">Location access has not been granted. App will not be able to discover Noke devices.</string>
+    <string name="no_bluetooth_message" translatable="false">Bluetooth has not been granted. App will not be able to discover Noke devices.</string>
 </resources>

@@ -22,7 +22,9 @@
 
         <meta-data android:name= "noke-core-api-mobile-key"
             android:value= "MOBILE_API_KEY_HERE"/>
-        <activity android:name=".MainActivity">
+        <activity android:name=".MainActivity"
+            android:exported="true">
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
