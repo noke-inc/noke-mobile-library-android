@@ -147,6 +147,7 @@ public class NokeDefines {
     public static final int NOKE_LIBRARY_PRODUCTION        = 1;
     public static final int NOKE_LIBRARY_DEVELOP           = 2;
     public static final int NOKE_LIBRARY_OPEN              = 3;
+    public static final int NOKE_LIBRARY_CUSTOM            = 4;
 
 
     /**

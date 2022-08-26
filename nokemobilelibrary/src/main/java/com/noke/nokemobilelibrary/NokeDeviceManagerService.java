@@ -125,9 +125,14 @@ public class NokeDeviceManagerService extends Service {
      */
     public long numberOfSecondsToDetectTheConnectionError = 6;
     /**
-     * This propeerty is filled when the connection starts
+     * This property is filled when the connection starts
      */
     private NokeDevice currentNoke;
+
+    /**
+     * Stores the mode of the mobile library
+     */
+    private int libraryMode;
 
     /**
      * Int used to filter out noke devices with a low signal strength
@@ -194,6 +199,7 @@ public class NokeDeviceManagerService extends Service {
          *             - Develop (NOKE_LIBRARY_DEVELOP)
          */
         public NokeDeviceManagerService getService(int mode) {
+            libraryMode = mode;
             switch (mode) {
                 case NokeDefines.NOKE_LIBRARY_SANDBOX:
                     setUploadUrl(NokeDefines.sandboxUploadURL);
@@ -203,6 +209,9 @@ public class NokeDeviceManagerService extends Service {
                     break;
                 case NokeDefines.NOKE_LIBRARY_DEVELOP:
                     setUploadUrl(NokeDefines.developUploadURL);
+                    break;
+                case NokeDefines.NOKE_LIBRARY_CUSTOM:
+                    setUploadUrl("");
                     break;
                 default:
                     Log.e(TAG, "Unknown Mode Type. Setting URL to Sandbox");
@@ -1538,6 +1547,14 @@ public class NokeDeviceManagerService extends Service {
     @SuppressWarnings({"unused", "SameParameterValue"})
     private void setUploadUrl(String uploadUrl) {
         NokeDefines.uploadURL = uploadUrl;
+    }
+
+    public void setCustomUploadUrl(String uploadUrl){
+        if(libraryMode == NokeDefines.NOKE_LIBRARY_CUSTOM){
+            NokeDefines.uploadURL = uploadUrl;
+        }else{
+            Log.e(TAG, "TO USE A CUSTOM URL PLEASE SET THE LIBRARY MODE TO CUSTOM");
+        }
     }
 
     private void uploadDataCallback(String s) {
