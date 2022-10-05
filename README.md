@@ -20,7 +20,7 @@ public void onNokeShutdown(NokeDevice noke, Boolean isLocked, Boolean didTimeout
 
 ```
 
-The Nokē Mobile Library provides an easy-to-use and stable way to communicate with Nokē Devices via Bluetooth.  It must be used in conjunction with the Nokē Core API for full functionality such as unlocking locks and uploading activity.
+The Nokē Mobile Library provides an easy-to-use and stable way to communicate with Nokē Devices via Bluetooth.  It must be used in conjunction with the [Nokē Core API](https://github.com/noke-inc/noke-core-api-documentation) for full functionality such as unlocking locks and uploading activity.
 
 ![Nokē Core API Overview](https://imgur.com/vY2llC9.png)
 
