@@ -2,6 +2,10 @@ package com.noke.nokemobilelibrary;
 
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
+import android.util.Base64;
+import android.util.Log;
+
+import com.noke.nokemobilelibrary.enums.NokeDeviceSigningError;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -78,9 +82,25 @@ public class NokeDevice {
      */
     private String offlineKey;
     /**
+     * ACL data for ION-2 signing-based unlock
+     */
+    private byte[] currentAclData;
+    /**
+     * ACL signature data for ION-2 signing-based unlock verification
+     */
+    private byte[] currentAclSignatureData;
+    /**
+     * Command signature data for ION-2 signing-based unlock
+     */
+    private byte[] currentCommandSignatureData;
+    /**
      * Connection state of the Noke device
      */
     transient int connectionState;
+    /**
+     * Noke device disconnected during unlock attempt
+     */
+    public transient boolean isDisconnectedDuringUnlock;
     /**
      * Lock state of the Noke device
      */
@@ -89,6 +109,12 @@ public class NokeDevice {
      * Attempts made to connect. Sometimes if the gatt throws an error, simply retrying will work. We make 4 attempts to connect before throwing an error
      */
     transient int connectionAttempts;
+    /**
+     * Counter for tracking ACL signing retry attempts
+     * Used to prevent infinite retry loops when ACL is rejected or signature fails
+     * Matches iOS implementation: signingKeyState.signingRetryCount
+     */
+    transient int signingRetryCount;
     /**
      * Single strength of the Noke device broadcast
      */
@@ -105,6 +131,11 @@ public class NokeDevice {
      * Boolean that indicates if the lock is being restored by the Core API
      */
     transient boolean isRestoring;
+    /**
+     * The type of unlock operation being performed (None, Override, or Emergency)
+     * Similar to iOS signingKeyState.options
+     */
+    transient NokeUnlockOption unlockOption;
 
 
     /**
@@ -120,6 +151,7 @@ public class NokeDevice {
 
         commands = new ArrayList<>();
         connectionAttempts = 0;
+        signingRetryCount = 0;
     }
 
     /**
@@ -452,6 +484,206 @@ public class NokeDevice {
 
     public String getSoftwareVersion(){
         return this.version.substring(3);
+    }
+
+    // ==================== ION-2 Phone Key Signing Methods ====================
+
+    private static final String TAG = "NokeDevice";
+
+    /**
+     * Gets ACL data for ION-2 signing-based unlock
+     */
+    public byte[] getCurrentAclData() {
+        return currentAclData;
+    }
+
+    /**
+     * Gets ACL signature data for ION-2 signing-based unlock
+     */
+    public byte[] getCurrentAclSignatureData() {
+        return currentAclSignatureData;
+    }
+
+    /**
+     * Sets ACL signature data for ION-2 signing-based unlock
+     */
+    public byte[] setCurrentAclSignatureData(byte[] currentAclSignatureData) {
+        return this.currentAclSignatureData = currentAclSignatureData;
+    }
+
+    /**
+     * Gets command signature data for ION-2 signing-based unlock
+     */
+    public byte[] getCurrentCommandSignatureData() {
+        return currentCommandSignatureData;
+    }
+
+    /**
+     * Sets command signature data for ION-2 signing-based unlock
+     */
+    public byte[] setCurrentCommandSignatureData(byte[] currentCommandSignatureData) {
+        return this.currentCommandSignatureData = currentCommandSignatureData;
+    }
+
+    /**
+     * Checks if this is an ION-2 lock (hardware version E5 or 5E)
+     */
+    public boolean isNokeIon2() {
+        String hw = getHardwareVersion();
+        boolean isIon2 = hw != null && (hw.contains("E5") || hw.contains("5E"));
+        Log.d(TAG, "isNokeIon2() check: version=" + this.version + ", hw=" + hw + ", isIon2=" + isIon2);
+        return isIon2;
+    }
+
+    /**
+     * Gets the unlock option type for this operation
+     *
+     * @return the unlock option type, or NONE if not set
+     */
+    public NokeUnlockOption getUnlockOption() {
+        return unlockOption != null ? unlockOption : NokeUnlockOption.NONE;
+    }
+
+    /**
+     * Sets the unlock option type for this operation
+     * This should be called before attempting to unlock the device
+     *
+     * @param unlockOption the type of unlock operation
+     */
+    public void setUnlockOption(NokeUnlockOption unlockOption) {
+        this.unlockOption = unlockOption;
+    }
+
+    /**
+     * Checks if this unlock operation requires emergency unlock
+     * Mirrors iOS implementation: options.isEmergencyUnlockRequired()
+     *
+     * @return true if emergency unlock is required, false otherwise
+     */
+    public boolean isEmergencyUnlockRequired() {
+        return getUnlockOption() == NokeUnlockOption.EMERGENCY;
+    }
+
+    /**
+     * Checks if this unlock operation requires override unlock
+     * Mirrors iOS implementation: options.isOverrideUnlockRequired()
+     *
+     * @return true if override unlock is required, false otherwise
+     */
+    public boolean isOverrideUnlockRequired() {
+        return getUnlockOption() == NokeUnlockOption.OVERRIDE;
+    }
+
+    /**
+     * Maximum number of ACL signing retry attempts allowed
+     * Matches iOS: MAX_SIGNING_RETRIES = 1 (total 2 attempts: initial + 1 retry)
+     */
+    private static final int MAX_SIGNING_RETRIES = 1;
+
+    /**
+     * Checks if the device is eligible for another ACL signing retry attempt.
+     * Matches iOS: signingKeyState.isEligibleForSigningRetry
+     *
+     * @return true if retry count is below maximum, false otherwise
+     */
+    public boolean isEligibleForSigningRetry() {
+        return signingRetryCount < MAX_SIGNING_RETRIES;
+    }
+
+    /**
+     * Increments the signing retry counter.
+     * Should be called each time an ACL refetch/retry is attempted for signature failures.
+     * Matches iOS: signingKeyState.incrementSigningRetry()
+     */
+    public void incrementSigningRetry() {
+        signingRetryCount++;
+        Log.d(TAG, "incrementSigningRetry: retry count is now " + signingRetryCount + "/" + MAX_SIGNING_RETRIES);
+    }
+
+    /**
+     * Resets the signing retry counter to zero.
+     * Should be called when starting a fresh unlock attempt.
+     */
+    public void resetSigningRetry() {
+        signingRetryCount = 0;
+        Log.d(TAG, "resetSigningRetry: retry count reset to 0");
+    }
+
+    /**
+     * Start unlock operation for ION-2 signing locks.
+     * Mirrors iOS: NokeDevice+Signing.swift unlockForSigning() method
+     * 
+     * For new user-initiated unlocks, call resetSigningRetry() BEFORE calling this method.
+     * For retry unlocks (after ACL refetch), call this directly without resetting counter.
+     *
+     * @param aclBinary Base64-encoded ACL data
+     * @param aclSignature Base64-encoded ACL signature
+     */
+    public void unlockForSigning(String aclBinary, String aclSignature) {
+        startUnlock(aclBinary, aclSignature);
+    }
+
+    /**
+     * Internal unlock method that performs validation and starts the ION-2 unlock flow
+     */
+    private void startUnlock(String aclBinary, String aclSignature) {
+        try {
+            Log.d(TAG, "startUnlock: unlockOption=" + getUnlockOption());
+
+            // Check if emergency unlock is required but not being used
+            if (isEmergencyUnlockRequired()) {
+                Log.w(TAG, "startUnlock: Emergency unlock is required but attempting ACL-based unlock. Failing with REQUIRES_EMERGENCY_UNLOCK error.");
+                if (mService != null && mService.getNokeListener() != null) {
+                    mService.getNokeListener().onError(this, NokeMobileError.ERROR_SIGNING, 
+                        NokeDeviceSigningError.REQUIRES_EMERGENCY_UNLOCK.getDescription());
+                } else {
+                    Log.e(TAG, "startUnlock: Cannot report emergency unlock error - NokeListener is null");
+                }
+                return;
+            }
+            
+            // Check if override unlock is required but not being used
+            if (isOverrideUnlockRequired()) {
+                Log.w(TAG, "startUnlock: Override unlock is required but attempting ACL-based unlock. Failing with REQUIRES_OVERRIDE_UNLOCK error.");
+                if (mService != null && mService.getNokeListener() != null) {
+                    mService.getNokeListener().onError(this, NokeMobileError.ERROR_SIGNING, 
+                        NokeDeviceSigningError.REQUIRES_OVERRIDE_UNLOCK.getDescription());
+                } else {
+                    Log.e(TAG, "startUnlock: Cannot report override unlock error - NokeListener is null");
+                }
+                return;
+            }
+
+            Log.d(TAG, "startUnlock: Proceeding with ACL-based unlock");
+
+            // Decode ACL data from Base64
+            currentAclData = Base64.decode(aclBinary, Base64.DEFAULT);
+            currentAclSignatureData = Base64.decode(aclSignature, Base64.DEFAULT);
+            
+            // Write time characteristic (step 1 of ION-2 unlock flow)
+            long secondsSinceEpoch = System.currentTimeMillis() / 1000L;
+            byte[] timeBytes = dataFromInt64LE(secondsSinceEpoch);
+            Log.d(TAG, "startUnlock: Writing time characteristic, secondsSinceEpoch=" + secondsSinceEpoch);
+            mService.writeTimeCharacteristic(this, timeBytes);
+        } catch (IllegalArgumentException e) {
+            currentAclData = null;
+            Log.e(TAG, "startUnlock: Failed to decode ACL data", e);
+            // TODO: Handle Failure properly
+        }
+    }
+
+    /**
+     * Converts a long value (Int64) to a little-endian byte array.
+     * Used for time synchronization in ION-2 unlock flow.
+     *
+     * @param value the long value to convert
+     * @return 8-byte array in little-endian order
+     */
+    private byte[] dataFromInt64LE(long value) {
+        ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
+        buffer.order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        buffer.putLong(value);
+        return buffer.array();
     }
 
 }

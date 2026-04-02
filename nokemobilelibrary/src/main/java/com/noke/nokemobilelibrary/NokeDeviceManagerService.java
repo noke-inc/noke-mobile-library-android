@@ -32,9 +32,17 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.util.Log;
 
+import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 
 import com.google.gson.Gson;
+import com.noke.nokemobilelibrary.enums.NokeDeviceSigningError;
+import com.noke.nokemobilelibrary.enums.NokeDeviceSigningStatus;
+import com.noke.nokemobilelibrary.enums.SigningDeviceCharacteristicType;
+import com.noke.nokemobilelibrary.enums.SigningReadCharacteristicType;
+import com.noke.nokemobilelibrary.enums.SigningWriteCharacteristicType;
+import com.noke.nokemobilelibrary.interfaces.ResultCallback;
+import com.noke.nokemobilelibrary.phonekey.internal.PhoneKeyManager;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -47,6 +55,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import static com.noke.nokemobilelibrary.NokeMobileError.DEVICE_SHUTDOWN_RESULT;
 import static com.noke.nokemobilelibrary.NokeMobileError.ERROR_CONNECTION_TIMEOUT;
@@ -184,6 +193,52 @@ public class NokeDeviceManagerService extends Service {
      */
     public Boolean firmwareScanning = false;
 
+    // ==================== ION-2 Phone Key Unlock Variables ====================
+
+    /**
+     * BLE operation queue for serializing operations and preventing Connection 104 errors
+     */
+    private BleOperationQueue bleOperationQueue;
+
+    /**
+     * PhoneKeyManager instance for signing operations
+     */
+    private PhoneKeyManager phoneKeyManager;
+
+    /**
+     * ION-2 characteristic references
+     */
+    private BluetoothGattCharacteristic aclChar;
+    private BluetoothGattCharacteristic aclSigChar;
+    private BluetoothGattCharacteristic commandIdChar;
+    private BluetoothGattCharacteristic commandWriteChar;
+    private BluetoothGattCharacteristic commandSigChar;
+    private BluetoothGattCharacteristic statusChar;
+
+    /**
+     * Callback for async command ID read
+     */
+    private ResultCallback<byte[]> readCommandIdCompletion;
+
+    /**
+     * Retry counter for ACL signature failures
+     */
+    private int signingRetries = 0;
+    private static final int MAX_SIGNING_RETRIES = 1;
+
+    /**
+     * SharedPreferences key for user UUID
+     */
+    private static final String PREF_USER_UUID = "user_uuid";
+
+    /**
+     * Custom base URL for ION-2 phone key operations (optional)
+     * If set, this overrides the libraryMode-based URL selection
+     */
+    private String customPhoneKeyBaseUrl = null;
+
+    // ==================== End ION-2 Variables ====================
+
     /**
      * Class for binding service to activity
      */
@@ -298,6 +353,8 @@ public class NokeDeviceManagerService extends Service {
         setBluetoothDelayBackgroundDefault(NokeDefines.BLUETOOTH_DEFAULT_SCAN_TIME_BACKGROUND);
         setBluetoothScanDuration(NokeDefines.BLUETOOTH_DEFAULT_SCAN_DURATION);
 
+        // Initialize BLE operation queue for ION-2 unlock
+        bleOperationQueue = new BleOperationQueue();
 
         //
     }
@@ -1005,8 +1062,37 @@ public class NokeDeviceManagerService extends Service {
                 if (gatt.getDevice().getName().contains("NOKE_FW") || gatt.getDevice().getName().contains("NFOB_FW") || gatt.getDevice().getName().contains("N3P_FW")) {
                     enableFirmwareTXNotification(noke);
                 } else {
+                    // Discover ION-2 characteristics if this is an ION-2 lock
+                    discoverIon2Characteristics(gatt);
+                    
                     readStateCharacteristic(noke);
                 }
+            }
+        }
+        
+        /**
+         * Discover and cache ION-2 characteristics from the connected device.
+         */
+        private void discoverIon2Characteristics(BluetoothGatt gatt) {
+            try {
+                BluetoothGattService signingService = gatt.getService(SigningDeviceCharacteristicType.getServiceUuid());
+                if (signingService != null) {
+                    Log.d(TAG, "ION-2 signing service discovered");
+                    
+                    // Cache write characteristics
+                    aclChar = signingService.getCharacteristic(SigningWriteCharacteristicType.ACL.getCharacteristicUuid());
+                    aclSigChar = signingService.getCharacteristic(SigningWriteCharacteristicType.ACL_SIGNATURE.getCharacteristicUuid());
+                    commandWriteChar = signingService.getCharacteristic(SigningWriteCharacteristicType.COMMAND.getCharacteristicUuid());
+                    commandSigChar = signingService.getCharacteristic(SigningWriteCharacteristicType.COMMAND_SIGNATURE.getCharacteristicUuid());
+                    
+                    // Cache read characteristics
+                    statusChar = signingService.getCharacteristic(SigningReadCharacteristicType.STATUS.getCharacteristicUuid());
+                    commandIdChar = signingService.getCharacteristic(SigningReadCharacteristicType.COMMAND_ID.getCharacteristicUuid());
+                    
+                    Log.d(TAG, "ION-2 characteristics cached successfully");
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error discovering ION-2 characteristics", e);
             }
         }
 
@@ -1021,6 +1107,11 @@ public class NokeDeviceManagerService extends Service {
                     NokeDevice noke = nokeDevices.get(gatt.getDevice().getAddress());
                     noke.setSession(characteristic.getValue());
                     enableTXNotification(noke);
+                }
+                
+                // Notify BLE operation queue that read is complete
+                if (bleOperationQueue != null) {
+                    bleOperationQueue.notifyOperationComplete();
                 }
             }
         }
@@ -1054,7 +1145,10 @@ public class NokeDeviceManagerService extends Service {
         public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
             super.onCharacteristicWrite(gatt, characteristic, status);
 
-
+            // Notify BLE operation queue that write is complete
+            if (bleOperationQueue != null) {
+                bleOperationQueue.notifyOperationComplete();
+            }
         }
     };
 
@@ -1495,6 +1589,11 @@ public class NokeDeviceManagerService extends Service {
                     noke.gatt.close();
                     noke.gatt = null;
                 }
+                
+                // Clear BLE operation queue on disconnect
+                if (bleOperationQueue != null) {
+                    bleOperationQueue.clear();
+                }
             }
         });
     }
@@ -1555,6 +1654,26 @@ public class NokeDeviceManagerService extends Service {
         }else{
             Log.e(TAG, "TO USE A CUSTOM URL PLEASE SET THE LIBRARY MODE TO CUSTOM");
         }
+    }
+
+    /**
+     * Sets a custom base URL for ION-2 phone key operations (provisioning, ACL fetch, etc.)
+     * This allows third-party apps to configure their own API gateway URLs.
+     *
+     * Example URLs:
+     * - Production: "https://router.smartentry.noke.com/"
+     * - Sandbox: "https://router.smartentry-sandbox.noke.com/"
+     * - Custom: "https://your-custom-gateway.example.com/"
+     *
+     * Note: URL should include trailing slash
+     *
+     * @param baseUrl The custom base URL for phone key operations, or null to use libraryMode-based URL
+     */
+    public void setPhoneKeyBaseUrl(String baseUrl) {
+        this.customPhoneKeyBaseUrl = baseUrl;
+        // Clear existing phoneKeyManager to force recreation with new baseUrl
+        phoneKeyManager = null;
+        Log.d(TAG, "Custom phone key base URL set: " + baseUrl);
     }
 
     private void uploadDataCallback(String s) {
@@ -1678,6 +1797,631 @@ public class NokeDeviceManagerService extends Service {
                 disconnectNoke(currentNoke);
             }
         };
+    }
+
+    // ==================== ION-2 Signing-Based Unlock Methods ====================
+
+    /**
+     * Get or create PhoneKeyManager instance for current user.
+     * Returns null if no user is logged in.
+     */
+    private synchronized PhoneKeyManager getPhoneKeyManager() {
+        SharedPreferences pref = getSharedPreferences(NokeDefines.PREFS_NAME, MODE_PRIVATE);
+        String userId = pref.getString(PREF_USER_UUID, "");
+        
+        // No user logged in - clear manager
+        if (userId.isEmpty()) {
+            phoneKeyManager = null;
+            return null;
+        }
+        
+        // User changed - clear old manager and create new one for new user
+        if (phoneKeyManager != null && !phoneKeyManager.getUserId().equals(userId)) {
+            Log.d(TAG, "User changed from " + phoneKeyManager.getUserId() + " to " + userId + " - creating new PhoneKeyManager");
+            phoneKeyManager = null;
+        }
+        
+        // Create manager if needed
+        if (phoneKeyManager == null) {
+            // Determine base URL: use custom if set, otherwise use library mode
+            String baseUrl;
+            if (customPhoneKeyBaseUrl != null && !customPhoneKeyBaseUrl.trim().isEmpty()) {
+                baseUrl = customPhoneKeyBaseUrl;
+                Log.d(TAG, "Using custom phonekey base URL: " + baseUrl);
+            } else {
+                // Fall back to library mode-based URL selection
+                switch (libraryMode) {
+                    case NokeDefines.NOKE_LIBRARY_SANDBOX:
+                        baseUrl = "https://router.smartentry-sandbox.noke.com/";
+                        break;
+                    case NokeDefines.NOKE_LIBRARY_PRODUCTION:
+                        baseUrl = "https://router.smartentry.noke.com/";
+                        break;
+                    case NokeDefines.NOKE_LIBRARY_DEVELOP:
+                        baseUrl = "https://router.smartentry-dev.noke.com/";
+                        break;
+                    default:
+                        baseUrl = "https://router.smartentry.noke.com/";
+                        Log.w(TAG, "Unknown library mode, defaulting to production");
+                        break;
+                }
+            }
+            
+            // Create SecurityService implementation
+            final SharedPreferences finalPref = pref;
+            com.noke.nokemobilelibrary.phonekey.internal.SecurityService securityService = 
+                new com.noke.nokemobilelibrary.phonekey.internal.SecurityServiceImpl(
+                    getApplicationContext(),
+                    baseUrl,
+                    () -> finalPref.getString("accesstoken", ""),
+                    () -> finalPref.getString(PREF_USER_UUID, ""),
+                    1,
+                    3000
+                );
+            phoneKeyManager = new PhoneKeyManager(
+                getApplicationContext(), 
+                userId, 
+                securityService
+            );
+            Log.d(TAG, "Created PhoneKeyManager for user " + userId);
+        }
+        
+        return phoneKeyManager;
+    }
+
+    /**
+     * Unlock ION-2 device using signing-based authentication.
+     * This is the entry point for ION-2 unlock operations.
+     * 
+     * @param noke The ION-2 device to unlock
+     */
+    public void unlockSigningDevice(NokeDevice noke) {
+        try {
+            // Reset retry counter for new user-initiated unlock attempt
+            noke.resetSigningRetry();
+            signingRetries = 0;
+            
+            // Set currentNoke so that handleAclStatus can process the status response
+            currentNoke = noke;
+            
+            PhoneKeyManager manager = getPhoneKeyManager();
+            if (manager == null) {
+                Log.e(TAG, "Cannot unlock - no userId available");
+                if (mGlobalNokeListener != null) {
+                    mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, "No user logged in");
+                }
+                return;
+            }
+
+            if (!manager.isProvisioned()) {
+                Log.e(TAG, "Cannot unlock - phone not provisioned");
+                if (mGlobalNokeListener != null) {
+                    mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, "Phone not provisioned");
+                }
+                return;
+            }
+
+            Log.d(TAG, "Attempting to unlock ION-2 lock with ACL from PhoneKeyManager");
+
+            com.noke.nokemobilelibrary.phonekey.models.AclEnvelope aclEnvelope = manager.getAclEnvelope(noke.getMac());
+            if (aclEnvelope == null) {
+                Log.e(TAG, "No ACL found for device " + noke.getMac());
+                if (mGlobalNokeListener != null) {
+                    mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, "No ACL available for device");
+                }
+                return;
+            }
+
+            String aclBinary = aclEnvelope.getAclBinary();
+            String aclSignature = aclEnvelope.getAclSignature();
+
+            noke.unlockForSigning(aclBinary, aclSignature);
+
+        } catch (Exception e) {
+            Log.e(TAG, "Unlocking failed: " + e.getMessage(), e);
+            if (mGlobalNokeListener != null) {
+                mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, "Unlock failed: " + e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Retry unlock for ION-2 device after ACL refresh.
+     * This method is called during retry flows and does NOT reset the retry counter.
+     * 
+     * @param noke The ION-2 device to unlock
+     */
+    private void retryUnlockAfterAclFetch(NokeDevice noke) {
+        try {
+            // Do NOT reset retry counter - this is a retry continuation
+            currentNoke = noke;
+            
+            PhoneKeyManager manager = getPhoneKeyManager();
+            if (manager == null) {
+                Log.e(TAG, "Cannot unlock - no userId available");
+                return;
+            }
+
+            if (!manager.isProvisioned()) {
+                Log.e(TAG, "Cannot unlock - phone not provisioned");
+                return;
+            }
+
+            Log.d(TAG, "Retrying unlock with refreshed ACL");
+
+            com.noke.nokemobilelibrary.phonekey.models.AclEnvelope aclEnvelope = manager.getAclEnvelope(noke.getMac());
+            if (aclEnvelope == null) {
+                Log.e(TAG, "No ACL found after refetch for device " + noke.getMac());
+                return;
+            }
+
+            String aclBinary = aclEnvelope.getAclBinary();
+            String aclSignature = aclEnvelope.getAclSignature();
+
+            noke.unlockForSigning(aclBinary, aclSignature);
+
+        } catch (Exception e) {
+            Log.e(TAG, "Retry unlock failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Refetch ACL from backend and retry unlock.
+     * 
+     * @param noke The device to refetch ACL for
+     * @param errorOnExhaustion Error to report if retry limit exhausted
+     */
+    private void refetchAcl(NokeDevice noke, NokeDeviceSigningError errorOnExhaustion) {
+        if (noke == null) {
+            Log.e(TAG, "refetchAcl called with null noke device");
+            return;
+        }
+        
+        final NokeDeviceSigningError finalError = (errorOnExhaustion != null) ? errorOnExhaustion : NokeDeviceSigningError.ACL_REJECTED;
+
+        Log.d(TAG, "Refetching ACL from backend for " + noke.getMac() + " (retry attempt " + (noke.signingRetryCount + 1) + ")");
+
+        try {
+            PhoneKeyManager manager = getPhoneKeyManager();
+            if (manager == null) {
+                Log.e(TAG, "PhoneKeyManager not available - cannot refetch ACL");
+                if (mGlobalNokeListener != null) {
+                    mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, finalError.getDescription());
+                }
+                return;
+            }
+
+            String phoneKeyId = manager.getPhoneKeyId();
+            if (phoneKeyId == null) {
+                Log.e(TAG, "No phone key ID found - cannot refetch ACL");
+                if (mGlobalNokeListener != null) {
+                    mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, finalError.getDescription());
+                }
+                return;
+            }
+
+            SharedPreferences pref = getSharedPreferences(NokeDefines.PREFS_NAME, MODE_PRIVATE);
+            String userId = pref.getString(PREF_USER_UUID, "");
+
+            if (userId.isEmpty()) {
+                Log.e(TAG, "No user ID found - cannot refetch ACL");
+                if (mGlobalNokeListener != null) {
+                    mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, finalError.getDescription());
+                }
+                return;
+            }
+
+            int convertedUserId;
+            int convertedKeyId;
+            
+            try {
+                convertedUserId = Integer.parseInt(userId);
+                convertedKeyId = Integer.parseInt(phoneKeyId);
+            } catch (NumberFormatException e) {
+                Log.e(TAG, "Invalid userId or phoneKeyId format: userId=" + userId + ", phoneKeyId=" + phoneKeyId, e);
+                if (mGlobalNokeListener != null) {
+                    mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, finalError.getDescription());
+                }
+                return;
+            }
+
+            // Fetch fresh ACL from backend (not cache)
+            manager.getAcl(
+                    convertedUserId,
+                    noke.getMac(),
+                    convertedKeyId,
+                    success -> {
+                        if (success != null && success) {
+                            Log.d(TAG, "ACL refetch successful - retrying unlock (counter=" + noke.signingRetryCount + ")");
+                            // Retry unlock with new ACL - DON'T reset counter (already incremented)
+                            retryUnlockAfterAclFetch(noke);
+                        } else {
+                            Log.e(TAG, "ACL refetch failed - notifying failure: " + finalError.getDescription());
+                            if (mGlobalNokeListener != null) {
+                                mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, finalError.getDescription());
+                            }
+                        }
+                        return kotlin.Unit.INSTANCE;
+                    }
+            );
+        } catch (Exception e) {
+            Log.e(TAG, "Error refetching ACL: " + e.getMessage(), e);
+            if (mGlobalNokeListener != null) {
+                mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, finalError.getDescription());
+            }
+        }
+    }
+
+    /**
+     * Handle ACL status updates from ION-2 lock during unlock flow.
+     * This is the state machine that drives the ION-2 unlock process.
+     */
+    public void handleAclStatus(NokeDevice noke, @NonNull NokeDeviceSigningStatus status) {
+        Log.d(TAG, "Handling ACL status: " + status);
+        switch (status) {
+            case TIME_SYNCED:
+                Log.d(TAG, "Lock time synced, now writing ACL");
+                if (noke != null && noke.gatt != null) {
+                    byte[] aclData = noke.getCurrentAclData();
+                    if (aclData != null && aclData.length > 0) {
+                        writeAclCharacteristic(noke, aclData);
+                    } else {
+                        Log.e(TAG, "TIME_SYNCED: ACL data is null or empty, cannot proceed");
+                        mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, "ACL data not available after time sync");
+                    }
+                }
+                break;
+                
+            case ACL_RECEIVED:
+            case ACL_VALIDATED:
+                Log.d(TAG, "ACL packet validated by lock (" + status + "), now writing signature");
+                if (noke != null && noke.gatt != null) {
+                    byte[] aclSigData = noke.getCurrentAclSignatureData();
+                    if (aclSigData != null && aclSigData.length > 0) {
+                        writeAclSignatureCharacteristic(noke, aclSigData);
+                        readStatusCharacteristic(noke);
+                    } else {
+                        Log.e(TAG, "ACL_RECEIVED/VALIDATED: ACL signature data is null or empty, cannot proceed");
+                        mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, "ACL signature data not available");
+                    }
+                }
+                break;
+
+            case ACLSIG_VERIFIED:
+                Log.d(TAG, "Signature received by lock, now reading command id");
+                readCommandId(noke.gatt, new ResultCallback<byte[]>() {
+                    @Override
+                    public void onSuccess(byte[] commandBytes) {
+                        try {
+                            // Create command: 0x00 + nonce (9 bytes total, matching iOS)
+                            byte[] fullCommand = new byte[commandBytes.length + 1];
+                            fullCommand[0] = 0x00; // Unlock command prefix
+                            System.arraycopy(commandBytes, 0, fullCommand, 1, commandBytes.length);
+
+                            Log.d(TAG, "Command bytes (0x00 + nonce): " + bytesToHex(fullCommand));
+
+                            // Sign the full command using PhoneKeyManager
+                            PhoneKeyManager manager = getPhoneKeyManager();
+                            if (manager == null) {
+                                Log.e(TAG, "Cannot sign command - no PhoneKeyManager available");
+                                mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, "No PhoneKeyManager available");
+                                return;
+                            }
+
+                            byte[] commandSignature = manager.sign(fullCommand);
+                            noke.setCurrentCommandSignatureData(commandSignature);
+                            Log.d(TAG, "Generated command signature: " + bytesToHex(commandSignature));
+
+                            // Write the full command (0x00 + nonce)
+                            writeCommandCharacteristic(noke, fullCommand);
+                            readStatusCharacteristic(noke);
+                            Log.d(TAG, "Successfully wrote command with signature");
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error writing command characteristic", e);
+                            mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, "Command signing failed");
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Throwable t) {
+                        Log.e(TAG, "readCommandId failed", t);
+                        mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, "Command ID read failed");
+                    }
+                });
+                break;
+
+            case CMD_RECEIVED:
+                if (noke != null && noke.gatt != null) {
+                    Log.d(TAG, "Writing command signature characteristic");
+                    writeCommandSignatureCharacteristic(noke, noke.getCurrentCommandSignatureData());
+                    readStatusCharacteristic(noke);
+                }
+                break;
+
+            case UNLOCK_EXECUTED:
+                Log.d(TAG, "🎉 Unlock executed successfully");
+                noke.connectionState = NokeDefines.NOKE_STATE_UNLOCKED;
+                mGlobalNokeListener.onNokeUnlocked(noke);
+                Log.d(TAG, "Disconnecting after successful unlock");
+                disconnectNoke(noke);
+                break;
+                
+            case ACL_REJECTED:
+            case ACL_SETUP_ERR:
+                Log.d(TAG, "ACL rejected by lock with status: " + status);
+                if (noke.isEligibleForSigningRetry()) {
+                    noke.incrementSigningRetry();
+                    Log.d(TAG, "Attempting ACL refetch (retry " + noke.signingRetryCount + "/" + (MAX_SIGNING_RETRIES + 1) + ")");
+                    refetchAcl(noke, NokeDeviceSigningError.ACL_REJECTED);
+                } else {
+                    Log.e(TAG, "ACL retry limit exhausted for " + noke.getMac());
+                    noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
+                    mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, NokeDeviceSigningError.ACL_REJECTED.getDescription());
+                    mGlobalNokeListener.onNokeDisconnected(noke);
+                }
+                break;
+                
+            case ACL_TIME_EXPIRED:
+                Log.d(TAG, "ACL TIME EXPIRED on lock " + noke.getMac());
+                if (noke.isEligibleForSigningRetry()) {
+                    noke.incrementSigningRetry();
+                    Log.d(TAG, "Attempting ACL refetch (retry " + noke.signingRetryCount + "/" + (MAX_SIGNING_RETRIES + 1) + ")");
+                    refetchAcl(noke, NokeDeviceSigningError.ACL_REJECTED);
+                } else {
+                    Log.e(TAG, "ACL retry limit exhausted for " + noke.getMac());
+                    noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
+                    mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, NokeDeviceSigningError.ACL_REJECTED.getDescription());
+                    mGlobalNokeListener.onNokeDisconnected(noke);
+                }
+                break;
+                
+            case ACLSIG_VERIFY_FAIL:
+                Log.d(TAG, "ACL SIGNATURE VERIFY FAIL on lock " + noke.getMac());
+                if (signingRetries < MAX_SIGNING_RETRIES) {
+                    signingRetries++;
+                    Log.d(TAG, "Attempting ACL refetch (retry " + signingRetries + "/" + (MAX_SIGNING_RETRIES + 1) + ")");
+                    refetchAcl(noke, NokeDeviceSigningError.INVALID_ACL_SIGNATURE);
+                } else {
+                    Log.e(TAG, "ACL signature retry limit exhausted for " + noke.getMac());
+                    mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, NokeDeviceSigningError.INVALID_ACL_SIGNATURE.getDescription());
+                    disconnectNoke(noke);
+                    noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
+                    mGlobalNokeListener.onNokeDisconnected(noke);
+                    signingRetries = 0;
+                }
+                break;
+                
+            case ACL_SCHEDULE_BLOCKED:
+                Log.d(TAG, "ACL rejected due to schedule restrictions (status: " + status + ")");
+                if (signingRetries < MAX_SIGNING_RETRIES) {
+                    signingRetries++;
+                    Log.d(TAG, "Attempting ACL refetch (retry " + signingRetries + "/" + (MAX_SIGNING_RETRIES + 1) + ")");
+                    refetchAcl(noke, NokeDeviceSigningError.OUT_OF_SCHEDULE);
+                } else {
+                    Log.e(TAG, "ACL retry limit exhausted for " + noke.getMac());
+                    mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, NokeDeviceSigningError.OUT_OF_SCHEDULE.getDescription());
+                    disconnectNoke(noke);
+                    noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
+                    mGlobalNokeListener.onNokeDisconnected(noke);
+                    signingRetries = 0;
+                }
+                break;
+                
+            case UNLOCK_DENIED:
+                Log.w(TAG, "Unlock command denied by lock for MAC: " + noke.getMac());
+                mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, NokeDeviceSigningError.UNLOCK_DENIED.getDescription());
+                disconnectNoke(noke);
+                noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
+                mGlobalNokeListener.onNokeDisconnected(noke);
+                break;
+                
+            case UNLOCK_OVERLOCKED:
+                Log.w(TAG, "Unlock command denied by lock due to overlock: " + noke.getMac());
+                mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, NokeDeviceSigningError.UNLOCK_OVERLOCKED.getDescription());
+                disconnectNoke(noke);
+                noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
+                mGlobalNokeListener.onNokeDisconnected(noke);
+                break;
+                
+            case LOCK_ALREADY_UNLOCKED:
+            case LOCK_LOCKED:
+                Log.w(TAG, "Lock command rejected because lock is already unlocked for MAC: " + noke.getMac());
+                disconnectNoke(noke);
+                noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
+                mGlobalNokeListener.onNokeDisconnected(noke);
+                break;
+                
+            default:
+                Log.w(TAG, "⚠️ Unknown ACL status: " + status);
+        }
+    }
+
+    /**
+     * Read command ID from lock during unlock flow.
+     */
+    private void readCommandId(BluetoothGatt bluetoothGatt, @NonNull ResultCallback<byte[]> completion) {
+        if (commandIdChar == null) {
+            Log.e(TAG, "Command ID characteristic not available");
+            completion.onFailure(new IllegalStateException("Command ID characteristic not found"));
+            return;
+        }
+        if (bluetoothGatt == null) {
+            completion.onFailure(new IllegalStateException("BluetoothGatt is null"));
+            return;
+        }
+
+        // Store completion to be called when the async read completes
+        readCommandIdCompletion = completion;
+
+        // Kick off the read (async). Result arrives in onCharacteristicRead
+        boolean started = readCommandIdCharacteristic(currentNoke);
+        if (!started) {
+            ResultCallback<byte[]> cb = readCommandIdCompletion;
+            readCommandIdCompletion = null;
+            cb.onFailure(new IllegalStateException("Failed to start read"));
+        }
+    }
+
+    /**
+     * Parse status bytes from lock and handle accordingly.
+     */
+    private void parseAndHandleStatus(NokeDevice noke, byte[] statusBytes) {
+        if (statusBytes == null || statusBytes.length == 0) {
+            Log.w(TAG, "Empty status bytes received");
+            return;
+        }
+
+        try {
+            // Convert hex byte to status string
+            String statusHex = bytesToHex(statusBytes);
+            Log.d(TAG, "Status hex: " + statusHex);
+
+            // Parse status from first byte
+            NokeDeviceSigningStatus status = parseStatus(statusBytes[0]);
+            if (status != null) {
+                handleAclStatus(noke, status);
+            } else {
+                Log.w(TAG, "Unknown status byte: 0x" + String.format("%02X", statusBytes[0]));
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing status", e);
+        }
+    }
+
+    /**
+     * Parse status byte to NokeDeviceSigningStatus enum.
+     */
+    private NokeDeviceSigningStatus parseStatus(byte statusByte) {
+        // Map status bytes to enum values (these match the lock firmware spec)
+        switch (statusByte) {
+            case 0x00: return NokeDeviceSigningStatus.TIME_SYNCED;
+            case 0x01: return NokeDeviceSigningStatus.ACL_RECEIVED;
+            case 0x02: return NokeDeviceSigningStatus.ACL_VALIDATED;
+            case 0x03: return NokeDeviceSigningStatus.ACLSIG_VERIFIED;
+            case 0x04: return NokeDeviceSigningStatus.CMD_RECEIVED;
+            case 0x05: return NokeDeviceSigningStatus.UNLOCK_EXECUTED;
+            case (byte) 0xF0: return NokeDeviceSigningStatus.ACL_REJECTED;
+            case (byte) 0xF1: return NokeDeviceSigningStatus.ACL_TIME_EXPIRED;
+            case (byte) 0xF2: return NokeDeviceSigningStatus.ACLSIG_VERIFY_FAIL;
+            case (byte) 0xF3: return NokeDeviceSigningStatus.UNLOCK_DENIED;
+            case (byte) 0xF4: return NokeDeviceSigningStatus.ACL_SETUP_ERR;
+            case (byte) 0xF5: return NokeDeviceSigningStatus.ACL_SCHEDULE_BLOCKED;
+            case (byte) 0xF6: return NokeDeviceSigningStatus.UNLOCK_OVERLOCKED;
+            case (byte) 0xF7: return NokeDeviceSigningStatus.LOCK_ALREADY_UNLOCKED;
+            case (byte) 0xF8: return NokeDeviceSigningStatus.LOCK_LOCKED;
+            default: return null;
+        }
+    }
+
+    // ==================== BLE Characteristic Write/Read Methods ====================
+
+    void writeTimeCharacteristic(final NokeDevice noke, byte[] bytes) {
+        writeSigningCharacteristic(noke, SigningWriteCharacteristicType.TIME, bytes);
+        readStatusCharacteristic(noke);
+    }
+
+    void writeAclCharacteristic(final NokeDevice noke, byte[] bytes) {
+        writeSigningCharacteristic(noke, SigningWriteCharacteristicType.ACL, bytes);
+        readStatusCharacteristic(noke);
+    }
+
+    void writeAclSignatureCharacteristic(final NokeDevice noke, byte[] bytes) {
+        writeSigningCharacteristic(noke, SigningWriteCharacteristicType.ACL_SIGNATURE, bytes);
+    }
+
+    void writeCommandCharacteristic(final NokeDevice noke, byte[] bytes) {
+        writeSigningCharacteristic(noke, SigningWriteCharacteristicType.COMMAND, bytes);
+    }
+
+    void writeCommandSignatureCharacteristic(final NokeDevice noke, byte[] bytes) {
+        writeSigningCharacteristic(noke, SigningWriteCharacteristicType.COMMAND_SIGNATURE, bytes);
+    }
+
+    void writeSigningCharacteristic(final NokeDevice noke, final SigningWriteCharacteristicType type, byte[] bytes) {
+        try {
+            if (noke.gatt == null) {
+                return;
+            }
+
+            GattRequest.ErrorReporter reporter = (device, code, message) ->
+                    mGlobalNokeListener.onError(device, code, message);
+
+            GattRequest request = GattRequest.write(
+                    getApplicationContext(),
+                    noke,
+                    type,
+                    () -> bytes,
+                    reporter,
+                    bleOperationQueue
+            );
+
+            request.execute();
+
+        } catch (NullPointerException e) {
+            Log.e(TAG, "BAD DEVICE - writeSigningCharacteristic", e);
+            mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
+        }
+    }
+
+    void readStatusCharacteristic(final NokeDevice noke) {
+        readSigningCharacteristic(noke, SigningReadCharacteristicType.STATUS);
+    }
+
+    boolean readCommandIdCharacteristic(final NokeDevice noke) {
+        readSigningCharacteristic(noke, SigningReadCharacteristicType.COMMAND_ID);
+        return true;
+    }
+
+    void readSigningCharacteristic(final NokeDevice noke, final SigningReadCharacteristicType type) {
+        try {
+            if (noke.gatt == null) {
+                return;
+            }
+
+            GattRequest.ErrorReporter reporter = (device, code, message) ->
+                    mGlobalNokeListener.onError(device, code, message);
+
+            GattRequest request = GattRequest.read(
+                    getApplicationContext(),
+                    noke,
+                    type.getCharacteristicUuid(),
+                    type.getTag(),
+                    (device, value) -> {
+                        Log.d(TAG, "readSigningCharacteristic -> value = " + bytesToHex(value));
+                        // Process the read value based on characteristic type
+                        if (type == SigningReadCharacteristicType.STATUS) {
+                            parseAndHandleStatus(noke, value);
+                        } else if (type == SigningReadCharacteristicType.COMMAND_ID) {
+                            // Command ID read completion handled via callback
+                            if (readCommandIdCompletion != null) {
+                                ResultCallback<byte[]> cb = readCommandIdCompletion;
+                                readCommandIdCompletion = null;
+                                cb.onSuccess(value);
+                            }
+                        }
+                    },
+                    reporter,
+                    bleOperationQueue
+            );
+
+            request.execute();
+
+        } catch (NullPointerException e) {
+            Log.e(TAG, "BAD DEVICE - readSigningCharacteristic", e);
+            mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_INVALID_NOKE_DEVICE, "Invalid noke device");
+        }
+    }
+
+    /**
+     * Convert byte array to hex string for logging.
+     */
+    private static String bytesToHex(byte[] bytes) {
+        if (bytes == null) return "null";
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            sb.append(String.format("%02X", b));
+        }
+        return sb.toString();
     }
 
 }
