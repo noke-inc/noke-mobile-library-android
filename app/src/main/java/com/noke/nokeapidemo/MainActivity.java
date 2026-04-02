@@ -1,5 +1,7 @@
 package com.noke.nokeapidemo;
 
+import com.noke.nokeapidemo.R;
+
 import android.Manifest;
 import android.annotation.TargetApi;
 import android.content.ComponentName;

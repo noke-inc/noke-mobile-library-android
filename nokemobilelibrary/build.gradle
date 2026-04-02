@@ -1,18 +1,17 @@
 
 apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
 
 android {
-    compileSdkVersion 31
-
+    compileSdkVersion 34
 
     defaultConfig {
-        minSdkVersion 19
-        targetSdkVersion 31
+        minSdkVersion 21  // Required for Android Keystore features
+        targetSdkVersion 34
         versionCode 30
         versionName "0.10.1"
 
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
-
     }
 
     buildTypes {
@@ -22,20 +21,62 @@ android {
         }
     }
 
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+// Force Java 17 toolchain
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
 }
 
 dependencies {
+    // Existing dependencies
     implementation fileTree(include: ['*.jar'], dir: 'libs')
-    testImplementation 'junit:junit:4.12'
-    androidTestImplementation 'androidx.test.ext:junit:1.1.1'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.1.0'
-    implementation 'com.google.code.gson:gson:2.8.2'
-    def appcompat_version = "1.4.1"
-
-    implementation "androidx.appcompat:appcompat:$appcompat_version"
-    // For loading and tinting drawables on older versions of the platform
-    implementation "androidx.appcompat:appcompat-resources:$appcompat_version"
-
+    
+    // Testing
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+    
+    // Kotlin - Using 1.8.22 for AGP 7.4.2 compatibility
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:1.8.22"
+    
+    // Coroutines - Downgraded to 1.7.3 for AGP 7.4.2 compatibility
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
+    
+    // Security (EncryptedSharedPreferences)
+    implementation "androidx.security:security-crypto:1.1.0-alpha06"
+    
+    // Networking - Downgraded for AGP 7.4.2 compatibility
+    implementation "com.squareup.okhttp3:okhttp:4.10.0"
+    
+    // Date/Time
+    implementation "com.jakewharton.threetenabp:threetenabp:1.4.5"
+    
+    // JSON serialization
+    implementation 'com.google.code.gson:gson:2.8.9'
+    
+    // AndroidX
+    implementation "androidx.appcompat:appcompat:1.6.1"
+    implementation "androidx.appcompat:appcompat-resources:1.6.1"
+    
+    // Crypto (Tink for base64 decoding and other utilities)
+    implementation "com.google.crypto.tink:tink-android:1.10.0"
+    
+    // Testing - Mockk for Kotlin
+    testImplementation "io.mockk:mockk:1.13.8"
+    testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0"
+    testImplementation "app.cash.turbine:turbine:1.0.0"
 }
 
 
@@ -45,9 +86,11 @@ ext {
     PUBLISH_ARTIFACT_ID = 'noke-mobile-library'
 }
 
-apply from: "${rootProject.projectDir}/scripts/publish-module.gradle"
+//apply from: "${rootProject.projectDir}/scripts/publish-module.gradle"
 
-apply from: 'install.gradle'
-apply from: 'bintray.gradle'
+// Legacy publishing scripts commented out - use Maven Publish plugin instead
+// apply from: 'install.gradle'
+// Bintray is deprecated - use Maven Central publishing instead
+// apply from: 'bintray.gradle'
 
 
