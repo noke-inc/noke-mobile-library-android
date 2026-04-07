@@ -1,6 +1,7 @@
 package com.noke.nokemobilelibrary.phonekey
 
 import com.noke.nokemobilelibrary.phonekey.models.BulkAclResult
+import com.noke.nokemobilelibrary.phonekey.models.PhoneKeyInfoResponse
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.delay
@@ -218,12 +219,12 @@ import kotlinx.coroutines.delay
  * 
  * @param userId User identifier
  * @param udid Device identifier
- * @return Flow emitting Result<Int> with phone key ID
+ * @return Flow emitting Result<PhoneKeyInfoResponse> with provisioning response
  */
 fun PhoneKeyAccessService.provisionPhoneKeyFlow(
     userId: String,
     udid: String
-): Flow<Result<Int>> = flow {
+): Flow<Result<PhoneKeyInfoResponse>> = flow {
     val result = provisionPhoneKey(userId, udid)
     emit(result)
 }
@@ -248,12 +249,12 @@ fun PhoneKeyAccessService.isProvisionedFlow(
  * 
  * @param userId User identifier
  * @param udid Device identifier
- * @return Flow emitting Result<String> with phone key ID
+ * @return Flow emitting Result<Int> with phone key ID
  */
 fun PhoneKeyAccessService.getPhoneKeyIdFlow(
     userId: String,
     udid: String
-): Flow<Result<String>> = flow {
+): Flow<Result<Int>> = flow {
     val result = getPhoneKeyId(userId, udid)
     emit(result)
 }
@@ -362,9 +363,7 @@ fun PhoneKeyAccessService.completeProvisioningWorkflowFlow(
                     // Get existing phone key ID
                     val idResult = getPhoneKeyId(userId, udid)
                     idResult.fold(
-                        onSuccess = { idString ->
-                            val keyId = idString.toIntOrNull()
-                                ?: throw IllegalStateException("Invalid phone key ID: $idString")
+                        onSuccess = { keyId ->
                             phoneKeyId = keyId
                             emit(ProvisioningEvent.Provisioned(keyId))
                         },
@@ -379,7 +378,8 @@ fun PhoneKeyAccessService.completeProvisioningWorkflowFlow(
                     
                     val provisionResult = provisionPhoneKey(userId, udid)
                     provisionResult.fold(
-                        onSuccess = { keyId ->
+                        onSuccess = { response ->
+                            val keyId = response.keyId ?: throw IllegalStateException("keyId is null")
                             phoneKeyId = keyId
                             emit(ProvisioningEvent.Provisioned(keyId))
                         },
