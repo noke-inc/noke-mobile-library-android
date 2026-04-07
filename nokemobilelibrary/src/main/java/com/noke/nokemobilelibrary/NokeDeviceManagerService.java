@@ -1650,25 +1650,6 @@ public class NokeDeviceManagerService extends Service {
         }
     }
 
-    /**
-     * Sets a custom base URL for ION-2 phone key operations (provisioning, ACL fetch, etc.)
-     * This allows third-party apps to configure their own API gateway URLs.
-     *
-     * Example URLs:
-     * - Production: "https://router.smartentry.noke.com/"
-     * - Sandbox: "https://router.smartentry-sandbox.noke.com/"
-     * - Custom: "https://your-custom-gateway.example.com/"
-     *
-     * Note: URL should include trailing slash
-     *
-     * @param baseUrl The custom base URL for phone key operations, or null to use libraryMode-based URL
-     */
-    public void setPhoneKeyBaseUrl(String baseUrl) {
-        this.customPhoneKeyBaseUrl = baseUrl;
-        // Clear existing phoneKeyManager to force recreation with new baseUrl
-        phoneKeyManager = null;
-        Log.d(TAG, "Custom phone key base URL set: " + baseUrl);
-    }
 
     private void uploadDataCallback(String s) {
         try {
