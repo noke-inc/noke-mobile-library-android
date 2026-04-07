@@ -122,6 +122,13 @@ public enum NokeDeviceSigningError {
             false
     ),
 
+    CMDSIG_VERIFY_FAIL(
+            "Command signature failed",
+            false,
+            false,
+            false
+    ),
+
     TIME_OFFSET_ERROR(
             "Time offset error",
             false,

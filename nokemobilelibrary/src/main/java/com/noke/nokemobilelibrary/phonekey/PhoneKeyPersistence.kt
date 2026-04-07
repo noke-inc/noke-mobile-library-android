@@ -1,5 +1,6 @@
 package com.noke.nokemobilelibrary.phonekey
 
+import android.util.Log
 import com.noke.nokemobilelibrary.phonekey.internal.PhoneKeyManager
 import com.noke.nokemobilelibrary.phonekey.models.BulkAclEnvelope
 import com.noke.nokemobilelibrary.phonekey.models.PhoneKeyInfoResponse
@@ -159,8 +160,13 @@ internal class DefaultPhoneKeyPersistence(
     }
 
     override fun deletePhoneKeyInfo(userId: String, deviceId: String) {
-        // PhoneKeyManager doesn't have explicit delete - would need to clear prefs
-        // For now, this is a no-op (data cleared on app uninstall)
+        try {
+            manager.clearProvisioningData()
+            Log.d("PhoneKeyPersistence", "Deleted phone key info for user=$userId, device=$deviceId")
+        } catch (e: Exception) {
+            Log.e("PhoneKeyPersistence", "Failed to delete phone key info: ${e.message}", e)
+            throw e
+        }
     }
 
     override fun getACL(userId: String, lockMac: String): BulkAclEnvelope? {
@@ -168,7 +174,7 @@ internal class DefaultPhoneKeyPersistence(
     }
 
     override fun listACLs(): List<BulkAclEnvelope> {
-        return manager.listBulkAclEnvelopes()
+        return manager.listBulkAclEnvelopes() ?: emptyList()
     }
 
     override fun saveACL(userId: String, lockMac: String, acl: BulkAclEnvelope) {
@@ -176,8 +182,7 @@ internal class DefaultPhoneKeyPersistence(
     }
 
     override fun deleteACL(userId: String, lockMac: String) {
-        // PhoneKeyManager doesn't have explicit ACL deletion method
-        // ACLs are typically cleared via deleteAllACLs or replaced when updated
+        manager.deleteACL(userId, lockMac)
     }
 
     override fun deleteAllACLs() {

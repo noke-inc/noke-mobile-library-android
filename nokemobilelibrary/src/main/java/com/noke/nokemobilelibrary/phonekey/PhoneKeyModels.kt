@@ -71,3 +71,17 @@ val BulkAclEnvelope.statusMessage: String
         isValid -> "Valid until ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(java.util.Date(expiresAt * 1000))}"
         else -> "Expired at ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(java.util.Date(expiresAt * 1000))}"
     }
+
+// MARK: - Type Aliases (iOS Parity)
+
+/**
+ * Type aliases to match iOS PhoneKeyModels for cross-platform consistency.
+ *
+ * These provide familiar naming for developers working across both platforms.
+ */
+
+/** Short alias for BulkAclEnvelope (matches iOS `Acl = BulkPhoneKeyAcl`) */
+typealias Acl = BulkAclEnvelope
+
+/** Alias for provisioning response (matches iOS `PhoneKeyProvisionResponse = PhoneKeyInfoResponse`) */
+typealias PhoneKeyProvisionResponse = com.noke.nokemobilelibrary.phonekey.models.PhoneKeyInfoResponse

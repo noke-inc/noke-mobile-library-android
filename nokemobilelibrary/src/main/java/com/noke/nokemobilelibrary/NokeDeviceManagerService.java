@@ -231,12 +231,6 @@ public class NokeDeviceManagerService extends Service {
      */
     private static final String PREF_USER_UUID = "user_uuid";
 
-    /**
-     * Custom base URL for ION-2 phone key operations (optional)
-     * If set, this overrides the libraryMode-based URL selection
-     */
-    private String customPhoneKeyBaseUrl = null;
-
     // ==================== End ION-2 Variables ====================
 
     /**
@@ -1656,26 +1650,6 @@ public class NokeDeviceManagerService extends Service {
         }
     }
 
-    /**
-     * Sets a custom base URL for ION-2 phone key operations (provisioning, ACL fetch, etc.)
-     * This allows third-party apps to configure their own API gateway URLs.
-     *
-     * Example URLs:
-     * - Production: "https://router.smartentry.noke.com/"
-     * - Sandbox: "https://router.smartentry-sandbox.noke.com/"
-     * - Custom: "https://your-custom-gateway.example.com/"
-     *
-     * Note: URL should include trailing slash
-     *
-     * @param baseUrl The custom base URL for phone key operations, or null to use libraryMode-based URL
-     */
-    public void setPhoneKeyBaseUrl(String baseUrl) {
-        this.customPhoneKeyBaseUrl = baseUrl;
-        // Clear existing phoneKeyManager to force recreation with new baseUrl
-        phoneKeyManager = null;
-        Log.d(TAG, "Custom phone key base URL set: " + baseUrl);
-    }
-
     private void uploadDataCallback(String s) {
         try {
             JSONObject obj = new JSONObject(s);
@@ -1821,30 +1795,24 @@ public class NokeDeviceManagerService extends Service {
             phoneKeyManager = null;
         }
         
-        // Create manager if needed
+        // Get singleton instance for current user (ensures same instance across all code paths)
         if (phoneKeyManager == null) {
-            // Determine base URL: use custom if set, otherwise use library mode
+            // Determine base URL based on library mode
             String baseUrl;
-            if (customPhoneKeyBaseUrl != null && !customPhoneKeyBaseUrl.trim().isEmpty()) {
-                baseUrl = customPhoneKeyBaseUrl;
-                Log.d(TAG, "Using custom phonekey base URL: " + baseUrl);
-            } else {
-                // Fall back to library mode-based URL selection
-                switch (libraryMode) {
-                    case NokeDefines.NOKE_LIBRARY_SANDBOX:
-                        baseUrl = "https://router.smartentry-sandbox.noke.com/";
-                        break;
-                    case NokeDefines.NOKE_LIBRARY_PRODUCTION:
-                        baseUrl = "https://router.smartentry.noke.com/";
-                        break;
-                    case NokeDefines.NOKE_LIBRARY_DEVELOP:
-                        baseUrl = "https://router.smartentry-dev.noke.com/";
-                        break;
-                    default:
-                        baseUrl = "https://router.smartentry.noke.com/";
-                        Log.w(TAG, "Unknown library mode, defaulting to production");
-                        break;
-                }
+            switch (libraryMode) {
+                case NokeDefines.NOKE_LIBRARY_SANDBOX:
+                    baseUrl = "https://router.smartentry-sandbox.noke.com/";
+                    break;
+                case NokeDefines.NOKE_LIBRARY_PRODUCTION:
+                    baseUrl = "https://router.smartentry.noke.com/";
+                    break;
+                case NokeDefines.NOKE_LIBRARY_DEVELOP:
+                    baseUrl = "https://router.smartentry-dev.noke.com/";
+                    break;
+                default:
+                    baseUrl = "https://router.smartentry.noke.com/";
+                    Log.w(TAG, "Unknown library mode, defaulting to production");
+                    break;
             }
             
             // Create SecurityService implementation
@@ -1858,12 +1826,12 @@ public class NokeDeviceManagerService extends Service {
                     1,
                     3000
                 );
-            phoneKeyManager = new PhoneKeyManager(
+            phoneKeyManager = PhoneKeyManager.getInstance(
                 getApplicationContext(), 
                 userId, 
                 securityService
             );
-            Log.d(TAG, "Created PhoneKeyManager for user " + userId);
+            Log.d(TAG, "Retrieved PhoneKeyManager singleton for user " + userId);
         }
         
         return phoneKeyManager;
@@ -2226,6 +2194,15 @@ public class NokeDeviceManagerService extends Service {
             case LOCK_ALREADY_UNLOCKED:
             case LOCK_LOCKED:
                 Log.w(TAG, "Lock command rejected because lock is already unlocked for MAC: " + noke.getMac());
+                disconnectNoke(noke);
+                noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
+                mGlobalNokeListener.onNokeDisconnected(noke);
+                break;
+                
+            case CMDSIG_VERIFY_FAIL:
+                // iOS pattern: Fail immediately, no retry (matches iOS Ion2SigningCoordinator)
+                Log.e(TAG, "Command signature verification failed on lock " + noke.getMac());
+                mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, NokeDeviceSigningError.CMDSIG_VERIFY_FAIL.getDescription());
                 disconnectNoke(noke);
                 noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
                 mGlobalNokeListener.onNokeDisconnected(noke);

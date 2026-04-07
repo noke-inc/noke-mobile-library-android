@@ -256,9 +256,10 @@ class PhoneKeyStateMonitor(
                             
                             val provisionResult = phoneKeyService.provisionPhoneKey(userId, deviceId)
                             provisionResult.fold(
-                                onSuccess = { keyId ->
+                                onSuccess = { response ->
+                                    val keyId = response.keyId ?: throw IllegalStateException("keyId is null")
                                     phoneKeyId = keyId
-                                    _provisioningState.value = ProvisioningState.Provisioned(keyId)
+                                   _provisioningState.value = ProvisioningState.Provisioned(keyId)
                                 },
                                 onFailure = { error ->
                                     _provisioningState.value = ProvisioningState.Error(error)

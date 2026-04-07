@@ -4,25 +4,24 @@ package com.noke.nokemobilelibrary.phonekey
  * Sealed class hierarchy for all Noke Mobile Library errors.
  * 
  * Provides a type-safe, exhaustive error handling mechanism for phone key operations.
- * All errors thrown by phone key operations will be wrapped in one of these error types.
+ * All errors thrown by [PhoneKeyAccessService] and extension functions will be wrapped
+ * in one of these error types.
  * 
  * ## Error Categories
  * 
  * - **Initialization Errors**: [NotInitialized], [InvalidConfiguration]
  * - **Input Validation Errors**: [InvalidInput]
  * - **Provisioning Errors**: [ProvisioningFailed]
- * - **ACL Errors**: [AclFetchFailed], [AclStorageFailed], [BulkAclFetchFailed]
+ * - **ACL Errors**: [AclFetchFailed], [AclStorageFailed]
  * - **Storage Errors**: [StorageError]
- * - **Network Errors**: [NetworkError]
  * - **Crypto Errors**: [CryptographicError]
- * - **State Errors**: [NotProvisioned]
  * - **Generic**: [UnknownError]
  * 
  * ## Usage Example
  * 
  * ```kotlin
  * try {
- *     val result = phoneKeyService.provisionPhoneKey(
+ *     val result = PhoneKeyAccessService.getInstance().provisionPhoneKey(
  *         userId = "12345",
  *         udid = deviceId
  *     ).getOrThrow()
@@ -50,8 +49,8 @@ sealed class NokeMobileLibraryError(
     /**
      * Library has not been initialized or configured properly.
      * 
-     * This typically means the phone key service was called before initialization,
-     * or required components are not available.
+     * This typically means [PhoneKeyAccessService] was called before initialization,
+     * or required components (like PhoneKeyManager) are not available.
      * 
      * ## Recovery
      * Ensure the library is initialized before calling any operations.
@@ -85,7 +84,7 @@ sealed class NokeMobileLibraryError(
      * ## Examples
      * - Missing required context
      * - Invalid credentials
-     * - Incompatible Android version (minSdk 21 required)
+     * - Incompatible Android version
      */
     data class InvalidConfiguration(
         val reason: String
@@ -243,8 +242,8 @@ sealed class NokeMobileLibraryError(
      * - Signing operation failure
      * 
      * ## Recovery
-     * - Check device compatibility (minSdk 21)
-     * - Verify lockscreen is enabled (some devices require this for Keystore)
+     * - Check device compatibility
+     * - Verify lockscreen is enabled (some devices require this)
      * - Retry key generation
      */
     data class CryptographicError(
@@ -261,7 +260,7 @@ sealed class NokeMobileLibraryError(
      * @param userId The user ID that is not provisioned
      * 
      * ## Recovery
-     * Call the provisioning method first before attempting ACL operations.
+     * Call [PhoneKeyAccessService.provisionPhoneKey] first.
      */
     data class NotProvisioned(
         val userId: String

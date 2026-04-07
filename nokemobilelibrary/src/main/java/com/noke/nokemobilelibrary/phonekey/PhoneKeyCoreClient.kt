@@ -15,36 +15,88 @@ import com.noke.nokemobilelibrary.phonekey.models.PhoneKeyInfoResponse
  *
  * **Thoughtful Intent-Driven Design** - This interface:
  * - Exposes **what** needs to be done (intent), not **how** to do it (implementation)
+ * - Allows complete flexibility in networking, authentication, and backend integration
  * - Maintains clean separation between cryptographic operations and networking
  * - Enables testability through interface-based dependency injection
- * - Allows complete flexibility in networking, authentication, and backend integration
  *
  * ## Third-Party Integration
  *
  * Third parties can implement this interface to integrate with their own:
  * - Network layer (Retrofit, OkHttp, Fuel, Ktor, etc.)
- * - Authentication system (OAuth, JWT, API keys, etc.)
- * - Backend API endpoints (custom domains, staging vs production)
+ * - Authentication system
+ * - Backend API endpoints
  * - Error handling and logging strategies
  *
  * ## Default Implementation
  *
- * A reference implementation is provided: [PhoneKeyCoreClientImpl]
- *
- * ## Multi-Context Support (Android-Specific Design)
- *
- * Unlike iOS which typically uses a single client per user/device, Android
- * implementations can manage multiple (userId, deviceId) contexts simultaneously.
- * This enables:
- * - Multi-device support (one user, multiple devices)
- * - Multi-user support (multiple users on one device)
- * - Flexible context management
+ * A default implementation is provided that integrates with StorageSmartEntry's
+ * existing infrastructure. See [PhoneKeyCoreClientImpl] for reference.
  *
  * ## Thread Safety
  *
- * Implementations MUST be thread-safe. All suspend functions should be safe to call
- * from any coroutine context. Use appropriate synchronization primitives (Mutex,
- * single-threaded dispatcher, etc.).
+ * Implementations must be thread-safe. All suspend functions should be safe to call
+ * from any coroutine context. Consider using a Mutex or single-threaded dispatcher
+ * to serialize access to PhoneKeyManager if needed.
+ *
+ * ## Example Implementation
+ *
+ * ```kotlin
+ * class MyPhoneKeyCoreClient(
+ *     private val context: Context,
+ *     private val myApiClient: MyApiClient
+ * ) : PhoneKeyCoreClient {
+ *
+ *     private val phoneKeyManager = PhoneKeyManager(context, userId, udid)
+ *     private val mutex = Mutex()
+ *     private var initialized = false
+ *
+ *     override suspend fun initialize(userId: String, deviceId: String): Result<String> =
+ *         withContext(Dispatchers.IO) {
+ *             mutex.withLock {
+ *                 if (initialized) return@withContext Result.success(getPublicKey())
+ *
+ *                 phoneKeyManager.ensureKeys()
+ *                 initialized = true
+ *                 Result.success(phoneKeyManager.getPublicKey())
+ *             }
+ *         }
+ *
+ *     override val isInitialized: Boolean
+ *         get() = initialized
+ *
+ *     override suspend fun provisionPhoneKey(
+ *         userId: String,
+ *         deviceId: String,
+ *         publicKey: String
+ *     ): Result<PhoneKeyInfoResponse> {
+ *         return myApiClient.provisionPhoneKey(userId, deviceId, publicKey)
+ *     }
+ *
+ *     override suspend fun generateAcl(
+ *         userId: Int,
+ *         lockMac: String,
+ *         phoneKeyId: Int
+ *     ): Result<Unit> {
+ *         return myApiClient.generateAcl(userId, lockMac, phoneKeyId)
+ *     }
+ *
+ *     override suspend fun generateBulkAcls(phoneKeyId: Int): Result<BulkAclResult> {
+ *         return myApiClient.generateBulkAcls(phoneKeyId)
+ *     }
+ *
+ *     override suspend fun validateCurrentKey(userId: String, deviceId: String): String? {
+ *         return phoneKeyManager.getPublicKey()
+ *     }
+ * }
+ * ```
+ *
+ * ## Usage in PhoneKeyAccessService
+ *
+ * ```kotlin
+ * // In Application.onCreate()
+ * val client = MyPhoneKeyCoreClient(this, myApiClient)
+ * PhoneKeyAccessService.setSharedClient(client)
+ * ```
  *
  * @see PhoneKeyAccessService
  * @see PhoneKeyCoreClientImpl
@@ -54,13 +106,13 @@ interface PhoneKeyCoreClient {
     /**
      * Initialize the Phone Key Core client and ensure cryptographic keys are generated.
      *
-     * This operation:
-     * 1. Generates ECDSA P-256 key pair in Android Keystore (hardware-backed if available)
-     * 2. Verifies keys are accessible and valid
-     * 3. Returns the public key in Base64-encoded X9.62 uncompressed format (65 bytes)
+     * This operation should:
+     * 1. Generate ECDSA P-256 key pair in secure storage (e.g., Android Keystore)
+     * 2. Verify keys are accessible and valid
+     * 3. Return the public key in Base64-encoded X9.62 format
      *
-     * Implementations should cache initialization state per (userId, deviceId)
-     * and return immediately if already initialized (idempotent behavior).
+     * Implementations should cache initialization state and return immediately
+     * if already initialized (idempotent).
      *
      * ## Thread Safety
      * Must be thread-safe and safe to call from any coroutine context.
@@ -68,13 +120,26 @@ interface PhoneKeyCoreClient {
      * @param userId User identifier for key isolation
      * @param deviceId Device identifier (UDID) for key isolation
      * @return [Result] containing Base64-encoded public key on success, or error on failure
+     *
+     * ## Example
+     * ```kotlin
+     * val result = client.initialize(userId = "12345", deviceId = androidId)
+     * result.fold(
+     *     onSuccess = { publicKey ->
+     *         Log.d(TAG, "Initialized with public key: $publicKey")
+     *     },
+     *     onFailure = { error ->
+     *         Log.e(TAG, "Initialization failed: ${error.message}")
+     *     }
+     * )
+     * ```
      */
     suspend fun initialize(userId: String, deviceId: String): Result<String>
 
     /**
-     * Check if the client has been initialized for at least one user/device combination.
+     * Check if the client has been initialized.
      *
-     * @return true if [initialize] has been called successfully at least once, false otherwise
+     * @return true if [initialize] has been called successfully, false otherwise
      */
     val isInitialized: Boolean
 
@@ -82,14 +147,15 @@ interface PhoneKeyCoreClient {
      * Provision a new phone key with the backend.
      *
      * This operation registers the device's public key with the backend and
-     * receives a phone key identifier for all subsequent ACL operations.
+     * receives a phone key identifier that will be used for all subsequent
+     * ACL operations.
      *
-     * ## Backend Integration Points
-     * Implementations must:
+     * ## Backend Integration
+     * Implementations should:
      * 1. Make authenticated request to phone key provisioning endpoint
-     * 2. Send payload: `{ userId, phoneUdid, publicKey }`
+     * 2. Send payload: { userId, phoneUdid, publicKey }
      * 3. Parse response and extract phone key ID
-     * 4. Store phone key ID locally via PhoneKeyManager
+     * 4. Store phone key ID locally for future use
      *
      * ## Thread Safety
      * Must be thread-safe and safe to call from any coroutine context.
@@ -97,7 +163,24 @@ interface PhoneKeyCoreClient {
      * @param userId User identifier as String
      * @param deviceId Device identifier (UDID)
      * @param publicKey Base64-encoded X9.62 format public key
-     * @return [Result] containing [PhoneKeyInfoResponse] with keyId on success, or error on failure
+     * @return [Result] containing [PhoneKeyInfoResponse] on success, or error on failure
+     *
+     * ## Example
+     * ```kotlin
+     * val result = client.provisionPhoneKey(
+     *     userId = "12345",
+     *     deviceId = androidId,
+     *     publicKey = base64PublicKey
+     * )
+     * result.fold(
+     *     onSuccess = { response ->
+     *         Log.d(TAG, "Provisioned with ID: ${response.keyId}")
+     *     },
+     *     onFailure = { error ->
+     *         Log.e(TAG, "Provisioning failed: ${error.message}")
+     *     }
+     * )
+     * ```
      */
     suspend fun provisionPhoneKey(
         userId: String,
@@ -108,20 +191,16 @@ interface PhoneKeyCoreClient {
     /**
      * Generate ACL (Access Control List) for a specific lock.
      *
-     * This operation fetches the ACL envelope from the backend for a single lock.
-     * The ACL envelope includes binary representation, signature, and permissions.
-     * The ACL is stored locally in encrypted storage for offline access.
+     * This operation fetches the ACL envelope from the backend for a single lock,
+     * including the ACL binary, signature, and permissions. The ACL should be
+     * stored locally in encrypted storage for offline access.
      *
-     * ## Backend Integration Points
-     * Implementations must:
+     * ## Backend Integration
+     * Implementations should:
      * 1. Make authenticated request to ACL generation endpoint
-     * 2. Send payload: `{ userId, lockMac, phoneKeyId }`
+     * 2. Send payload: { userId, lockMac, phoneKeyId }
      * 3. Parse response and extract ACL envelope (binary, signature, permissions)
-     * 4. Store ACL locally via PhoneKeyManager for the appropriate user context
-     *
-     * ## Context Management
-     * Implementations should use userId to lookup the appropriate PhoneKeyManager
-     * for the user (since a single client can manage multiple users/devices).
+     * 4. Store ACL locally via PhoneKeyManager
      *
      * ## When to Use
      * Use for single-lock ACL refresh scenarios (after unlock failure or explicit update).
@@ -130,10 +209,23 @@ interface PhoneKeyCoreClient {
      * ## Thread Safety
      * Must be thread-safe and safe to call from any coroutine context.
      *
-     * @param userId User ID as integer (must match backend user ID)
-     * @param lockMac Lock MAC address (format: "AA:BB:CC:DD:EE:FF")
+     * @param userId User ID as integer
+     * @param lockMac Lock MAC address (e.g., "AA:BB:CC:DD:EE:FF")
      * @param phoneKeyId Phone key ID from provisioning
      * @return [Result] with Unit on success (ACL stored), or error on failure
+     *
+     * ## Example
+     * ```kotlin
+     * val result = client.generateAcl(
+     *     userId = 12345,
+     *     lockMac = "AA:BB:CC:DD:EE:FF",
+     *     phoneKeyId = 67890
+     * )
+     * result.fold(
+     *     onSuccess = { Log.d(TAG, "ACL stored successfully") },
+     *     onFailure = { error -> Log.e(TAG, "ACL fetch failed: ${error.message}") }
+     * )
+     * ```
      */
     suspend fun generateAcl(
         userId: Int,
@@ -144,34 +236,52 @@ interface PhoneKeyCoreClient {
     /**
      * Generate multiple ACLs in bulk for all locks accessible to the user.
      *
-     * This is the **preferred method** for ACL fetching in production:
-     * - Significantly more efficient than individual requests
-     * - Fetches all authorized locks in a single backend call
+     * This is the **preferred method** for ACL fetching:
+     * - More efficient than individual requests
+     * - Fetches all authorized locks in one call
      * - Returns summary with success/failure counts
-     * - Handles partial failures gracefully
      *
-     * ## Backend Integration Points
-     * Implementations must:
+     * ## Backend Integration
+     * Implementations should:
      * 1. Make authenticated request to bulk ACL endpoint
-     * 2. Send payload: `{ phoneKeyId }`
+     * 2. Send payload: { phoneKeyId }
      * 3. Parse response containing array of ACL envelopes
      * 4. Store each ACL locally via PhoneKeyManager
-     * 5. Track success/failure for each ACL individually
-     * 6. Return [BulkAclResult] with success/total counts
-     *
-     * ## Context Management
-     * Implementations can use any available PhoneKeyManager since bulk ACLs
-     * are associated with the phoneKeyId, not a specific manager instance.
+     * 5. Track success/failure for each ACL
+     * 6. Return [BulkAclResult] with summary
      *
      * ## Partial Success Handling
      * If some ACLs fail to store, the operation should NOT fail completely.
-     * Instead, return success with [BulkAclResult] indicating storage results.
+     * Instead, return success with [BulkAclResult] indicating which ACLs
+     * were stored successfully.
      *
      * ## Thread Safety
      * Must be thread-safe and safe to call from any coroutine context.
      *
      * @param phoneKeyId Phone key ID from provisioning
      * @return [Result] containing [BulkAclResult] with storage summary
+     *
+     * ## Example
+     * ```kotlin
+     * val result = client.generateBulkAcls(phoneKeyId = 67890)
+     * result.fold(
+     *     onSuccess = { bulkResult ->
+     *         when {
+     *             bulkResult.isFullSuccess ->
+     *                 Log.d(TAG, "All ${bulkResult.totalCount} ACLs stored")
+     *             bulkResult.hasPartialSuccess ->
+     *                 Log.w(TAG, "${bulkResult.successCount}/${bulkResult.totalCount} stored")
+     *             bulkResult.isEmpty ->
+     *                 Log.i(TAG, "No locks assigned")
+     *             else ->
+     *                 Log.e(TAG, "All ACL storage failed")
+     *         }
+     *     },
+     *     onFailure = { error ->
+     *         Log.e(TAG, "Bulk ACL fetch failed: ${error.message}")
+     *     }
+     * )
+     * ```
      */
     suspend fun generateBulkAcls(phoneKeyId: Int): Result<BulkAclResult>
 
@@ -184,19 +294,28 @@ interface PhoneKeyCoreClient {
      * ## Use Cases
      * - Pre-flight check before provisioning
      * - Verify key integrity after app update or system restore
-     * - Debug/logging/analytics scenarios
-     * - Key rotation verification
+     * - Debug/logging scenarios
      *
      * ## Return Value
-     * - Returns Base64-encoded X9.62 public key if valid
-     * - Returns null if no key exists, keys are inaccessible, or validation fails
+     * - Returns Base64-encoded public key if valid
+     * - Returns null if no key exists or validation fails
      *
      * ## Thread Safety
      * Must be thread-safe and safe to call from any context.
      *
      * @param userId User identifier for key lookup
      * @param deviceId Device identifier for key lookup
-     * @return Base64-encoded public key in X9.62 format, or null if invalid/missing
+     * @return Base64-encoded public key, or null if invalid/missing
+     *
+     * ## Example
+     * ```kotlin
+     * val publicKey = client.validateCurrentKey(userId = "12345", deviceId = androidId)
+     * if (publicKey != null) {
+     *     Log.d(TAG, "Valid key found: $publicKey")
+     * } else {
+     *     Log.w(TAG, "No valid key - need to initialize")
+     * }
+     * ```
      */
     suspend fun validateCurrentKey(userId: String, deviceId: String): String?
 }

@@ -2,50 +2,85 @@ package com.noke.nokemobilelibrary.phonekey
 
 import android.content.Context
 import android.util.Log
-import com.noke.nokemobilelibrary.phonekey.internal.PhoneKeyManager
-import com.noke.nokemobilelibrary.phonekey.internal.SecurityServiceImpl
 import com.noke.nokemobilelibrary.phonekey.models.BulkAclResult
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import com.noke.nokemobilelibrary.phonekey.models.BulkAclEnvelope
+import com.noke.nokemobilelibrary.phonekey.models.PhoneKeyInfoResponse
 
 /**
  * PhoneKeyAccessService - High-level facade for ION-2 phone key operations.
  * 
  * This service provides a modern, coroutine-based API for phone key provisioning
- * and ACL (Access Control List) management, designed for easy integration into
- * third-party applications.
+ * and ACL (Access Control List) management. It uses a pluggable [PhoneKeyCoreClient]
+ * abstraction layer to allow third-party implementations with custom networking,
+ * authentication, and backend integration.
  * 
- * ## Architecture
+ * ## Architecture (TIDY Principles)
  * 
- * This is a **standalone library** facade that:
- * - Wraps internal [PhoneKeyManager] with coroutine-based suspend APIs
- * - Manages SecurityService lifecycle internally
- * - Provides simplified, intent-revealing public API
- * - Handles thread safety with mutex for manager access
- * - Supports multi-device and multi-user scenarios
+ * This service follows **Thoughtful Intent-Driven Design**:
+ * - **Public API focus**: Exposes **what** (intent), hides **how** (implementation)
+ * - **Pluggable backend**: Uses [PhoneKeyCoreClient] interface for flexibility
+ * - **Zero coupling**: No dependency on specific networking libraries or auth systems
+ * - **Third-party friendly**: Easy to integrate with any Android architecture
+ * 
+ * ```
+ * ┌─────────────────────────────┐
+ * │  PhoneKeyAccessService      │  <- Public facade (this file)
+ * │  (Coordinator/Orchestrator) │
+ * └──────────┬──────────────────┘
+ *            │ uses
+ *            ▼
+ * ┌─────────────────────────────┐
+ * │  PhoneKeyCoreClient         │  <- Abstraction (interface)
+ * │  (Protocol/Contract)        │
+ * └──────────┬──────────────────┘
+ *            │ implemented by
+ *            ▼
+ * ┌─────────────────────────────┐
+ * │  PhoneKeyCoreClientImpl     │  <- Default implementation
+ * │  (or CustomClientImpl)      │     (third parties can provide own)
+ * └──────────┬──────────────────┘
+ *            │ uses
+ *            ▼
+ * ┌─────────────────────────────┐
+ * │  PhoneKeyManager            │  <- Crypto/Storage layer
+ * │  + SecurityService          │     (networking layer)
+ * └─────────────────────────────┘
+ * ```
  * 
  * ## Features
  * 
  * - **Singleton pattern**: Single instance via [getInstance]
- * - **Zero-config**: Initialize once, use everywhere
- * - **Thread-safe**: All operations protected by mutex
+ * - **Pluggable client**: Set custom [PhoneKeyCoreClient] via [setSharedClient]
+ * - **Thread-safe**: All operations are thread-safe
  * - **Coroutine-native**: All operations are suspend functions
  * - **Result-based**: Returns `Result<T>` for exhaustive error handling
  * - **Per-device isolation**: Each (userId, deviceId) combination is isolated
- * - **Flexible authentication**: Accepts auth token provider for dynamic token refresh
+ * - **Zero-config default**: Works with [PhoneKeyCoreClientImpl] out of the box
  * 
- * ## Initialization
+ * ## Setup (Required)
  * 
- * The service must be initialized once before use with your backend configuration:
+ * Set the client implementation before using the service:
  * 
+ * ### Option 1: Use Default Implementation (StorageSmartEntry)
  * ```kotlin
- * // In Application.onCreate() or early startup
- * PhoneKeyAccessService.initialize(
- *     context = applicationContext,
- *     baseUrl = "https://router.smartentry.noke.com/",
- *     authTokenProvider = { sessionManager.getCurrentToken() },
- *     userUuidProvider = { sessionManager.getCurrentUserUuid() }
- * )
+ * // In Application.onCreate()
+ * val client = PhoneKeyCoreClientImpl(applicationContext)
+ * PhoneKeyAccessService.setSharedClient(client)
+ * ```
+ * 
+ * ### Option 2: Use Custom Implementation (Third Parties)
+ * ```kotlin
+ * // Implement PhoneKeyCoreClient with your own networking layer
+ * class MyPhoneKeyCoreClient(
+ *     private val context: Context,
+ *     private val myApiClient: MyApiClient
+ * ) : PhoneKeyCoreClient {
+ *     // Implement interface methods with your networking layer
+ * }
+ * 
+ * // In Application.onCreate()
+ * val client = MyPhoneKeyCoreClient(applicationContext, myApiClient)
+ * PhoneKeyAccessService.setSharedClient(client)
  * ```
  * 
  * ## Usage Example
@@ -53,184 +88,158 @@ import kotlinx.coroutines.sync.withLock
  * ```kotlin
  * val service = PhoneKeyAccessService.getInstance()
  * 
- * // Provision phone key
- * val provisionResult = service.provisionPhoneKey(
- *     userId = "12345",
- *     udid = Settings.Secure.getString(
- *         contentResolver,
- *         Settings.Secure.ANDROID_ID
- *     )
- * )
- * 
- * provisionResult.fold(
- *     onSuccess = { phoneKeyId ->
- *         Log.d(TAG, "Provisioned with keyId: $phoneKeyId")
+ * // Initialize phone key system
+ * val initResult = service.initialize(userId = "12345", deviceId = androidId)
+ * initResult.fold(
+ *     onSuccess = { publicKey ->
+ *         Log.d(TAG, "Initialized with public key")
  *         
- *         // Fetch all ACLs
- *         val aclResult = service.generateBulkAcls(
- *             phoneKeyId = phoneKeyId,
+ *         // Provision phone key
+ *         val provisionResult = service.provisionPhoneKey(
  *             userId = "12345",
- *             udid = deviceId
+ *             udid = androidId
  *         )
  *         
- *         aclResult.fold(
- *             onSuccess = { bulkResult ->
- *                 Log.d(TAG, "${bulkResult.successCount} ACLs fetched")
+ *         provisionResult.fold(
+ *             onSuccess = { response ->
+ *                 if (response.isSuccess) {
+ *                     Log.d(TAG, "Provisioned with keyId: ${response.keyId}")
+ *                     
+ *                     // Fetch all ACLs
+ *                     val aclResult = service.generateBulkAcls(response.keyId!!)
+ *                     // ... handle result
+ *                 }
  *             },
  *             onFailure = { error ->
- *                 Log.e(TAG, "ACL fetch failed: $error")
+ *                 Log.e(TAG, "Provisioning failed: $error")
  *             }
  *         )
  *     },
  *     onFailure = { error ->
- *         Log.e(TAG, "Provisioning failed: $error")
+ *         Log.e(TAG, "Initialization failed: $error")
  *     }
  * )
  * ```
  * 
  * ## Thread Safety
  * 
- * All operations are thread-safe and can be called from any coroutine context.
- * Internal operations are serialized using a mutex to ensure PhoneKeyManager
- * is accessed safely.
+ * All operations are thread-safe. The underlying [PhoneKeyCoreClient] implementation
+ * is responsible for ensuring thread safety of its operations.
  * 
  * ## Error Handling
  * 
  * All operations return `Result<T>` wrapping [NokeMobileLibraryError] subtypes:
- * - [NokeMobileLibraryError.NotInitialized] - Service not initialized
+ * - [NokeMobileLibraryError.NotInitialized] - Client not set
  * - [NokeMobileLibraryError.InvalidInput] - Invalid parameters
  * - [NokeMobileLibraryError.ProvisioningFailed] - Provisioning errors
  * - [NokeMobileLibraryError.AclFetchFailed] - ACL fetch errors
  * - And others - see [NokeMobileLibraryError] for complete list
  * 
- * ## Multi-Device Support
+ * ## Backward Compatibility
  * 
- * Each (userId, deviceId) combination is isolated with:
- * - Unique ECDSA key pair in Android Keystore
- * - Separate encrypted storage file
- * - Independent phone key ID from backend
+ * This service does NOT replace existing PhoneKeyManager-based code.
+ * All existing callback-based APIs continue to work unchanged. This provides
+ * a modern, coroutine-based alternative for new code.
  * 
- * This enables scenarios where a single user has multiple devices,
- * or multiple users share a device (each with their own keys/ACLs).
+ * ## Third-Party Integration
  * 
- * @see PhoneKeyManager
+ * Third parties can implement their own [PhoneKeyCoreClient] to integrate with:
+ * - Custom network layers (Retrofit, Ktor, custom HTTP clients)
+ * - Custom authentication systems
+ * - Custom backend URLs and endpoints
+ * - Mock implementations for testing
+ * 
+ * @see PhoneKeyCoreClient
+ * @see PhoneKeyCoreClientImpl
  * @see NokeMobileLibraryError
  * @see BulkAclResult
  */
-class PhoneKeyAccessService private constructor() {
+class PhoneKeyAccessService private constructor(
+    private val client: PhoneKeyCoreClient?,
+    private val context: Context?
+) {
     
     companion object {
         private const val TAG = "PhoneKeyAccessService"
         
         @Volatile
-        private var INSTANCE: PhoneKeyAccessService? = null
-        
-        @Volatile
-        private var sharedClient: PhoneKeyCoreClient? = null
-        
-        @Volatile
-        private var appContext: Context? = null
-        
-        @Volatile
-        private var sharedSecurityService: com.noke.nokemobilelibrary.phonekey.internal.SecurityService? = null
+        private var sharedInstance: PhoneKeyAccessService = PhoneKeyAccessService(null, null)
         
         /**
-         * Set the shared PhoneKeyCoreClient implementation.
-         *
-         * This method allows third parties to inject their own client implementation
-         * with custom networking, authentication, and backend integration.
-         *
-         * ## When to Call
-         * Call this once during app initialization, before using [getInstance]:
-         *
-         * ```kotlin
-         * // In Application.onCreate()
-         * val client = PhoneKeyCoreClientImpl(
-         *     context = applicationContext,
-         *     baseUrl = "https://router.smartentry.noke.com/",
-         *     authTokenProvider = { sessionManager.getCurrentToken() },
-         *     userUuidProvider = { sessionManager.getCurrentUserUuid() }
-         * )
-         * PhoneKeyAccessService.setSharedClient(client)
-         * ```
-         *
-         * ## Third-Party Implementations
-         * Third parties can provide custom implementations:
-         *
-         * ```kotlin
-         * class MyCustomClient(
-         *     private val myApiClient: MyApiClient
-         * ) : PhoneKeyCoreClient {
-         *     override suspend fun initialize(userId: String, deviceId: String): Result<String> {
-         *         // Custom implementation with your networking layer
-         *     }
-         *     // ... other methods
-         * }
-         *
-         * PhoneKeyAccessService.setSharedClient(MyCustomClient(myApiClient))
-         * ```
-         *
-         * @param client PhoneKeyCoreClient implementation
-         */
-        @JvmStatic
-        fun setSharedClient(client: PhoneKeyCoreClient) {
-            sharedClient = client
-            Log.d(TAG, "Shared PhoneKeyCoreClient configured: ${client::class.simpleName}")
-        }
-        
-        /**
-         * Initialize PhoneKeyAccessService with default client implementation.
-         *
-         * This method creates a [PhoneKeyCoreClientImpl] with the provided configuration
-         * and sets it as the shared client. It also stores the context for local operations
-         * needed by PhoneKeyFacade.
-         *
-         * Call this once during app initialization:
-         *
-         * ```kotlin
-         * // In Application.onCreate()
-         * PhoneKeyAccessService.initialize(
-         *     context = applicationContext,
-         *     baseUrl = "https://router.smartentry.noke.com/",
-         *     authTokenProvider = { sessionManager.getCurrentToken() },
-         *     userUuidProvider = { sessionManager.getCurrentUserUuid() }
-         * )
-         * ```
-         *
+         * Initialize the service with a context.
+         * 
+         * **DEPRECATED:** This method is no longer available in noke-mobile-library-android.
+         * Third-party developers must provide their own PhoneKeyCoreClient implementation.
+         * 
+         * Use [setSharedClient] instead with your own implementation.
+         * See TEMPLATE_PhoneKeyCoreClient.kt for an example implementation.
+         * 
          * @param context Application context
-         * @param baseUrl Backend API base URL
-         * @param authTokenProvider Function returning current auth token
-         * @param userUuidProvider Function returning current user UUID
+         * @deprecated Provide your own PhoneKeyCoreClient implementation via setSharedClient()
+         */
+        @Deprecated(
+            message = "Provide your own PhoneKeyCoreClient implementation via setSharedClient()",
+            replaceWith = ReplaceWith("setSharedClient(yourClientImpl, context)"),
+            level = DeprecationLevel.ERROR
+        )
+        @JvmStatic
+        fun initialize(context: Context) {
+            throw UnsupportedOperationException(
+                "PhoneKeyCoreClient implementation required. " +
+                "See TEMPLATE_PhoneKeyCoreClient.kt for an example implementation."
+            )
+        }
+
+        /**
+         * Set the shared [PhoneKeyCoreClient] implementation.
+         * 
+         * This must be called before using [getInstance], typically in
+         * Application.onCreate() or early in app startup.
+         * 
+         * **IMPORTANT:** This sets the client for all subsequent operations.
+         * Call this once during app initialization.
+         * 
+         * @param client PhoneKeyCoreClient implementation (custom or default)
+         * @param context Application context
+         * 
+         * ## Example with Default Implementation
+         * ```kotlin
+         * class MyApplication : Application() {
+         *     override fun onCreate() {
+         *         super.onCreate()
+         *         
+         *         val client = PhoneKeyCoreClientImpl(this)
+         *         PhoneKeyAccessService.setSharedClient(client, this)
+         *     }
+         * }
+         * ```
+         * 
+         * ## Example with Custom Implementation
+         * ```kotlin
+         * class MyApplication : Application() {
+         *     override fun onCreate() {
+         *         super.onCreate()
+         *         
+         *         val client = MyCustomPhoneKeyCoreClient(
+         *             context = this,
+         *             apiClient = myApiClient
+         *         )
+         *         PhoneKeyAccessService.setSharedClient(client, this)
+         *     }
+         * }
+         * ```
          */
         @JvmStatic
-        fun initialize(
-            context: Context,
-            baseUrl: String,
-            authTokenProvider: () -> String,
-            userUuidProvider: () -> String
-        ) {
-            val client = PhoneKeyCoreClientImpl(
-                context = context.applicationContext,
-                baseUrl = baseUrl,
-                authTokenProvider = authTokenProvider,
-                userUuidProvider = userUuidProvider
-            )
-            appContext = context.applicationContext
-            sharedSecurityService = com.noke.nokemobilelibrary.phonekey.internal.SecurityServiceImpl(
-                context = context.applicationContext,
-                baseUrl = baseUrl,
-                authTokenProvider = authTokenProvider,
-                userUuidProvider = userUuidProvider
-            )
-            setSharedClient(client)
-            Log.d(TAG, "PhoneKeyAccessService initialized with context and client")
+        fun setSharedClient(client: PhoneKeyCoreClient, context: Context) {
+            sharedInstance = PhoneKeyAccessService(client, context.applicationContext)
+            Log.d(TAG, "PhoneKeyAccessService client set: ${client::class.java.simpleName}")
         }
         
         /**
          * Get the singleton instance of PhoneKeyAccessService.
          * 
          * @return PhoneKeyAccessService singleton instance
-         * @throws IllegalStateException if [setSharedClient] or [initialize] has not been called
+         * @throws IllegalStateException if [setSharedClient] has not been called
          * 
          * ## Example
          * ```kotlin
@@ -239,27 +248,115 @@ class PhoneKeyAccessService private constructor() {
          */
         @JvmStatic
         fun getInstance(): PhoneKeyAccessService {
-            if (sharedClient == null) {
-                throw IllegalStateException(
-                    "PhoneKeyAccessService not initialized. Call setSharedClient() or initialize() first."
-                )
-            }
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: PhoneKeyAccessService().also { INSTANCE = it }
-            }
+            return sharedInstance
+        }
+        
+        /**
+         * Get the device UDID (Android ID).
+         * 
+         * Uses Settings.Secure.ANDROID_ID which is unique per device and app installation.
+         * 
+         * **Production Note:** ANDROID_ID persists across app reinstalls but resets on factory reset.
+         * This is the recommended approach for device identification in Android.
+         * 
+         * @param context Application context
+         * @return Device UDID string (ANDROID_ID)
+         * @throws IllegalStateException if ANDROID_ID cannot be retrieved
+         * 
+         * ## Example
+         * ```kotlin
+         * val udid = PhoneKeyAccessService.getDeviceUdid(applicationContext)
+         * ```
+         */
+        @JvmStatic
+        fun getDeviceUdid(context: Context): String {
+            return android.provider.Settings.Secure.getString(
+                context.contentResolver,
+                android.provider.Settings.Secure.ANDROID_ID
+            ) ?: throw IllegalStateException("Unable to retrieve device ANDROID_ID")
         }
     }
-    
-    // Mutex for thread-safe access
-    private val mutex = Mutex()
+
     
     /**
-     * Get the configured client.
-     * @throws IllegalStateException if client not configured
+     * Initialize the Phone Key system and ensure cryptographic keys are generated.
+     *
+     * This operation should be called once per (userId, deviceId) combination before
+     * performing any other operations. It generates ECDSA P-256 keys in Android Keystore
+     * and returns the public key.
+     *
+     * ## Idempotency
+     * Safe to call multiple times - returns immediately if already initialized.
+     *
+     * ## Thread Safety
+     * Thread-safe - can be called from any coroutine context.
+     *
+     * @param userId User identifier for key isolation
+     * @param deviceId Device identifier (UDID) for key isolation
+     * @return [Result] containing Base64-encoded public key on success, or [NokeMobileLibraryError] on failure
+     *
+     * ## Example
+     * ```kotlin
+     * val result = service.initialize(userId = "12345", deviceId = androidId)
+     * result.fold(
+     *     onSuccess = { publicKey ->
+     *         Log.d(TAG, "Initialized with public key")
+     *     },
+     *     onFailure = { error ->
+     *         Log.e(TAG, "Initialization failed: $error")
+     *     }
+     * )
+     * ```
      */
-    private fun getClient(): PhoneKeyCoreClient {
-        return sharedClient
-            ?: throw IllegalStateException("PhoneKeyAccessService not initialized")
+    suspend fun initialize(userId: String, deviceId: String): Result<String> {
+        val currentClient = client
+            ?: return Result.failure(NokeMobileLibraryError.NotInitialized)
+        
+        return try {
+            currentClient.initialize(userId, deviceId)
+        } catch (e: Exception) {
+            Log.e(TAG, "Initialize failed", e)
+            Result.failure(
+                NokeMobileLibraryError.UnknownError(
+                    operation = "initialize",
+                    underlying = e
+                )
+            )
+        }
+    }
+
+    /**
+     * Check if the service has been initialized.
+     *
+     * @return true if a client is set and initialized, false otherwise
+     */
+    val isInitialized: Boolean
+        get() = client?.isInitialized ?: false
+
+    /**
+     * Validate and retrieve the current public key.
+     *
+     * @param userId User identifier for key lookup
+     * @param deviceId Device identifier for key lookup
+     * @return Base64-encoded public key, or null if invalid/missing
+     *
+     * ## Example
+     * ```kotlin
+     * val publicKey = service.validateCurrentKey(userId = "12345", deviceId = androidId)
+     * if (publicKey != null) {
+     *     Log.d(TAG, "Valid key found")
+     * } else {
+     *     Log.w(TAG, "No valid key - need to initialize")
+     * }
+     * ```
+     */
+    suspend fun validateCurrentKey(userId: String, deviceId: String): String? {
+        return try {
+            client?.validateCurrentKey(userId, deviceId)
+        } catch (e: Exception) {
+            Log.e(TAG, "Key validation failed", e)
+            null
+        }
     }
     
     /**
@@ -270,9 +367,9 @@ class PhoneKeyAccessService private constructor() {
      * phone key identifier.
      * 
      * ## Process
-     * 1. Generate ECDSA P-256 key pair in Android Keystore (hardware-backed)
+     * 1. Ensure keys are initialized via [initialize]
      * 2. Extract public key in X9.62 format (Base64-encoded)
-     * 3. Send provisioning request to backend: (udid, publicKey, userId)
+     * 3. Send provisioning request to backend: (userId, deviceId, publicKey)
      * 4. Store phone key ID and metadata locally
      * 
      * ## Per-Device Isolation
@@ -293,10 +390,10 @@ class PhoneKeyAccessService private constructor() {
      * 
      * @param userId User identifier (must not be empty)
      * @param udid Unique device identifier (must not be empty)
-     * @return [Result] containing phone key ID on success, or [NokeMobileLibraryError] on failure
+     * @return [Result] containing [PhoneKeyInfoResponse] on success, or [NokeMobileLibraryError] on failure
      * 
      * ## Error Types
-     * - [NokeMobileLibraryError.NotInitialized] - Service not initialized
+     * - [NokeMobileLibraryError.NotInitialized] - Client not set
      * - [NokeMobileLibraryError.InvalidInput] - Empty userId or udid
      * - [NokeMobileLibraryError.CryptographicError] - Key generation failed
      * - [NokeMobileLibraryError.NetworkError] - Network request failed
@@ -313,9 +410,13 @@ class PhoneKeyAccessService private constructor() {
      * )
      * 
      * result.fold(
-     *     onSuccess = { phoneKeyId ->
-     *         Log.d(TAG, "Phone key provisioned: $phoneKeyId")
-     *         // Now fetch ACLs
+     *     onSuccess = { response ->
+     *         if (response.isSuccess) {
+     *             Log.d(TAG, "Phone key provisioned: ${response.keyId}")
+     *             // Now fetch ACLs
+     *         } else {
+     *             Log.e(TAG, "Provisioning failed: ${response.statusMessage}")
+     *         }
      *     },
      *     onFailure = { error ->
      *         when (error) {
@@ -333,40 +434,27 @@ class PhoneKeyAccessService private constructor() {
     suspend fun provisionPhoneKey(
         userId: String,
         udid: String
-    ): Result<Int> {
+    ): Result<PhoneKeyInfoResponse> {
+        val currentClient = client
+            ?: return Result.failure(NokeMobileLibraryError.NotInitialized)
+        
         return try {
-            val client = getClient()
-            
-            // Initialize first to ensure keys are generated
-            val initResult = client.initialize(userId, udid)
+            // Ensure client is initialized first
+            val initResult = currentClient.initialize(userId, udid)
             if (initResult.isFailure) {
-                return Result.failure(initResult.exceptionOrNull() ?: Exception("Initialization failed"))
+                return Result.failure(
+                    initResult.exceptionOrNull() ?: NokeMobileLibraryError.UnknownError("initialize", Exception("Initialization failed"))
+                )
             }
             
             val publicKey = initResult.getOrThrow()
-            
-            // Provision with backend
-            val provisionResult = client.provisionPhoneKey(userId, udid, publicKey)
-            if (provisionResult.isFailure) {
-                return Result.failure(provisionResult.exceptionOrNull() ?: Exception("Provisioning failed"))
-            }
-            
-            val response = provisionResult.getOrThrow()
-            if (response.isSuccess && response.keyId != null) {
-                Log.d(TAG, "Phone key provisioned: ${response.keyId}")
-                Result.success(response.keyId)
-            } else {
-                Log.e(TAG, "Provisioning failed: ${response.statusMessage}")
-                Result.failure(
-                    NokeMobileLibraryError.ProvisioningFailed(response.statusMessage)
-                )
-            }
-        } catch (e: NokeMobileLibraryError) {
-            Result.failure(e)
+            currentClient.provisionPhoneKey(userId, udid, publicKey)
         } catch (e: Exception) {
-            Log.e(TAG, "Unexpected error during provisioning", e)
+            Log.e(TAG, "Provisioning failed", e)
             Result.failure(
-                NokeMobileLibraryError.UnknownError("provisionPhoneKey", e)
+                NokeMobileLibraryError.ProvisioningFailed(
+                    reason = e.message ?: "Unknown error"
+                )
             )
         }
     }
@@ -395,11 +483,10 @@ class PhoneKeyAccessService private constructor() {
      * @param userId User ID as integer (matching backend API)
      * @param lockMac Lock MAC address (e.g., "AA:BB:CC:DD:EE:FF")
      * @param phoneKeyId Phone key ID from [provisionPhoneKey]
-     * @param udid Device identifier (for manager lookup)
      * @return [Result] with Unit on success, or [NokeMobileLibraryError] on failure
      * 
      * ## Error Types
-     * - [NokeMobileLibraryError.NotInitialized] - Service not initialized
+     * - [NokeMobileLibraryError.NotInitialized] - Client not set
      * - [NokeMobileLibraryError.InvalidInput] - Invalid parameters
      * - [NokeMobileLibraryError.NetworkError] - Network request failed
      * - [NokeMobileLibraryError.AclFetchFailed] - Backend rejected or not authorized
@@ -410,8 +497,7 @@ class PhoneKeyAccessService private constructor() {
      * val result = service.generateAcl(
      *     userId = 12345,
      *     lockMac = "AA:BB:CC:DD:EE:FF",
-     *     phoneKeyId = 67890,
-     *     udid = deviceId
+     *     phoneKeyId = 67890
      * )
      * 
      * result.fold(
@@ -430,21 +516,27 @@ class PhoneKeyAccessService private constructor() {
         phoneKeyId: Int,
         udid: String
     ): Result<Unit> {
+        val currentClient = client
+            ?: return Result.failure(NokeMobileLibraryError.NotInitialized)
+        
         return try {
-            val client = getClient()
-            client.generateAcl(userId, lockMac, phoneKeyId)
-        } catch (e: NokeMobileLibraryError) {
-            Result.failure(e)
+            currentClient.generateAcl(userId, lockMac, phoneKeyId)
         } catch (e: Exception) {
-            Log.e(TAG, "Unexpected error during ACL generation", e)
+            Log.e(TAG, "ACL generation failed", e)
             Result.failure(
-                NokeMobileLibraryError.UnknownError("generateAcl", e)
+                NokeMobileLibraryError.AclFetchFailed(
+                    lockMac = lockMac,
+                    reason = e.message ?: "Unknown error"
+                )
             )
         }
     }
     
     /**
      * Generate bulk ACLs for all locks accessible to the user.
+     * 
+     * **CRITICAL:** Must call [initialize] with userId and deviceId BEFORE calling this method.
+     * The PhoneKeyCoreClient requires a manager instance in its cache to fetch ACLs.
      * 
      * This is the **preferred method** for fetching ACLs in most scenarios:
      * - After successful login
@@ -454,6 +546,16 @@ class PhoneKeyAccessService private constructor() {
      * 
      * This operation fetches all ACL envelopes in a single backend request,
      * which is much more efficient than fetching individual ACLs one-by-one.
+     * 
+     * ## Initialization Requirement
+     * **Why initialize() is required:**
+     * - PhoneKeyCoreClient uses a manager cache keyed by (userId, deviceId)
+     * - generateBulkAcls() retrieves ACLs using a cached manager instance
+     * - If initialize() wasn't called, the cache is empty → NotInitialized error
+     * - This pattern mirrors iOS PhoneKeyFacade lazy initialization
+     * 
+     * **Common mistake:** Provisioning creates a manager internally, but doesn't
+     * add it to the cache. Always call initialize() explicitly before ACL operations.
      * 
      * ## Bulk ACL Format
      * Bulk ACLs are stored in simplified format without detailed permissions/schedule.
@@ -468,12 +570,12 @@ class PhoneKeyAccessService private constructor() {
      * Thread-safe - can be called from any coroutine context.
      * 
      * @param phoneKeyId Phone key ID from [provisionPhoneKey]
-     * @param userId User identifier (for manager lookup)
-     * @param udid Device identifier (for manager lookup)
+     * @param userId User identifier (for logging/debugging - not functionally used)
+     * @param udid Device identifier (for logging/debugging - not functionally used)
      * @return [Result] containing [BulkAclResult] on success, or [NokeMobileLibraryError] on complete failure
      * 
      * ## Error Types
-     * - [NokeMobileLibraryError.NotInitialized] - Service not initialized
+     * - [NokeMobileLibraryError.NotInitialized] - initialize() not called (manager cache empty)
      * - [NokeMobileLibraryError.InvalidInput] - Invalid phoneKeyId
      * - [NokeMobileLibraryError.NetworkError] - Network request failed
      * - [NokeMobileLibraryError.BulkAclFetchFailed] - Backend rejected or all storage failed
@@ -482,9 +584,13 @@ class PhoneKeyAccessService private constructor() {
      * 
      * ## Example
      * ```kotlin
+     * // Step 1: REQUIRED - Initialize for this user/device
+     * service.initialize(userId, deviceId).getOrThrow()
+     * 
+     * // Step 2: Fetch bulk ACLs (manager now in cache)
      * val result = service.generateBulkAcls(
      *     phoneKeyId = 67890,
-     *     userId = "12345",
+     *     userId = userId,
      *     udid = deviceId
      * )
      * 
@@ -502,7 +608,13 @@ class PhoneKeyAccessService private constructor() {
      *         }
      *     },
      *     onFailure = { error ->
-     *         Log.e(TAG, "Bulk ACL fetch failed: $error")
+     *         when (error) {
+     *             is NokeMobileLibraryError.NotInitialized -> {
+     *                 // MUST call initialize() before generateBulkAcls()!
+     *                 Log.e(TAG, "Manager cache empty - call initialize() first")
+     *             }
+     *             else -> Log.e(TAG, "Bulk ACL fetch failed: $error")
+     *         }
      *     }
      * )
      * ```
@@ -512,65 +624,26 @@ class PhoneKeyAccessService private constructor() {
         userId: String,
         udid: String
     ): Result<BulkAclResult> {
+        val currentClient = client
+            ?: return Result.failure(NokeMobileLibraryError.NotInitialized)
+        
         return try {
-            val client = getClient()
-            client.generateBulkAcls(phoneKeyId)
-        } catch (e: NokeMobileLibraryError) {
-            Result.failure(e)
+            currentClient.generateBulkAcls(phoneKeyId)
         } catch (e: Exception) {
-            Log.e(TAG, "Unexpected error during bulk ACL generation", e)
+            Log.e(TAG, "Bulk ACL generation failed", e)
             Result.failure(
-                NokeMobileLibraryError.UnknownError("generateBulkAcls", e)
+                NokeMobileLibraryError.BulkAclFetchFailed(
+                    phoneKeyId = phoneKeyId,
+                    reason = e.message ?: "Unknown error"
+                )
             )
         }
     }
-    
+
     /**
      * Refresh all ACLs by fetching from backend.
      * 
-     * This is a convenience method for manual ACL refresh scenarios:
-     * - User-initiated refresh (pull-to-refresh)
-     * - Periodic background refresh
-     * - After detecting ACL changes server-side
-     * 
-     * This method automatically uses the stored phone key ID, so you don't
-     * need to pass it explicitly (unlike [generateBulkAcls]).
-     * 
-     * ## Requirements
-     * The phone key must be provisioned before calling this method.
-     * If not provisioned, returns [NokeMobileLibraryError.NotProvisioned].
-     * 
-     * ## Thread Safety
-     * Thread-safe - can be called from any coroutine context.
-     * 
-     * @param userId User identifier (for manager lookup)
-     * @param udid Device identifier (for manager lookup)
-     * @return [Result] containing [BulkAclResult] on success, or [NokeMobileLibraryError] on failure
-     * 
-     * ## Error Types
-     * - [NokeMobileLibraryError.NotInitialized] - Service not initialized
-     * - [NokeMobileLibraryError.NotProvisioned] - Phone key not provisioned yet
-     * - All errors from [generateBulkAcls]
-     * 
-     * ## Example
-     * ```kotlin
-     * // In pull-to-refresh handler
-     * val result = service.refreshAllAcls(
-     *     userId = "12345",
-     *     udid = deviceId
-     * )
-     * 
-     * result.fold(
-     *     onSuccess = { bulkResult ->
-     *         Log.d(TAG, "Refreshed ${bulkResult.successCount} ACLs")
-     *         hideRefreshIndicator()
-     *     },
-     *     onFailure = { error ->
-     *         Log.e(TAG, "Refresh failed: $error")
-     *         showErrorMessage(error.message)
-     *     }
-     * )
-     * ```
+     * @deprecated This method depends on internal state. Use generateBulkAcls() directly with stored phone key ID.
      */
     @Deprecated(
         message = "This method depends on internal state. Use generateBulkAcls() directly with stored phone key ID.",
@@ -580,8 +653,6 @@ class PhoneKeyAccessService private constructor() {
         userId: String,
         udid: String
     ): Result<BulkAclResult> {
-        // This method can't work cleanly with the abstraction because it needs access
-        // to the stored phone key ID, which the client abstraction doesn't expose
         return Result.failure(
             NokeMobileLibraryError.UnknownError(
                 "refreshAllAcls",
@@ -589,77 +660,42 @@ class PhoneKeyAccessService private constructor() {
             )
         )
     }
-    
+
+    // MARK: - Local Operations (via PhoneKeyFacade)
+
     /**
-     * Check if phone key is provisioned for the given user and device.
-     * 
+     * Check if phone is provisioned for a user.
+     *
      * @param userId User identifier
-     * @param udid Device identifier
-     * @return [Result] containing true if provisioned, false otherwise
-     * 
-     * ## Example
-     * ```kotlin
-     * val result = service.isProvisioned(userId = "12345", udid = deviceId)
-     * result.fold(
-     *     onSuccess = { isProvisioned ->
-     *         if (isProvisioned) {
-     *             Log.d(TAG, "Already provisioned")
-     *         } else {
-     *             Log.d(TAG, "Need to provision")
-     *         }
-     *     },
-     *     onFailure = { error ->
-     *         Log.e(TAG, "Error checking provisioning status: $error")
-     *     }
-     * )
-     * ```
+     * @param deviceId Device identifier
+     * @return Result containing true if provisioned, false otherwise
      */
-    suspend fun isProvisioned(userId: String, udid: String): Result<Boolean> {
-        val ctx = appContext ?: return Result.failure(NokeMobileLibraryError.NotInitialized)
-        val security = sharedSecurityService ?: return Result.failure(NokeMobileLibraryError.NotInitialized)
+    suspend fun isProvisioned(userId: String, deviceId: String): Result<Boolean> {
+        val ctx = context ?: return Result.failure(NokeMobileLibraryError.NotInitialized)
         
         return try {
-            val facade = PhoneKeyFacade.getInstance(ctx, security)
-            val info = facade.getPhoneKeyInfo(userId, udid)
+            val facade = PhoneKeyFacade.getInstance(ctx)
+            val info = facade.getPhoneKeyInfo(userId, deviceId)
             Result.success(info != null && info.isSuccess)
         } catch (e: Exception) {
             Log.e(TAG, "isProvisioned check failed", e)
             Result.failure(NokeMobileLibraryError.UnknownError("isProvisioned", e))
         }
     }
-    
+
     /**
-     * Get the stored phone key ID for the given user and device.
-     * 
+     * Get stored phone key ID for a user.
+     *
      * @param userId User identifier
-     * @param udid Device identifier
-     * @return [Result] containing phone key ID if provisioned, or error if not provisioned
-     * 
-     * ## Example
-     * ```kotlin
-     * val result = service.getPhoneKeyId(userId = "12345", udid = deviceId)
-     * result.fold(
-     *     onSuccess = { phoneKeyId ->
-     *         Log.d(TAG, "Phone key ID: $phoneKeyId")
-     *     },
-     *     onFailure = { error ->
-     *         when (error) {
-     *             is NokeMobileLibraryError.NotProvisioned ->
-     *                 Log.e(TAG, "Not provisioned yet")
-     *             else ->
-     *                 Log.e(TAG, "Error: $error")
-     *         }
-     *     }
-     * )
-     * ```
+     * @param deviceId Device identifier
+     * @return Result containing phone key ID, or error if not provisioned
      */
-    suspend fun getPhoneKeyId(userId: String, udid: String): Result<Int> {
-        val ctx = appContext ?: return Result.failure(NokeMobileLibraryError.NotInitialized)
-        val security = sharedSecurityService ?: return Result.failure(NokeMobileLibraryError.NotInitialized)
+    suspend fun getPhoneKeyId(userId: String, deviceId: String): Result<Int> {
+        val ctx = context ?: return Result.failure(NokeMobileLibraryError.NotInitialized)
         
         return try {
-            val facade = PhoneKeyFacade.getInstance(ctx, security)
-            val info = facade.getPhoneKeyInfo(userId, udid)
+            val facade = PhoneKeyFacade.getInstance(ctx)
+            val info = facade.getPhoneKeyInfo(userId, deviceId)
             
             if (info != null && info.keyId != null) {
                 Result.success(info.keyId)
@@ -671,55 +707,36 @@ class PhoneKeyAccessService private constructor() {
             Result.failure(NokeMobileLibraryError.UnknownError("getPhoneKeyId", e))
         }
     }
-    
+
     /**
      * List all valid (non-expired) ACLs from local cache.
      *
      * @return List of valid ACLs
      */
-    suspend fun listValidACLs(): List<com.noke.nokemobilelibrary.phonekey.models.BulkAclEnvelope> {
-        val ctx = appContext ?: return emptyList()
-        val security = sharedSecurityService ?: return emptyList()
+    suspend fun listValidACLs(): List<BulkAclEnvelope> {
+        val ctx = context ?: return emptyList()
         
         return try {
-            val facade = PhoneKeyFacade.getInstance(ctx, security)
+            val facade = PhoneKeyFacade.getInstance(ctx)
             facade.listValidACLs()
         } catch (e: Exception) {
             Log.e(TAG, "listValidACLs failed", e)
             emptyList()
         }
     }
-    
+
     /**
-     * Clean up all ACLs for a specific user and device.
-     * 
-     * This method should be called on user logout to ensure ACL data is
-     * removed from encrypted storage for security purposes.
-     * 
+     * Cleanup all ACLs for a user (logout cleanup).
+     *
      * @param userId User identifier
-     * @param udid Device identifier
-     * @return [Result] with Unit on success, or [NokeMobileLibraryError] on failure
-     * 
-     * ## Example
-     * ```kotlin
-     * // On user logout
-     * val result = service.cleanupAclsForUser(
-     *     userId = "12345",
-     *     udid = deviceId
-     * )
-     * 
-     * result.fold(
-     *     onSuccess = { Log.d(TAG, "ACLs cleaned up successfully") },
-     *     onFailure = { error -> Log.e(TAG, "Cleanup failed: $error") }
-     * )
-     * ```
+     * @param deviceId Device identifier
+     * @return Result with Unit on success, or error
      */
-    suspend fun cleanupAclsForUser(userId: String, udid: String): Result<Unit> {
-        val ctx = appContext ?: return Result.failure(NokeMobileLibraryError.NotInitialized)
-        val security = sharedSecurityService ?: return Result.failure(NokeMobileLibraryError.NotInitialized)
+    suspend fun cleanupAclsForUser(userId: String, deviceId: String): Result<Unit> {
+        val ctx = context ?: return Result.failure(NokeMobileLibraryError.NotInitialized)
         
         return try {
-            val facade = PhoneKeyFacade.getInstance(ctx, security)
+            val facade = PhoneKeyFacade.getInstance(ctx)
             facade.clearAll(userId)
             Result.success(Unit)
         } catch (e: Exception) {
@@ -727,12 +744,68 @@ class PhoneKeyAccessService private constructor() {
             Result.failure(NokeMobileLibraryError.UnknownError("cleanupAclsForUser", e))
         }
     }
-    
+
     /**
-     * Clear internal cache (for user switching scenarios).
+     * Check if a valid cached ACL exists for a specific lock.
+     * 
+     * Validation includes:
+     * - ACL exists in cache
+     * - ACL has not expired (expiresAt > current time)
+     * - ACL has required UNLOCK permission (for full ACLs)
+     *
+     * @param userId User identifier
+     * @param udid Device UDID (use [getDeviceUdid])
+     * @param lockMac MAC address of the lock
+     * @return Result with true if valid cached ACL exists, false otherwise
+     * 
+     * ## Example
+     * ```kotlin
+     * val service = PhoneKeyAccessService.getInstance()
+     * val udid = PhoneKeyAccessService.getDeviceUdid(context)
+     * val result = service.hasCachedAcl(userId = "12345", udid = udid, lockMac = "XX:XX:XX:XX:XX:XX")
+     * 
+     * result.fold(
+     *     onSuccess = { hasCached ->
+     *         if (hasCached) {
+     *             Log.d(TAG, "Valid ACL exists in cache")
+     *         } else {
+     *             Log.d(TAG, "No valid ACL, need to fetch from backend")
+     *         }
+     *     },
+     *     onFailure = { error ->
+     *         Log.e(TAG, "Failed to check cached ACL", error)
+     *     }
+     * )
+     * ```
+     */
+    suspend fun hasCachedAcl(userId: String, udid: String, lockMac: String): Result<Boolean> {
+        val ctx = context ?: return Result.failure(NokeMobileLibraryError.NotInitialized)
+        
+        return try {
+            val facade = PhoneKeyFacade.getInstance(ctx)
+            val hasCached = facade.hasCachedAcl(userId, udid, lockMac)
+            Result.success(hasCached)
+        } catch (e: Exception) {
+            Log.e(TAG, "hasCachedAcl failed for lock $lockMac", e)
+            Result.failure(NokeMobileLibraryError.UnknownError("hasCachedAcl", e))
+        }
+    }
+
+    /**
+     * Clear cached state (for user switching).
+     * 
+     * **NOTE:** This is a no-op method. Actual cache clearing is handled by
+     * [cleanupAclsForUser] which calls [PhoneKeyFacade.clearAll] to delete
+     * both ACLs and provisioning data.
+     * 
+     * This method exists for API compatibility but does not need to be called
+     * explicitly. Use [cleanupAclsForUser] for proper logout cleanup.
+     * 
+     * @see cleanupAclsForUser
      */
     fun clearCache() {
-        // PhoneKeyFacade manages its own cache
-        Log.d(TAG, "clearCache - cache managed by PhoneKeyFacade")
+        // PhoneKeyFacade manages its own cache, no action needed here
+        // Actual cleanup done via cleanupAclsForUser() → PhoneKeyFacade.clearAll()
+        Log.d(TAG, "clearCache - no-op (use cleanupAclsForUser for logout)")
     }
 }
