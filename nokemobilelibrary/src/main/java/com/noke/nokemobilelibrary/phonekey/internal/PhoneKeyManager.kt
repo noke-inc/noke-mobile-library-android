@@ -355,49 +355,7 @@ internal class PhoneKeyManager constructor(
         }
     }
 
-    /**
-     * Force EncryptedSharedPreferences to reload from disk.
-     * 
-     * **Critical Cross-Thread Cache Coherency Fix:**
-     * 
-     * EncryptedSharedPreferences has **per-thread internal caching** that causes writes on one
-     * thread to be invisible on other threads, even after commit() and even with external synchronization.
-     * 
-     * **The Problem:**
-     * - Thread A: `commit()` → writes to disk → invalidates Thread A's cache
-     * - Thread B: `getString()` → returns stale value from Thread B's cache (NOT from disk!)
-     * 
-     * **The Solution:**
-     * Call `forcePrefsReload()`:
-     * 1. **AFTER every write** (commit/apply) - invalidates writing thread's cache
-     * 2. **BEFORE every read** - forces reading thread to reload from disk
-     * 
-     * This ensures:
-     * - Writing thread sees its own writes immediately
-     * - Reading threads see writes from other threads immediately
-     * - True cross-thread cache coherency
-     * 
-     * **How it works:**
-     * Accessing ANY key via getString() forces EncryptedSharedPreferences to check if its
-     * internal cache is stale. By accessing a unique dummy key on EVERY read/write,
-     * we force it to reload from disk, ensuring all threads see the latest data.
-     * 
-     * **MUST be called:**
-     * - INSIDE synchronized(prefsLock) block (already thread-safe)
-     * - AFTER commit() operations (write path)
-     * - BEFORE getString()/getAll() operations (read path)
-     * 
-     * @see storeBulkAclEnvelope
-     * @see getBulkAclEnvelope
-     * @see storeAclEnvelope
-     * @see getAclEnvelope
-     */
-    private fun forcePrefsReload() {
-        // Accessing a dummy key forces EncryptedSharedPreferences to reload from disk
-        // The unique key (using nanoTime) ensures we're not hitting cached data
-        // This invalidates per-thread cached values, ensuring cross-thread coherency
-        prefs.getString("__force_reload_${System.nanoTime()}", null)
-    }
+
 
     // ------------------------------------------------
     // Key management (ECDSA P-256) - Android Keystore
@@ -600,7 +558,6 @@ internal class PhoneKeyManager constructor(
      */
     fun isProvisioned(): Boolean {
         synchronized(prefsLock) {
-            forcePrefsReload()
             return prefs.getBoolean(KEY_IS_PROVISIONED, false)
         }
     }
@@ -639,7 +596,6 @@ internal class PhoneKeyManager constructor(
                 Log.e(TAG, "ION-2 - Failed to persist provisioning state (storage may be full)")
                 throw java.io.IOException("Failed to persist provisioning state to SharedPreferences")
             }
-            forcePrefsReload()
             Log.d(TAG, "ION-2 - Provisioning state saved for user $userId: keyId=$keyId")
         }
     }
@@ -650,7 +606,6 @@ internal class PhoneKeyManager constructor(
      */
     fun getPhoneKeyId(): String? {
         synchronized(prefsLock) {
-            forcePrefsReload()
             return prefs.getString(KEY_PHONE_KEY_ID, null)
         }
     }
@@ -683,7 +638,6 @@ internal class PhoneKeyManager constructor(
                 Log.e(TAG, "ION-2 - Failed to clear provisioning data (storage may be full)")
                 throw java.io.IOException("Failed to clear provisioning data from SharedPreferences")
             }
-            forcePrefsReload()
             Log.d(TAG, "ION-2 - Provisioning data cleared for user $userId")
         }
     }
@@ -748,7 +702,6 @@ internal class PhoneKeyManager constructor(
                 Log.e(TAG, "ION-2 - Failed to persist provisioning result (storage may be full)")
                 throw java.io.IOException("Failed to persist provisioning data to SharedPreferences")
             }
-            forcePrefsReload()
         }
     }
 
@@ -760,7 +713,6 @@ internal class PhoneKeyManager constructor(
      */
     fun getProvisioningInfo(): ProvisioningInfo {
         synchronized(prefsLock) {
-            forcePrefsReload()
             val phoneKeyId = prefs.getString(KEY_PHONE_KEY_ID, null)
                 ?: error("Phone key not provisioned for user=$userId, device=$udid")
 
@@ -860,16 +812,14 @@ internal class PhoneKeyManager constructor(
                 }
                 
                 // Store bulk fetch timestamp
-                synchronized(prefsLock) {
-                    val timestampStored = prefs.edit()
+                val timestampStored = synchronized(prefsLock) {
+                    prefs.edit()
                         .putLong("bulk_acl_last_fetched", System.currentTimeMillis())
                         .commit()
-                    
-                    if (!timestampStored) {
-                        Log.w(TAG, "ION-2 - Failed to store bulk ACL fetch timestamp")
-                    } else {
-                        forcePrefsReload()
-                    }
+                }
+                
+                if (!timestampStored) {
+                    Log.w(TAG, "ION-2 - Failed to store bulk ACL fetch timestamp")
                 }
                 
                 Log.d(TAG, "ION-2 - Bulk ACL fetch completed: $successCount/$totalCount ACLs stored successfully")
@@ -1017,8 +967,6 @@ internal class PhoneKeyManager constructor(
                 Log.e(TAG, "ION-2 - Failed to persist ACL envelope for lock ${envelope.acl.lockMac} (storage may be full)")
                 throw java.io.IOException("Failed to persist ACL data to SharedPreferences")
             }
-            
-            forcePrefsReload()
         }
         
         // Safeguard: Warn if ACL has no recognized permissions
@@ -1065,8 +1013,6 @@ internal class PhoneKeyManager constructor(
                 Log.e(TAG, "ION-2 - Failed to persist bulk ACL for lock ${bulkAcl.lockMac} (storage may be full)")
                 throw java.io.IOException("Failed to persist ACL data to SharedPreferences")
             }
-            
-            forcePrefsReload()
         }
         
         Log.d(TAG, "ION-2 - Stored bulk ACL envelope for lock ${bulkAcl.lockMac} " +
@@ -1082,7 +1028,6 @@ internal class PhoneKeyManager constructor(
      */
     fun getBulkAclEnvelope(lockMac: String): BulkAclEnvelope? {
         synchronized(prefsLock) {
-            forcePrefsReload()
             val jsonStr = prefs.getString("acl_envelope_$lockMac", null) ?: return null
             
             try {
@@ -1117,7 +1062,6 @@ internal class PhoneKeyManager constructor(
      */
     fun listBulkAclEnvelopes(): List<BulkAclEnvelope> {
         synchronized(prefsLock) {
-            forcePrefsReload()
             val allKeys = prefs.all.keys.filter { it.startsWith("acl_envelope_") }
             val envelopes = mutableListOf<BulkAclEnvelope>()
             
@@ -1147,40 +1091,69 @@ internal class PhoneKeyManager constructor(
      * @return true if valid cached ACL exists, false otherwise
      */
     fun hasCachedAcl(lockMac: String): Boolean {
-        // Try bulk ACL first
-        val bulkAcl = getBulkAclEnvelope(lockMac)
-        if (bulkAcl != null) {
+        synchronized(prefsLock) {
             val now = Instant.now().epochSecond
-            val isValid = bulkAcl.expiresAt > now
-            if (isValid) {
-                val timeUntilExpiry = bulkAcl.expiresAt - now
-                Log.d(TAG, "ION-2 - ✅ Valid bulk ACL cached for lock $lockMac (expires in ${timeUntilExpiry}s)")
-            } else {
-                Log.d(TAG, "ION-2 - ⏰ Bulk ACL for lock $lockMac is EXPIRED (expiresAt=${bulkAcl.expiresAt}, now=$now)")
+            
+            // DIAGNOSTIC: Log that we're checking cache after reload
+            Log.d(TAG, "ION-2 - Checking cached ACL for $lockMac after cache sync (thread=${Thread.currentThread().name})")
+            
+            // Try bulk ACL first (direct prefs access - no nested synchronized calls)
+            val bulkAclJsonStr = prefs.getString("acl_envelope_$lockMac", null)
+            if (bulkAclJsonStr != null) {
+                try {
+                    val envelopeJson = JSONObject(bulkAclJsonStr)
+                    val isBulkAcl = envelopeJson.optBoolean("isBulkAcl", false)
+                    
+                    if (isBulkAcl) {
+                        val expiresAt = envelopeJson.getLong("expiresAt")
+                        val isValid = expiresAt > now
+                        
+                        if (isValid) {
+                            val timeUntilExpiry = expiresAt - now
+                            Log.d(TAG, "ION-2 - ✅ Valid bulk ACL cached for lock $lockMac (expires in ${timeUntilExpiry}s)")
+                        } else {
+                            Log.d(TAG, "ION-2 - ⏰ Bulk ACL for lock $lockMac is EXPIRED (expiresAt=$expiresAt, now=$now)")
+                        }
+                        return isValid
+                    }
+                    
+                    // Full ACL format - check expiration and permissions
+                    val aclJson = envelopeJson.getJSONObject("acl")
+                    val expiresAt = aclJson.getLong("expiresAt")
+                    
+                    if (expiresAt <= now) {
+                        Log.d(TAG, "ION-2 - ⏰ Full ACL for lock $lockMac is EXPIRED (expiresAt=$expiresAt, now=$now)")
+                        return false
+                    }
+                    
+                    // Check for UNLOCK permission
+                    val permissionsArray = aclJson.getJSONArray("permissions")
+                    var hasUnlock = false
+                    for (i in 0 until permissionsArray.length()) {
+                        if (permissionsArray.getString(i).equals("unlock", ignoreCase = true)) {
+                            hasUnlock = true
+                            break
+                        }
+                    }
+                    
+                    if (hasUnlock) {
+                        val timeUntilExpiry = expiresAt - now
+                        Log.d(TAG, "ION-2 - ✅ Valid full ACL cached for lock $lockMac (expires in ${timeUntilExpiry}s)")
+                        return true
+                    } else {
+                        Log.w(TAG, "ION-2 - ❌ Full ACL for lock $lockMac missing UNLOCK permission")
+                        return false
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "ION-2 - Failed to parse cached ACL for $lockMac: ${e.message}", e)
+                    return false
+                }
             }
-            return isValid
+            
+            // No ACL found in cache
+            Log.d(TAG, "ION-2 - 📭 No cached ACL found for lock $lockMac")
+            return false
         }
-        
-        // Fall back to full ACL
-        val fullAcl = getAcl(lockMac)
-        if (fullAcl != null) {
-            val now = Instant.now().epochSecond
-            if (fullAcl.expiresAt <= now) {
-                Log.d(TAG, "ION-2 - ⏰ Full ACL for lock $lockMac is EXPIRED (expiresAt=${fullAcl.expiresAt}, now=$now)")
-                return false
-            }
-            val isValid = isAclValid(fullAcl)
-            if (isValid) {
-                val timeUntilExpiry = fullAcl.expiresAt - now
-                Log.d(TAG, "ION-2 - ✅ Valid full ACL cached for lock $lockMac (expires in ${timeUntilExpiry}s)")
-            } else {
-                Log.w(TAG, "ION-2 - ❌ Full ACL for lock $lockMac exists but is INVALID (missing permissions or schedule issue)")
-            }
-            return isValid
-        }
-        
-        Log.d(TAG, "ION-2 - 📭 No cached ACL found for lock $lockMac")
-        return false
     }
 
     /**
@@ -1193,7 +1166,6 @@ internal class PhoneKeyManager constructor(
      */
     fun getAclEnvelope(lockMac: String): AclEnvelope? {
         synchronized(prefsLock) {
-            forcePrefsReload()
             val jsonStr = prefs.getString("acl_envelope_$lockMac", null) ?: return null
             
             try {
@@ -1277,7 +1249,6 @@ internal class PhoneKeyManager constructor(
         
         // Fallback to legacy ACL storage
         synchronized(prefsLock) {
-            forcePrefsReload()
             val jsonStr = prefs.getString("acl_$lockMac", null) ?: return null
             val json = JSONObject(jsonStr)
             val permissionsArray = json.getJSONArray("permissions")
@@ -1356,7 +1327,6 @@ internal class PhoneKeyManager constructor(
      */
     fun cleanupExpiredAcls() {
         synchronized(prefsLock) {
-            forcePrefsReload()
             val now = System.currentTimeMillis() / 1000
             val allKeys = prefs.all.keys.filter { it.startsWith("acl_envelope_") }
             
@@ -1375,7 +1345,6 @@ internal class PhoneKeyManager constructor(
             // Batch apply all removals
             if (removedCount > 0) {
                 editor.apply()
-                forcePrefsReload()
                 Log.d(TAG, "ION-2 - Cleaned up $removedCount expired ACL(s)")
             }
         }
@@ -1399,8 +1368,6 @@ internal class PhoneKeyManager constructor(
             editor.remove(legacyKey)
             editor.apply()
             
-            forcePrefsReload()
-            
             if (removed) {
                 Log.d(TAG, "ION-2 - Deleted ACL for lock=$lockMac")
             } else {
@@ -1416,14 +1383,12 @@ internal class PhoneKeyManager constructor(
      */
     fun cleanupAllAcls() {
         synchronized(prefsLock) {
-            forcePrefsReload()
             val allKeys = prefs.all.keys.filter { it.startsWith("acl_envelope_") || it.startsWith("acl_") }
             
             if (allKeys.isNotEmpty()) {
                 val editor = prefs.edit()
                 allKeys.forEach { key -> editor.remove(key) }
                 editor.apply()
-                forcePrefsReload()
                 Log.d(TAG, "ION-2 - Cleaned up all ACLs (${allKeys.size} total) on logout for security")
             } else {
                 Log.d(TAG, "ION-2 - No ACLs to clean up")

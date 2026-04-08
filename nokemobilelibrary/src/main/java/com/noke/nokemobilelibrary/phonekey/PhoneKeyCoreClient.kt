@@ -80,8 +80,14 @@ import com.noke.nokemobilelibrary.phonekey.models.PhoneKeyInfoResponse
  *         return myApiClient.generateAcl(userId, lockMac, phoneKeyId)
  *     }
  *
- *     override suspend fun generateBulkAcls(phoneKeyId: Int): Result<BulkAclResult> {
- *         return myApiClient.generateBulkAcls(phoneKeyId)
+ *     override suspend fun generateBulkAcls(
+ *         phoneKeyId: Int,
+ *         userId: String,
+ *         deviceId: String
+ *     ): Result<BulkAclResult> {
+ *         // Important: Use these parameters to get correct manager instance
+ *         val manager = getOrCreateManager(userId, deviceId)
+ *         return myApiClient.generateBulkAcls(phoneKeyId, manager)
  *     }
  *
  *     override suspend fun validateCurrentKey(userId: String, deviceId: String): String? {
@@ -282,8 +288,16 @@ interface PhoneKeyCoreClient {
      *     }
      * )
      * ```
+     *
+     * @param phoneKeyId The phone key ID from provisioning
+     * @param userId User identifier (required to ensure correct manager instance)
+     * @param deviceId Device identifier (required to ensure correct manager instance)
      */
-    suspend fun generateBulkAcls(phoneKeyId: Int): Result<BulkAclResult>
+    suspend fun generateBulkAcls(
+        phoneKeyId: Int,
+        userId: String,
+        deviceId: String
+    ): Result<BulkAclResult>
 
     /**
      * Validate and retrieve the current public key.

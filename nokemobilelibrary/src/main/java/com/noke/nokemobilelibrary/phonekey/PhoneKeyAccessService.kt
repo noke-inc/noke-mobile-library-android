@@ -628,7 +628,8 @@ class PhoneKeyAccessService private constructor(
             ?: return Result.failure(NokeMobileLibraryError.NotInitialized)
         
         return try {
-            currentClient.generateBulkAcls(phoneKeyId)
+            // Pass userId and udid to ensure correct manager instance is used
+            currentClient.generateBulkAcls(phoneKeyId, userId, udid)
         } catch (e: Exception) {
             Log.e(TAG, "Bulk ACL generation failed", e)
             Result.failure(
@@ -807,5 +808,32 @@ class PhoneKeyAccessService private constructor(
         // PhoneKeyFacade manages its own cache, no action needed here
         // Actual cleanup done via cleanupAclsForUser() → PhoneKeyFacade.clearAll()
         Log.d(TAG, "clearCache - no-op (use cleanupAclsForUser for logout)")
+    }
+
+    /**
+     * Clear the PhoneKeyManager singleton instance for a specific user and device.
+     * 
+     * This should be called on logout to free resources and ensure a fresh instance
+     * is created on next login. This method complements [cleanupAclsForUser] by
+     * clearing the in-memory singleton cache after ACLs are cleaned up.
+     * 
+     * @param userId User identifier
+     * @param deviceId Device identifier (UDID)
+     * 
+     * ## Example
+     * ```kotlin
+     * val service = PhoneKeyAccessService.getInstance()
+     * val udid = PhoneKeyAccessService.getDeviceUdid(context)
+     * 
+     * // First cleanup ACLs
+     * service.cleanupAclsForUser(userId, udid)
+     * 
+     * // Then clear singleton instance
+     * service.clearManagerInstance(userId, udid)
+     * ```
+     */
+    fun clearManagerInstance(userId: String, deviceId: String) {
+        com.noke.nokemobilelibrary.phonekey.internal.PhoneKeyManager.clearInstance(userId, deviceId)
+        Log.d(TAG, "Cleared PhoneKeyManager singleton for user=$userId, device=$deviceId")
     }
 }
