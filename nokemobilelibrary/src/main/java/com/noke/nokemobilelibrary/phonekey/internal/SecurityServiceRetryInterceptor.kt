@@ -78,7 +78,6 @@ internal class SecurityServiceRetryInterceptor(
 
                 // Clean up previous response before making new attempt
                 response?.close()
-                response = null
 
                 // Execute request
                 response = chain.proceed(requestToExecute)

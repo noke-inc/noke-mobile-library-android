@@ -317,6 +317,7 @@ class PhoneKeyStateMonitor(
      * @param userId User identifier
      * @param deviceId Device identifier
      */
+    @Suppress("DEPRECATION")
     suspend fun refreshAcls(userId: String, deviceId: String) {
         mutex.withLock {
             try {

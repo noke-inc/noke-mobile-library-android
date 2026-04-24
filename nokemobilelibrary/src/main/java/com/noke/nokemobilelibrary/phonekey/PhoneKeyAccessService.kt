@@ -183,6 +183,7 @@ class PhoneKeyAccessService private constructor(
             level = DeprecationLevel.ERROR
         )
         @JvmStatic
+        @Suppress("UNUSED_PARAMETER")
         fun initialize(context: Context) {
             throw UnsupportedOperationException(
                 "PhoneKeyCoreClient implementation required. " +
@@ -510,6 +511,7 @@ class PhoneKeyAccessService private constructor(
      * )
      * ```
      */
+    @Suppress("UNUSED_PARAMETER")
     suspend fun generateAcl(
         userId: Int,
         lockMac: String,
@@ -650,6 +652,7 @@ class PhoneKeyAccessService private constructor(
         message = "This method depends on internal state. Use generateBulkAcls() directly with stored phone key ID.",
         level = DeprecationLevel.WARNING
     )
+    @Suppress("UNUSED_PARAMETER")
     suspend fun refreshAllAcls(
         userId: String,
         udid: String
@@ -733,6 +736,7 @@ class PhoneKeyAccessService private constructor(
      * @param deviceId Device identifier
      * @return Result with Unit on success, or error
      */
+    @Suppress("UNUSED_PARAMETER")
     suspend fun cleanupAclsForUser(userId: String, deviceId: String): Result<Unit> {
         val ctx = context ?: return Result.failure(NokeMobileLibraryError.NotInitialized)
         

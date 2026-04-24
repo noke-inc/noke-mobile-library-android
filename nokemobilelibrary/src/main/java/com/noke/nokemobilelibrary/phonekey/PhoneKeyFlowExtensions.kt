@@ -302,6 +302,7 @@ fun PhoneKeyAccessService.generateAclFlow(
  * @param udid Device identifier
  * @return Flow emitting Result<BulkAclResult>
  */
+@Suppress("DEPRECATION")
 fun PhoneKeyAccessService.refreshAllAclsFlow(
     userId: String,
     udid: String
@@ -473,6 +474,7 @@ sealed class ProvisioningEvent {
  * @param intervalMillis Polling interval in milliseconds (default: 5 minutes)
  * @return Flow emitting Result<BulkAclResult> at each interval
  */
+@Suppress("DEPRECATION")
 fun PhoneKeyAccessService.pollAclUpdatesFlow(
     userId: String,
     udid: String,

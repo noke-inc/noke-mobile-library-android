@@ -178,6 +178,21 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
         }
 
         @Override
+        public void onNokeJammedLocking(NokeDevice noke) {}
+
+        @Override
+        public void onNokeJammedUnlocking(NokeDevice noke) {}
+
+        @Override
+        public void successPacketReceived(NokeDevice noke) {}
+
+        @Override
+        public void shouldUploadData(org.json.JSONArray data) {}
+
+        @Override
+        public void nokeDeviceDidSendDiagnostics(org.json.JSONObject data, NokeDevice noke) {}
+
+        @Override
         public void onNokeShutdown(NokeDevice noke, Boolean isLocked, Boolean didTimeout) {
             setStatusText("NOKE SHUTDOWN: " + noke.getName() + " LOCKED: " + isLocked + " TIMEOUT: " + didTimeout);
         }
