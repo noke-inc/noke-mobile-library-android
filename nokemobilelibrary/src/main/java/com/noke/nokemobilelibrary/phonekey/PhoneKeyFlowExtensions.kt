@@ -240,7 +240,7 @@ fun PhoneKeyAccessService.isProvisionedFlow(
     userId: String,
     udid: String
 ): Flow<Result<Boolean>> = flow {
-    val result = isProvisioned(userId, udid)
+    val result = runCatching { isProvisioned(userId, udid) }.getOrElse { Result.failure(it) }
     emit(result)
 }
 
@@ -255,7 +255,7 @@ fun PhoneKeyAccessService.getPhoneKeyIdFlow(
     userId: String,
     udid: String
 ): Flow<Result<Int>> = flow {
-    val result = getPhoneKeyId(userId, udid)
+    val result = runCatching { getPhoneKeyId(userId, udid) }.getOrElse { Result.failure(it) }
     emit(result)
 }
 
@@ -272,7 +272,7 @@ fun PhoneKeyAccessService.generateBulkAclsFlow(
     userId: String,
     udid: String
 ): Flow<Result<BulkAclResult>> = flow {
-    val result = generateBulkAcls(phoneKeyId, userId, udid)
+    val result = runCatching { generateBulkAcls(phoneKeyId, userId, udid) }.getOrElse { Result.failure(it) }
     emit(result)
 }
 
@@ -291,7 +291,7 @@ fun PhoneKeyAccessService.generateAclFlow(
     phoneKeyId: Int,
     udid: String
 ): Flow<Result<Unit>> = flow {
-    val result = generateAcl(userId, lockMac, phoneKeyId, udid)
+    val result = runCatching { generateAcl(userId, lockMac, phoneKeyId, udid) }.getOrElse { Result.failure(it) }
     emit(result)
 }
 
@@ -306,7 +306,7 @@ fun PhoneKeyAccessService.refreshAllAclsFlow(
     userId: String,
     udid: String
 ): Flow<Result<BulkAclResult>> = flow {
-    val result = refreshAllAcls(userId, udid)
+    val result = runCatching { refreshAllAcls(userId, udid) }.getOrElse { Result.failure(it) }
     emit(result)
 }
 
@@ -470,13 +470,13 @@ sealed class ProvisioningEvent {
  * 
  * @param userId User identifier
  * @param udid Device identifier
- * @param intervalMillis Polling interval in milliseconds (default: 60000 = 1 minute)
+ * @param intervalMillis Polling interval in milliseconds (default: 5 minutes)
  * @return Flow emitting Result<BulkAclResult> at each interval
  */
 fun PhoneKeyAccessService.pollAclUpdatesFlow(
     userId: String,
     udid: String,
-    intervalMillis: Long = 60_000
+    intervalMillis: Long = 5 * 60 * 1000L  // 5 minutes default
 ): Flow<Result<BulkAclResult>> = flow {
     while (true) {
         val result = refreshAllAcls(userId, udid)
@@ -501,7 +501,7 @@ fun PhoneKeyAccessService.pollAclUpdatesFlow(
 fun PhoneKeyAccessService.provisionAndPollFlow(
     userId: String,
     udid: String,
-    intervalMillis: Long = 60_000
+    intervalMillis: Long = 5 * 60 * 1000L
 ): Flow<ProvisioningEvent> = flow {
     // First complete provisioning workflow
     completeProvisioningWorkflowFlow(userId, udid)

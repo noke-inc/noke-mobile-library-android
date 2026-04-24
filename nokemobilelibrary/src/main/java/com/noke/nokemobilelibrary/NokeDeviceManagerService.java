@@ -42,6 +42,8 @@ import com.noke.nokemobilelibrary.enums.SigningDeviceCharacteristicType;
 import com.noke.nokemobilelibrary.enums.SigningReadCharacteristicType;
 import com.noke.nokemobilelibrary.enums.SigningWriteCharacteristicType;
 import com.noke.nokemobilelibrary.interfaces.ResultCallback;
+import com.noke.nokemobilelibrary.interfaces.FailureHandler;
+import com.noke.nokemobilelibrary.interfaces.SuccessHandler;
 import com.noke.nokemobilelibrary.phonekey.internal.PhoneKeyManager;
 
 import org.json.JSONArray;
@@ -50,12 +52,16 @@ import org.json.JSONObject;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static com.noke.nokemobilelibrary.NokeMobileError.DEVICE_SHUTDOWN_RESULT;
 import static com.noke.nokemobilelibrary.NokeMobileError.ERROR_CONNECTION_TIMEOUT;
@@ -192,6 +198,84 @@ public class NokeDeviceManagerService extends Service {
      * Bool used to determine if the app should be looking for devices in firmware update mode
      */
     public Boolean firmwareScanning = false;
+
+    // ==================== Scan Timeout / Restart Infrastructure ====================
+
+    /** How long to wait for scan results before declaring timeout and restarting. */
+    private static final long SCAN_TIMEOUT = 10_000;
+    /** How long to wait before restarting scanning after a stop. */
+    private static final long RESTART_SCAN_DELAY = 5_000;
+    /** How long to scan before cycling (5 minutes). */
+    private static final long SCANNER_TIME_LIMIT = 5 * 60 * 1000;
+    /** How long a MAC stays banned after a failed connection attempt (2 minutes). */
+    private static final long BAN_DURATION_LIMIT = 2 * 60 * 1000;
+
+    private final Handler mScanTimeoutHandler = new Handler();
+    private final Handler mScanRestartHandler = new Handler();
+
+    private final Runnable mScanTimeoutRunnable = new Runnable() {
+        @Override
+        public void run() {
+            Log.w(TAG, "Scan timeout reached. No scan results received within the timeout period.");
+            stopLeScanning();
+            mScanTimeoutHandler.postDelayed(mRestartScanRunnable, RESTART_SCAN_DELAY);
+        }
+    };
+
+    private final Runnable mScanRestartRunnable = new Runnable() {
+        @Override
+        public void run() {
+            stopLeScanning();
+            mScanRestartHandler.postDelayed(mRestartScanRunnable, RESTART_SCAN_DELAY);
+        }
+    };
+
+    private final Runnable mRestartScanRunnable = new Runnable() {
+        @Override
+        public void run() {
+            Log.d(TAG, "Attempting to restart scan after delay.");
+            startLeScanning();
+        }
+    };
+
+    /** Tracks temporarily banned MAC addresses (failed connections). */
+    private final Map<String, Long> banned = new ConcurrentHashMap<>();
+
+    // ==================== Success / Failure Callbacks ====================
+
+    /** Optional callback invoked on successful ION-2 unlock. */
+    private SuccessHandler handleSuccess;
+    /** Optional callback invoked on failed ION-2 unlock. */
+    private FailureHandler handleFailure;
+
+    // ==================== Post-unlock & Disconnect Cooldowns ====================
+
+    /**
+     * Tracks the timestamp of the last successful unlock per MAC address.
+     * Suppresses re-discovery for POST_UNLOCK_SCAN_SUPPRESSION_MS after unlock to prevent
+     * connect→LOCK_ALREADY_UNLOCKED loops caused by continued BLE advertisements.
+     */
+    private final Map<String, Long> lastUnlockTimeMap = new ConcurrentHashMap<>();
+    private static final long POST_UNLOCK_SCAN_SUPPRESSION_MS = 4000;
+
+    /** Prevents rapid repeated disconnects from racing with reconnection. */
+    private final Map<String, Long> lastDisconnectTimeMap = new ConcurrentHashMap<>();
+    private static final long DISCONNECT_COOLDOWN_MS = 8000;
+
+    /**
+     * Guard against duplicate gatt.discoverServices() calls (Android BLE quirk where both
+     * onMtuChanged and an MTU timeout can each trigger service discovery).
+     */
+    private final Set<String> discoveringMacs = Collections.synchronizedSet(new HashSet<>());
+
+    /**
+     * Guard against duplicate onServicesDiscovered callbacks (known Android BLE bug where
+     * the stack fires the callback more than once per discoverServices() call).
+     */
+    private final Set<String> servicesHandledMacs = Collections.synchronizedSet(new HashSet<>());
+
+    /** Handler used to post the immediate-close sequence on the main thread in disconnectNoke(). */
+    private final Handler disconnectHandler = new Handler(Looper.getMainLooper());
 
     // ==================== ION-2 Phone Key Unlock Variables ====================
 
@@ -430,6 +514,39 @@ public class NokeDeviceManagerService extends Service {
     }
 
     /**
+     * Clears all pending responses from the upload queue.
+     */
+    public void clearUploadQueue() {
+        Log.d(TAG, "clearUploadQueue");
+        globalUploadQueue.clear();
+    }
+
+    /**
+     * Removes all temporarily banned MAC addresses.
+     */
+    public void removeAllBanned() {
+        banned.clear();
+    }
+
+    /**
+     * Registers an optional success callback invoked after a successful ION-2 unlock.
+     *
+     * @param closure The callback to invoke on success.
+     */
+    public void addHandleSuccessClosure(@NonNull SuccessHandler closure) {
+        this.handleSuccess = closure;
+    }
+
+    /**
+     * Registers an optional failure callback invoked after a failed ION-2 unlock.
+     *
+     * @param closure The callback to invoke on failure.
+     */
+    public void addHandleFailureClosure(@NonNull FailureHandler closure) {
+        this.handleFailure = closure;
+    }
+
+    /**
      * Returns a count of noke devices that have been added to the device manager
      *
      * @return a count of devices in the device manager
@@ -646,6 +763,12 @@ public class NokeDeviceManagerService extends Service {
         if (!mScanning) {
             mScanning = true;
             if (mBluetoothAdapter != null && mBluetoothAdapter.isEnabled()) {
+                // Arm scan timeout (restart if no results within SCAN_TIMEOUT) and
+                // a long-running scanner cycle limit (restart after SCANNER_TIME_LIMIT)
+                mScanTimeoutHandler.removeCallbacks(mScanTimeoutRunnable);
+                mScanRestartHandler.removeCallbacks(mScanRestartRunnable);
+                mScanTimeoutHandler.postDelayed(mScanTimeoutRunnable, SCAN_TIMEOUT);
+                mScanRestartHandler.postDelayed(mScanRestartRunnable, SCANNER_TIME_LIMIT);
                 if (Build.VERSION.SDK_INT >= 100) {
                     //SCANNING WITH THE OLD APIS IS MORE RELIABLE. HENCE THE 100
                     initNewBluetoothCallback();
@@ -667,6 +790,10 @@ public class NokeDeviceManagerService extends Service {
     @SuppressWarnings("deprecation")
     private void stopLeScanning() {
         mScanning = false;
+        // Cancel any pending scan timeout / restart runnables
+        mScanTimeoutHandler.removeCallbacks(mScanTimeoutRunnable);
+        mScanRestartHandler.removeCallbacks(mScanRestartRunnable);
+        mScanRestartHandler.removeCallbacks(mRestartScanRunnable);
         if (mBluetoothAdapter != null) {
             if (mBluetoothAdapter.isEnabled()) {
                 if (Build.VERSION.SDK_INT >= 100) {
@@ -767,14 +894,23 @@ public class NokeDeviceManagerService extends Service {
                             }
 
                             noke.bluetoothDevice = bluetoothDevice;
-                            noke.connectionState = NokeDefines.NOKE_STATE_DISCOVERED;
 
                             if (nokeDevices.get(noke.getMac()) == null) {
                                 nokeDevices.put(noke.getMac(), noke);
                             }
                             noke.lockState = lockState;
                             noke.rssi = rssi;
-                            mGlobalNokeListener.onNokeDiscovered(noke);
+
+                            if (isInPostUnlockCooldown(noke.getMac())) {
+                                Log.d(TAG, "onScanResult: Suppressing re-discovery for " + noke.getMac() + " (post-unlock cooldown active)");
+                            } else if (noke.connectionState == NokeDefines.NOKE_STATE_DISCONNECTED
+                                    || noke.connectionState == NokeDefines.NOKE_STATE_DISCOVERED) {
+                                noke.connectionState = NokeDefines.NOKE_STATE_DISCOVERED;
+                                Log.i(TAG, "onScanResult: NokeDevice discovered: " + noke.getMac() + " with lockState: " + lockState);
+                                mGlobalNokeListener.onNokeDiscovered(noke);
+                            } else {
+                                Log.d(TAG, "onScanResult: Skipping onNokeDiscovered for " + noke.getMac() + " — already in state " + noke.connectionState);
+                            }
                         }
                     }
                 }
@@ -916,6 +1052,11 @@ public class NokeDeviceManagerService extends Service {
             return false;
         }
 
+        // Clear any stale service-discovery guards from the previous session so the
+        // new connection can call discoverServices() and handle onServicesDiscovered cleanly.
+        discoveringMacs.remove(noke.getMac());
+        servicesHandledMacs.remove(noke.getMac());
+
         Handler handler = new Handler(Looper.getMainLooper());
         handler.post(new Runnable() {
             @Override
@@ -1016,12 +1157,47 @@ public class NokeDeviceManagerService extends Service {
                         }
                     });
                 } else {
-                    if (noke.connectionAttempts == 0) {
-                        refreshDeviceCache(noke.gatt, NokeDefines.SHOULD_FORCE_GATT_REFRESH);
-                        noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
-                        mGlobalNokeListener.onNokeDisconnected(noke);
-                        uploadData();
-                    }
+                    Handler handler = new Handler(Looper.getMainLooper());
+                    handler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            Log.d(TAG, "[DISCONNECT] STATE_DISCONNECTED else-branch for " + noke.getMac() + ": connectionAttempts=" + noke.connectionAttempts + ", connectionState=" + noke.connectionState);
+
+                            // Refresh device cache before closing (clears Android service cache for clean reconnect)
+                            refreshDeviceCache(gatt, NokeDefines.SHOULD_FORCE_GATT_REFRESH);
+
+                            // Close gatt properly using the callback parameter (noke.gatt may already be null
+                            // because disconnectNoke() closes immediately now)
+                            try {
+                                if (gatt != null) {
+                                    gatt.close();
+                                }
+                            } catch (Exception e) {
+                                Log.w(TAG, "[DISCONNECT] Exception closing gatt in STATE_DISCONNECTED: " + e.getMessage());
+                            }
+                            // Guard against corrupting a new connection that was established while
+                            // this old STATE_DISCONNECTED callback was queued on the main thread.
+                            final boolean newConnectionActive = (noke.gatt != null);
+                            if (!newConnectionActive) {
+                                noke.gatt = null; // already null, explicit for clarity
+                                discoveringMacs.remove(noke.getMac());
+                                servicesHandledMacs.remove(noke.getMac());
+                            } else {
+                                Log.d(TAG, "[DISCONNECT] STATE_DISCONNECTED: new GATT active for " + noke.getMac() + " — skipping gatt null-out and guard-set clear to prevent servicesHandledMacs race");
+                            }
+                            bleOperationQueue.clear();
+
+                            if (noke.connectionAttempts == 0) {
+                                // Guard against double notification (disconnectNoke() may have already fired)
+                                if (noke.connectionState != NokeDefines.NOKE_STATE_DISCONNECTED) {
+                                    Log.d(TAG, "[DISCONNECT] STATE_DISCONNECTED: setting DISCONNECTED state and firing onNokeDisconnected for " + noke.getMac());
+                                    noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
+                                    mGlobalNokeListener.onNokeDisconnected(noke);
+                                }
+                                uploadData();
+                            }
+                        }
+                    });
                 }
             }
         }
@@ -1050,8 +1226,42 @@ public class NokeDeviceManagerService extends Service {
         }
 
         @Override
+        public void onMtuChanged(BluetoothGatt gatt, int mtu, int status) {
+            super.onMtuChanged(gatt, mtu, status);
+            NokeDevice noke = nokeDevices.get(gatt.getDevice().getAddress());
+            if (noke == null) return;
+
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                Log.i(TAG, "MTU changed successfully to " + mtu + " bytes for " + noke.getMac());
+            } else {
+                Log.w(TAG, "MTU change failed with status " + status + " for " + noke.getMac() + ", using default MTU");
+            }
+
+            // MTU negotiation complete (success or failure) — proceed with service discovery
+            // Atomic guard: if this MAC is already being discovered, skip duplicate call.
+            if (noke.connectionState == NokeDefines.NOKE_STATE_CONNECTING) {
+                if (discoveringMacs.add(noke.getMac())) {
+                    boolean started = noke.gatt.discoverServices();
+                    Log.i(TAG, "Starting service discovery from onMtuChanged: " + started);
+                    if (!started) {
+                        discoveringMacs.remove(noke.getMac());
+                    }
+                } else {
+                    Log.w(TAG, "onMtuChanged: discovery already started for " + noke.getMac() + ", skipping duplicate call");
+                }
+            }
+        }
+
+        @Override
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             NokeDevice noke = nokeDevices.get(gatt.getDevice().getAddress());
+            if (noke == null) return;
+            // Guard against duplicate onServicesDiscovered callbacks (known Android BLE bug).
+            // Set.add() is atomic on synchronizedSet, so the first callback wins.
+            if (!servicesHandledMacs.add(noke.getMac())) {
+                Log.w(TAG, "onServicesDiscovered: duplicate callback for " + noke.getMac() + ", ignoring");
+                return;
+            }
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 if (gatt.getDevice().getName().contains("NOKE_FW") || gatt.getDevice().getName().contains("NFOB_FW") || gatt.getDevice().getName().contains("N3P_FW")) {
                     enableFirmwareTXNotification(noke);
@@ -1562,34 +1772,129 @@ public class NokeDeviceManagerService extends Service {
      * {@code BluetoothGattCallback#onConnectionStateChange(android.bluetooth.BluetoothGatt, int, int)}
      * callback.
      */
+    /**
+     * Disconnect from a Noke device immediately.
+     * Calls gatt.disconnect() + gatt.close() synchronously on the main thread, fires
+     * onNokeDisconnected immediately, and restarts BLE scanning.
+     * The STATE_DISCONNECTED GATT callback may still arrive asynchronously; the
+     * connectionState == NOKE_STATE_DISCONNECTED guard in onConnectionStateChange prevents
+     * a duplicate onNokeDisconnected notification in that case.
+     */
     public void disconnectNoke(final NokeDevice noke) {
+        Log.d(TAG, "disconnectNoke");
         invalidateConnectionTimer();
         if (mBluetoothAdapter == null || noke.gatt == null) {
+            Log.w(TAG, "[DISCONNECT] disconnectNoke: early exit - adapter=" + (mBluetoothAdapter != null ? "non-null" : "null") + ", gatt=" + (noke.gatt != null ? "non-null" : "null"));
             return;
         }
 
-        Handler handler = new Handler(Looper.getMainLooper());
-        handler.post(new Runnable() {
-            @Override
-            public void run() {
+        // Clear BLE operation queue immediately to prevent further operations
+        bleOperationQueue.clear();
 
-                if (noke.gatt != null) {
-                    noke.gatt.disconnect();
-                    try {
-                        Thread.sleep(100);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    noke.gatt.close();
-                    noke.gatt = null;
+        disconnectHandler.post(() -> {
+            if (noke.gatt != null) {
+                // Call disconnect() to signal the BLE peer, then close() immediately to release
+                // GATT resources rather than waiting for STATE_DISCONNECTED callback.
+                BluetoothGatt gattToClose = noke.gatt;
+                noke.gatt = null;
+                discoveringMacs.remove(noke.getMac());
+                servicesHandledMacs.remove(noke.getMac());
+                try {
+                    gattToClose.disconnect();
+                    gattToClose.close();
+                    Log.d(TAG, "[DISCONNECT] gatt.disconnect() + gatt.close() called immediately for " + noke.getMac());
+                } catch (Exception e) {
+                    Log.e(TAG, "[DISCONNECT] Exception during immediate close for " + noke.getMac() + ": " + e.getMessage());
                 }
-                
-                // Clear BLE operation queue on disconnect
-                if (bleOperationQueue != null) {
-                    bleOperationQueue.clear();
+                bleOperationQueue.clear();
+                if (noke.connectionState != NokeDefines.NOKE_STATE_DISCONNECTED) {
+                    Log.d(TAG, "[DISCONNECT] Firing onNokeDisconnected immediately for " + noke.getMac());
+                    noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
+                    mGlobalNokeListener.onNokeDisconnected(noke);
                 }
+                startLeScanning();
             }
         });
+    }
+
+    /**
+     * Disconnect from a Noke device with cooldown protection to prevent rapid repeated
+     * disconnects from racing with reconnection attempts.
+     *
+     * @param noke The device to disconnect
+     */
+    public void safeDisconnectNoke(NokeDevice noke) {
+        long now = System.currentTimeMillis();
+        Long lastTime = lastDisconnectTimeMap.get(noke.getMac());
+        if (lastTime == null || (now - lastTime) > DISCONNECT_COOLDOWN_MS) {
+            lastDisconnectTimeMap.put(noke.getMac(), now);
+            disconnectNoke(noke);
+        }
+    }
+
+    /**
+     * Record the timestamp of a successful unlock for the given MAC.
+     * Called from handleAclStatus on UNLOCK_EXECUTED and LOCK_ALREADY_UNLOCKED to suppress
+     * immediate re-discovery (and potential re-unlock loop) after the device disconnects.
+     */
+    private void recordUnlockTime(String mac) {
+        lastUnlockTimeMap.put(mac, System.currentTimeMillis());
+        Log.d(TAG, "[COOLDOWN] Recorded unlock time for " + mac + " (suppressing re-discovery for " + POST_UNLOCK_SCAN_SUPPRESSION_MS + "ms)");
+    }
+
+    /**
+     * Returns true if the device was recently unlocked and should be suppressed from re-discovery.
+     */
+    private boolean isInPostUnlockCooldown(String mac) {
+        Long lastUnlock = lastUnlockTimeMap.get(mac);
+        if (lastUnlock == null) return false;
+        long elapsed = System.currentTimeMillis() - lastUnlock;
+        if (elapsed < POST_UNLOCK_SCAN_SUPPRESSION_MS) {
+            return true;
+        }
+        lastUnlockTimeMap.remove(mac);
+        return false;
+    }
+
+    /**
+     * Returns true if the given MAC is currently banned due to repeated connection failures.
+     */
+    private boolean isBanned(String mac) {
+        Long bannedTime = banned.get(mac);
+        if (bannedTime == null) return false;
+        if (System.currentTimeMillis() - bannedTime > BAN_DURATION_LIMIT) {
+            banned.remove(mac);
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Reverses a colon-separated MAC address string (e.g. for 1R hardware types).
+     *
+     * @param mac colon-separated MAC address
+     * @return reversed MAC address
+     */
+    public static String reverseMac(String mac) {
+        String[] parts = mac.split(":");
+        List<String> list = Arrays.asList(parts);
+        Collections.reverse(list);
+        return String.join(":", list);
+    }
+
+    /**
+     * Converts the lower 4 bytes of a long value to a big-endian byte array.
+     *
+     * @param l the long value to convert
+     * @return 4-byte big-endian representation
+     */
+    public static byte[] longToBytes(long l) {
+        byte[] result = new byte[4];
+        for (int i = 3; i >= 0; i--) {
+            result[i] = (byte) (l & 0xFF);
+            l >>= 8;
+        }
+        return result;
     }
 
     /**
@@ -2109,8 +2414,13 @@ public class NokeDeviceManagerService extends Service {
 
             case UNLOCK_EXECUTED:
                 Log.d(TAG, "🎉 Unlock executed successfully");
+                // Record unlock time to suppress immediate re-discovery after disconnect
+                recordUnlockTime(noke.getMac());
                 noke.connectionState = NokeDefines.NOKE_STATE_UNLOCKED;
                 mGlobalNokeListener.onNokeUnlocked(noke);
+                if (handleSuccess != null) {
+                    handleSuccess.onSuccess();
+                }
                 Log.d(TAG, "Disconnecting after successful unlock");
                 disconnectNoke(noke);
                 break;
@@ -2179,6 +2489,9 @@ public class NokeDeviceManagerService extends Service {
             case UNLOCK_DENIED:
                 Log.w(TAG, "Unlock command denied by lock for MAC: " + noke.getMac());
                 mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, NokeDeviceSigningError.UNLOCK_DENIED.getDescription());
+                if (handleFailure != null) {
+                    handleFailure.onFailure(NokeDeviceSigningError.UNLOCK_DENIED.asException());
+                }
                 disconnectNoke(noke);
                 noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
                 mGlobalNokeListener.onNokeDisconnected(noke);
@@ -2187,14 +2500,41 @@ public class NokeDeviceManagerService extends Service {
             case UNLOCK_OVERLOCKED:
                 Log.w(TAG, "Unlock command denied by lock due to overlock: " + noke.getMac());
                 mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, NokeDeviceSigningError.UNLOCK_OVERLOCKED.getDescription());
+                if (handleFailure != null) {
+                    handleFailure.onFailure(NokeDeviceSigningError.UNLOCK_OVERLOCKED.asException());
+                }
                 disconnectNoke(noke);
                 noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
                 mGlobalNokeListener.onNokeDisconnected(noke);
                 break;
-                
+
+            case CID_READ:
+                // The lock is informing us it has read the command-ID characteristic.
+                // This is an intermediate status before CMD_RECEIVED; re-read status
+                // so the ACL state machine continues instead of stalling.
+                Log.d(TAG, "CID_READ status received — re-reading status to get CMD_RECEIVED");
+                readStatusCharacteristic(noke);
+                break;
+
             case LOCK_ALREADY_UNLOCKED:
+                Log.d(TAG, "Lock is already unlocked - treating as successful unlock");
+                // Record unlock time to suppress immediate re-discovery after disconnect
+                recordUnlockTime(noke.getMac());
+                noke.connectionState = NokeDefines.NOKE_STATE_UNLOCKED;
+                mGlobalNokeListener.onNokeUnlocked(noke);
+                if (handleSuccess != null) {
+                    handleSuccess.onSuccess();
+                }
+                Log.d(TAG, "Disconnecting after LOCK_ALREADY_UNLOCKED");
+                disconnectNoke(noke);
+                break;
+
             case LOCK_LOCKED:
-                Log.w(TAG, "Lock command rejected because lock is already unlocked for MAC: " + noke.getMac());
+                Log.w(TAG, "Lock command rejected because lock is already locked for MAC: " + noke.getMac());
+                mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, NokeDeviceSigningError.LOCK_LOCKED.getDescription());
+                if (handleFailure != null) {
+                    handleFailure.onFailure(NokeDeviceSigningError.LOCK_LOCKED.asException());
+                }
                 disconnectNoke(noke);
                 noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
                 mGlobalNokeListener.onNokeDisconnected(noke);

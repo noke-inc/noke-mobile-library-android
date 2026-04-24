@@ -222,7 +222,7 @@ internal class PhoneKeyManager constructor(
          * Should be called on logout to free resources.
          * 
          * NOTE: Does NOT clear EncryptedSharedPreferences cache to preserve ACL data
-         * across logout/login cycles. ACL cleanup is handled separately via cleanupAclsFor User().
+         * across logout/login cycles. ACL cleanup is handled separately via cleanupAclsForUser().
          * 
          * @param userId User identifier
          * @param udid Device identifier
@@ -380,7 +380,7 @@ internal class PhoneKeyManager constructor(
                 if (entry != null) {
                     privateKey = entry.privateKey
                     publicKey = entry.certificate.publicKey
-                    Log.d(TAG, "ION-2 - Loaded device-specific ECDSA key pair")
+                    Log.d(TAG, "ION-2 - Loaded device-specific ECDSA key pair for user=$userId, device=$udid")
                     return
                 }
             }
@@ -414,7 +414,7 @@ internal class PhoneKeyManager constructor(
             privateKey = keyPair.private
             publicKey = keyPair.public
 
-            Log.d(TAG, "ION-2 - Generated device-specific ECDSA key pair")
+            Log.d(TAG, "ION-2 - Generated device-specific ECDSA key pair for user=$userId, device=$udid")
         } catch (e: Exception) {
             Log.e(TAG, "ION-2 - Failed to generate key pair: ${e.message}", e)
             throw e
@@ -1356,7 +1356,7 @@ internal class PhoneKeyManager constructor(
      * @param userId User identifier (not used, scoped via isolated prefs)
      * @param lockMac Lock MAC address
      */
-    fun deleteACL(userId: String, lockMac: String) {
+    fun deleteACL(@Suppress("UNUSED_PARAMETER") userId: String, lockMac: String) {
         synchronized(prefsLock) {
             val aclKey = "acl_envelope_$lockMac"
             val legacyKey = "acl_$lockMac"

@@ -6,6 +6,7 @@ import android.util.Base64;
 import android.util.Log;
 
 import com.noke.nokemobilelibrary.enums.NokeDeviceSigningError;
+import com.noke.nokemobilelibrary.enums.NokeEncryptionType;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -60,7 +61,7 @@ public class NokeDevice {
     /**
      * BluetoothDevice used for interacting with the Noke device via bluetooth
      */
-    BluetoothDevice bluetoothDevice;
+    transient BluetoothDevice bluetoothDevice;
     /**
      * Provides Bluetooth GATT functionality to enable communication with Bluetooth Smart devices
      */
@@ -533,6 +534,16 @@ public class NokeDevice {
         boolean isIon2 = hw != null && (hw.contains("E5") || hw.contains("5E"));
         Log.d(TAG, "isNokeIon2() check: version=" + this.version + ", hw=" + hw + ", isIon2=" + isIon2);
         return isIon2;
+    }
+
+    /**
+     * Returns the encryption type used by this device.
+     * ION-2 locks (hardware E5/5E) use ECDSA signing; all others use symmetric encryption.
+     */
+    public NokeEncryptionType getEncryptionType() {
+        return (getHardwareVersion().contains("E5") || getHardwareVersion().contains("5E"))
+                ? NokeEncryptionType.SIGNING
+                : NokeEncryptionType.ENCRYPTION;
     }
 
     /**

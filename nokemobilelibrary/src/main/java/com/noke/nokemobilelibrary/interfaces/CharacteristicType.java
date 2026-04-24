@@ -17,4 +17,12 @@ public interface CharacteristicType {
     default String logTag() {
         return getTag();
     }
+
+    /** Optional: factory to create ad-hoc instances outside of enums if needed. */
+    static CharacteristicType of(String tag, UUID uuid) {
+        return new CharacteristicType() {
+            @Override public String getTag() { return tag; }
+            @Override public UUID getCharacteristicUuid() { return uuid; }
+        };
+    }
 }

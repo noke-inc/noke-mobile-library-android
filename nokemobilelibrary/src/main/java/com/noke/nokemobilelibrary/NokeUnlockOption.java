@@ -24,5 +24,10 @@ public enum NokeUnlockOption {
      * Emergency unlock with reason - requires AccessEmergencyUnlock permission  
      * Used in emergency situations (fire, flood, tenant locked in, etc.)
      */
-    EMERGENCY
+    EMERGENCY,
+    /**
+     * Online unlock - requires AccessOnlineUnlock permission
+     * Used when tenant is present and can authenticate online, but lock is offline
+     */
+    ONLINE
 }
