@@ -1,7 +1,9 @@
-package com.noke.nokemobilelibrary.phonekey
+package com.example.myapp // CHANGE THIS to your app's package
 
 import android.content.Context
 import android.util.Log
+import com.noke.nokemobilelibrary.phonekey.NokeMobileLibraryError
+import com.noke.nokemobilelibrary.phonekey.PhoneKeyCoreClient
 import com.noke.nokemobilelibrary.phonekey.internal.PhoneKeyManager
 import com.noke.nokemobilelibrary.phonekey.models.BulkAclResult
 import com.noke.nokemobilelibrary.phonekey.models.PhoneKeyInfoResponse
