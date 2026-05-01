@@ -1,13 +1,13 @@
 package com.noke.nokemobilelibrary;
 
+import android.util.Log;
+
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
-import java.net.InetSocketAddress;
-import java.net.Proxy;
 import java.net.URL;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
@@ -21,7 +21,8 @@ import javax.net.ssl.SSLContext;
 
 class NokeMobileApiClient {
 
-    static String POST(String urlStr, String jsonString, String apiKey, String proxyAddress, int port)
+    private final static String TAG = NokeDeviceManagerService.class.getSimpleName();
+    static String POST(String urlStr, String jsonString, String apiKey)
     {
         HttpURLConnection conn;
         InputStream inputStream;
@@ -31,13 +32,7 @@ class NokeMobileApiClient {
         try {
 
             URL url = new URL(urlStr);
-            if(!proxyAddress.equals("")){
-                Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxyAddress, port));
-                conn = (HttpURLConnection) url.openConnection(proxy);
-            }else{
-                conn = (HttpURLConnection) url.openConnection();
-            }
-
+            conn = (HttpURLConnection) url.openConnection();
             //Create the SSL connection
             SSLContext sc;
             sc = SSLContext.getInstance("TLS");
@@ -72,7 +67,7 @@ class NokeMobileApiClient {
                 result = "Did not work!";
             }
         } catch (IOException |NoSuchAlgorithmException |KeyManagementException e) {
-            e.printStackTrace();
+            Log.e(TAG, "Exception", e);
         }
 
         return result;    }

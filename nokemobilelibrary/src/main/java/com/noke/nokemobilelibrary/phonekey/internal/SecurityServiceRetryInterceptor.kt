@@ -2,14 +2,13 @@ package com.noke.nokemobilelibrary.phonekey.internal
 
 import android.content.Context
 import android.util.Log
+import com.noke.smartentrycore.helpers.SharedPreferencesHelper
 import okhttp3.Interceptor
 import okhttp3.Response
 import java.io.IOException
 
 /**
- * OkHttp Interceptor that implements retry logic for SecurityService operations.
- *
- * **INTERNAL API** - Not for public use.
+ * OkHttp Interceptor that implements retry logic for SecurityService operations
  *
  * Retries requests that fail due to:
  * - Network errors (IOException)
@@ -18,22 +17,19 @@ import java.io.IOException
  * - Rate limiting (429)
  * - Server errors (500, 502, 503)
  *
- * ## Retry Behavior
+ * Retry behavior:
  * - Max retries: 1 (2 total attempts) - matches ApiClient.doRequest default
  * - Retry delay: 3 seconds - matches RetryManager default
  * - Non-retryable errors (4xx except 401/403/408/429) fail immediately
  *
- * ## Thread Safety
- * Runs on OkHttp's background dispatcher threads.
+ * Thread safety: Runs on OkHttp's background dispatcher threads
  * 
  * @param context Android context (preferably application context to avoid memory leaks)
- * @param authTokenProvider Function that returns fresh auth token (invoked on retry)
  * @param maxRetries Maximum number of retry attempts (must be non-negative)
  * @param retryDelayMs Delay in milliseconds between retries (must be non-negative)
  */
-internal class SecurityServiceRetryInterceptor(
+class SecurityServiceRetryInterceptor(
     private val context: Context,
-    private val authTokenProvider: () -> String,
     private val maxRetries: Int = 1,
     private val retryDelayMs: Long = 3000
 ) : Interceptor {
@@ -55,7 +51,7 @@ internal class SecurityServiceRetryInterceptor(
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
-        val operation = extractOperationFromUrl(originalRequest.url.toString())
+        val operation = extractOperationFromUrl(originalRequest.url().toString())
         var attempt = 0
         var lastException: IOException? = null
         var response: Response? = null
@@ -67,7 +63,7 @@ internal class SecurityServiceRetryInterceptor(
                 val requestToExecute = if (attempt > 0 && lastStatusCode in listOf(401, 403)) {
                     // Auth error retry: fetch fresh token and rebuild request
                     Log.d(TAG, "ION-2 - Auth error detected, fetching fresh token before retry (attempt ${attempt + 1}/${maxRetries + 1})")
-                    val freshToken = authTokenProvider()
+                    val freshToken = SharedPreferencesHelper(context).token.toString()
                     originalRequest.newBuilder()
                         .header("Authorization", "Bearer $freshToken")
                         .build()
@@ -78,10 +74,11 @@ internal class SecurityServiceRetryInterceptor(
 
                 // Clean up previous response before making new attempt
                 response?.close()
+                response = null
 
                 // Execute request
                 response = chain.proceed(requestToExecute)
-                lastStatusCode = response.code
+                lastStatusCode = response.code()
 
                 // Success - return immediately
                 if (response.isSuccessful) {
@@ -89,7 +86,7 @@ internal class SecurityServiceRetryInterceptor(
                 }
 
                 // Check if we should retry based on HTTP status code
-                val shouldRetry = shouldRetryHttpError(response.code)
+                val shouldRetry = shouldRetryHttpError(response.code())
                 
                 if (!shouldRetry) {
                     // Non-retryable error (e.g., 400, 404) - fail immediately
@@ -98,13 +95,13 @@ internal class SecurityServiceRetryInterceptor(
 
                 // Retryable HTTP error - attempt retry if allowed
                 if (attempt < maxRetries) {
-                    Log.d(TAG, "ION-2 - Retrying $operation (attempt ${attempt + 2}/${maxRetries + 1}) after HTTP ${response.code}")
+                    Log.d(TAG, "ION-2 - Retrying $operation (attempt ${attempt + 2}/${maxRetries + 1}) after HTTP ${response.code()}")
                     sleepWithInterruptHandling(retryDelayMs)
                     attempt++
                     // Continue to next iteration
                 } else {
                     // Max retries exceeded
-                    Log.w(TAG, "ION-2 - Max retries exceeded for $operation after HTTP ${response.code}")
+                    Log.w(TAG, "ION-2 - Max retries exceeded for $operation after HTTP ${response.code()}")
                     return response
                 }
 
@@ -145,10 +142,7 @@ internal class SecurityServiceRetryInterceptor(
     }
 
     /**
-     * Sleep with proper InterruptedException handling.
-     * 
-     * @param delayMs Delay in milliseconds
-     * @throws InterruptedException if thread is interrupted during sleep
+     * Sleep with proper InterruptedException handling
      */
     private fun sleepWithInterruptHandling(delayMs: Long) {
         try {
@@ -161,19 +155,16 @@ internal class SecurityServiceRetryInterceptor(
     }
 
     /**
-     * Determine if an HTTP error code should trigger a retry.
+     * Determine if an HTTP error code should trigger a retry
      *
-     * ## Retryable Errors
+     * Retryable errors:
      * - 401, 403: Auth errors (will fetch fresh token)
      * - 408, 504: Timeout errors
      * - 429: Rate limiting
      * - 500, 502, 503: Server errors
      *
-     * ## Non-retryable Errors
+     * Non-retryable errors:
      * - Other 4xx errors (400, 404, etc.) - client errors that won't change on retry
-     *
-     * @param statusCode HTTP status code
-     * @return true if error should be retried, false otherwise
      */
     private fun shouldRetryHttpError(statusCode: Int): Boolean {
         return when (statusCode) {
@@ -186,10 +177,7 @@ internal class SecurityServiceRetryInterceptor(
     }
 
     /**
-     * Extract operation name from URL for logging.
-     * 
-     * @param url Request URL
-     * @return Human-readable operation name
+     * Extract operation name from URL for logging
      */
     private fun extractOperationFromUrl(url: String): String {
         return when {
@@ -199,4 +187,6 @@ internal class SecurityServiceRetryInterceptor(
             else -> "API request"
         }
     }
+
+
 }

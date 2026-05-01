@@ -2,16 +2,22 @@ package com.noke.nokemobilelibrary;
 
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
+import android.bluetooth.BluetoothGattCharacteristic;
 import android.util.Base64;
 import android.util.Log;
 
-import com.noke.nokemobilelibrary.enums.NokeDeviceSigningError;
-import com.noke.nokemobilelibrary.enums.NokeEncryptionType;
-
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+
+import com.noke.nokemobilelibrary.enums.NokeEncryptionType;
+import com.noke.nokemobilelibrary.enums.NokeDeviceSigningError;
+import com.noke.smartentrycore.database.entities.ConnectionState;
+
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
+
+import kotlinx.android.parcel.Parcelize;
 
 /************************************************************************************************************************************************
  * Copyright © 2018 Nokē Inc. All rights reserved.
@@ -31,6 +37,7 @@ import java.util.List;
  * Class stores information about the Noke device and contains methods for interacting with the Noke device
  */
 
+@Parcelize
 public class NokeDevice {
 
     /**
@@ -61,7 +68,7 @@ public class NokeDevice {
     /**
      * BluetoothDevice used for interacting with the Noke device via bluetooth
      */
-    transient BluetoothDevice bluetoothDevice;
+    public transient BluetoothDevice bluetoothDevice;
     /**
      * Provides Bluetooth GATT functionality to enable communication with Bluetooth Smart devices
      */
@@ -83,15 +90,15 @@ public class NokeDevice {
      */
     private String offlineKey;
     /**
-     * ACL data for ION-2 signing-based unlock
+     * ACL data read from the lock used to determine if the lock should be unlocked when in range and to send unlock commands to the lock.
      */
     private byte[] currentAclData;
     /**
-     * ACL signature data for ION-2 signing-based unlock verification
+     * ACL signature data read from the lock used to verify the ACL data and ensure it is valid before sending unlock commands to the lock
      */
     private byte[] currentAclSignatureData;
     /**
-     * Command signature data for ION-2 signing-based unlock
+     * Command data read from the lock used to determine if the lock should be unlocked when in range and to send unlock commands to the lock.
      */
     private byte[] currentCommandSignatureData;
     /**
@@ -121,6 +128,10 @@ public class NokeDevice {
      */
     transient int rssi;
     /**
+     * Array of RSSI from last 20 broadcasts
+     */
+    transient ArrayList<Integer> rssiArray;
+    /**
      * Array of commands to be sent to the Noke device
      */
     transient ArrayList<String> commands;
@@ -132,12 +143,33 @@ public class NokeDevice {
      * Boolean that indicates if the lock is being restored by the Core API
      */
     transient boolean isRestoring;
+
+    /**
+     *
+     */
+    transient boolean isAdded;
+
+    /**
+     *
+     */
+    transient boolean canAutoUnlock;
+
+    /**
+     * Used to prevent lock from connecting multiple times while auto unlocking
+     */
+    public transient boolean isAutoUnlocking;
+
     /**
      * The type of unlock operation being performed (None, Override, or Emergency)
      * Similar to iOS signingKeyState.options
      */
     transient NokeUnlockOption unlockOption;
 
+    public NokeEncryptionType getEncryptionType() {
+        return (getHardwareVersion().contains("E5") || getHardwareVersion().contains("5E"))
+                ? NokeEncryptionType.SIGNING
+                : NokeEncryptionType.ENCRYPTION;
+    }
 
     /**
      * Initializes Noke Device
@@ -145,6 +177,8 @@ public class NokeDevice {
      * @param name name of the device
      * @param mac  MAC address of the device
      */
+
+    private static final String TAG = "DeviceLayer";
     public NokeDevice(String name, String mac) {
 
         this.name = name;
@@ -154,6 +188,23 @@ public class NokeDevice {
         connectionAttempts = 0;
         signingRetryCount = 0;
     }
+
+    public enum CryptoState {
+        UNKNOWN,
+        NEEDS_PROVISIONING,
+        PROVISIONING_SENT,
+        PROVISIONED,
+        READY,
+        FAILED
+    }
+
+    // Per-device crypto state
+    public CryptoState cryptoState = CryptoState.UNKNOWN;
+
+    // Provisioning characteristics (for ion locks)
+    public transient BluetoothGattCharacteristic provisionWriteChar;
+    public transient BluetoothGattCharacteristic provisionNotifyChar;
+
 
     /**
      * Parses through the broadcast data and pulls out the version
@@ -202,6 +253,36 @@ public class NokeDevice {
         if (sessionIn.length >= 20) {
             session = NokeDefines.bytesToHex(sessionIn);
         }
+    }
+
+    public void addRSSIArray(Integer rssi) {
+        if (rssiArray == null) {
+            rssiArray = new ArrayList<>();
+        }
+        if (rssiArray.size() < 20) {
+            rssiArray.add(0, rssi);
+        } else {
+            rssiArray.remove(19);
+            rssiArray.add(0, rssi);
+        }
+    }
+
+    public boolean isAttemptingLockConnection() {
+        return (connectionState == ConnectionState.Connecting.ordinal() || connectionState == ConnectionState.Connected.ordinal() || connectionState == ConnectionState.Syncing.ordinal() || connectionState == ConnectionState.Unlocked.ordinal() || isDisconnectedDuringUnlock) && !isFob();
+    }
+
+    private boolean isFob() {
+        return getHardwareVersion().contains("F");
+    }
+
+    public void clearRSSIArray() {
+        if (rssiArray != null) {
+            rssiArray.clear();
+        }
+    }
+
+    public ArrayList<Integer> getRssiArray() {
+        return rssiArray;
     }
 
     public String getName() {
@@ -309,241 +390,55 @@ public class NokeDevice {
         this.connectionState = connectionState;
     }
 
-    public int getRssi() { return rssi; }
 
-    public void setRssi(int rssi) { this.rssi = rssi; }
+    public int getRssi() {
+        return rssi;
+    }
 
-    /**
-     * Sends a + delimited string of commands to the lock
-     *
-     * @param commands + delimited string returned from the unlock request
-     */
-    public void sendCommands(String commands) {
-        clearCommands();
-        List<String> commandArr = Arrays.asList(commands.split("\\+"));
-        this.commands.addAll(commandArr);
-        if (this.commands.size() > 1) {
-            this.connectionState = NokeDefines.NOKE_STATE_SYNCING;
-            mService.getNokeListener().onNokeSyncing(this);
+    public void setRssi(int rssi) {
+        this.rssi = rssi;
+    }
+
+    public int getCurrentRssi() {
+        if (rssiArray != null && rssiArray.size() > 0) {
+            return rssiArray.get(0);
         }
-        mService.writeRXCharacteristic(this);
+        return 0;
     }
 
-    /**
-     * Sends an arrayList of commands to the lock
-     *
-     * @param commands an arrayList of strings (NOT USED WITH THE CORE API)
-     */
-    public void sendCommands(ArrayList<String> commands){
-        this.commands = commands;
-        if (this.commands.size() > 1) {
-            this.connectionState = NokeDefines.NOKE_STATE_SYNCING;
-            mService.getNokeListener().onNokeSyncing(this);
-        }
-        mService.writeRXCharacteristic(this);
+    public boolean isAdded() {
+        return isAdded;
     }
 
-    /**
-     * Clears the command array. Used to prevent invalid commands from being sent to the lock and causing errors
-     */
-    public void clearCommands(){
-        if(this.commands != null){
-            this.commands.clear();
-        }
+    public void setAdded(boolean added) {
+        isAdded = added;
     }
 
-    public Integer getCommandCount(){
-        if(this.commands != null){
-            return this.commands.size();
-        }else{
-            return 0;
-        }
-    }
-
-    public String scheduledOfflineUnlock() {
-        if (this.offlineUnlockCmd.length() == NokeDefines.UNLOCK_COMMAND_LENGTH && this.offlineKey.length() == NokeDefines.OFFLINE_KEY_LENGTH) {
-            byte unlockCommand[] = NokeDefines.hexToBytes(this.offlineUnlockCmd);
-
-            byte header[] = new byte[4];
-            header[0] = unlockCommand[0];
-            header[1] = unlockCommand[1];
-            header[2] = unlockCommand[2];
-            header[3] = unlockCommand[3];
-
-            byte commandpacket[] = new byte[20];
-            System.arraycopy(header, 0, commandpacket, 0, header.length);
-
-            byte cmddata[] = new byte[16];
-            System.arraycopy(unlockCommand, 4, cmddata, 0, 16);
-
-            long unixTime = System.currentTimeMillis() / 1000L;
-
-            byte preSessionKey[] = NokeDefines.hexToBytes(this.offlineKey);
-            byte sessionBytes[] = NokeDefines.hexToBytes(this.session);
-
-            for (int x = 0; x < preSessionKey.length; x++) {
-                int total = NokeDefines.toUnsigned(preSessionKey[x]) + NokeDefines.toUnsigned(sessionBytes[x]);
-                preSessionKey[x] = (byte) total;
-            }
-
-
-            System.arraycopy(encryptPacket(preSessionKey, cmddata), 0, commandpacket, 4, 16);
-            this.commands.add(NokeDefines.bytesToHex(commandpacket));
-            mService.writeRXCharacteristic(this);
-            return String.valueOf(unixTime);
-        } else {
-            mService.getNokeListener().onError(this, NokeMobileError.ERROR_INVALID_OFFLINE_KEY, "Offline key/command is invalid.");
-            return "";
-        }
-    }
-
-    /**
-     * Checks for a valid offline key and offline unlock and unlocks the lock without a network connection
-     */
-    public String offlineUnlock() {
-        if (this.offlineUnlockCmd.length() == NokeDefines.UNLOCK_COMMAND_LENGTH && this.offlineKey.length() == NokeDefines.OFFLINE_KEY_LENGTH) {
-            byte unlockCommand[] = NokeDefines.hexToBytes(this.offlineUnlockCmd);
-
-            byte header[] = new byte[4];
-            header[0] = unlockCommand[0];
-            header[1] = unlockCommand[1];
-            header[2] = unlockCommand[2];
-            header[3] = unlockCommand[3];
-
-            byte commandpacket[] = new byte[20];
-            System.arraycopy(header, 0, commandpacket, 0, header.length);
-
-            byte cmddata[] = new byte[16];
-            System.arraycopy(unlockCommand, 4, cmddata, 0, 16);
-
-            long unixTime = System.currentTimeMillis() / 1000L;
-
-            ByteBuffer buffer = ByteBuffer.allocate(Long.SIZE);
-            buffer.putLong(unixTime);
-            byte timestamp[] = buffer.array();
-
-            cmddata[2] = timestamp[7];
-            cmddata[3] = timestamp[6];
-            cmddata[4] = timestamp[5];
-            cmddata[5] = timestamp[4];
-
-            byte preSessionKey[] = NokeDefines.hexToBytes(this.offlineKey);
-            byte sessionBytes[] = NokeDefines.hexToBytes(this.session);
-
-            for (int x = 0; x < preSessionKey.length; x++) {
-                int total = NokeDefines.toUnsigned(preSessionKey[x]) + NokeDefines.toUnsigned(sessionBytes[x]);
-                preSessionKey[x] = (byte) total;
-            }
-
-            byte checksum = 0;
-            for (int x = 0; x < 15; x++) {
-                checksum += cmddata[x];
-            }
-
-            cmddata[15] = checksum;
-            System.arraycopy(encryptPacket(preSessionKey, cmddata), 0, commandpacket, 4, 16);
-
-
-            this.commands.add(NokeDefines.bytesToHex(commandpacket));
-            mService.writeRXCharacteristic(this);
-            return String.valueOf(unixTime);
-        } else {
-
-            mService.getNokeListener().onError(this, NokeMobileError.ERROR_INVALID_OFFLINE_KEY, "Offline key/command is invalid.");
-            return "";
-        }
-    }
-
-    /**
-     * Used to encrypt command packets going to the lock
-     *
-     * @param combinedkey key for encrypting the commands
-     * @param data        data to be encrypted
-     * @return returns encrypted data packet
-     */
-    private byte[] encryptPacket(byte combinedkey[], byte data[]) {
-        byte buffer[] = new byte[16];
-        byte tmpkey[] = new byte[16];
-        System.arraycopy(combinedkey, 0, tmpkey, 0, 16);
-
-        AesLibrary.aes_enc_dec(data, tmpkey, (byte) 1);
-        System.arraycopy(data, 0, buffer, 0, 16);
-        return buffer;
-    }
-
-    public int getLockState() {
-        return lockState;
-    }
-
-    public void setLockState(int lockState) {
-        this.lockState = lockState;
-    }
-
-    public String getHardwareVersion(){
-        return this.version.substring(0,2);
-    }
-
-    public String getSoftwareVersion(){
-        return this.version.substring(3);
-    }
-
-    // ==================== ION-2 Phone Key Signing Methods ====================
-
-    private static final String TAG = "NokeDevice";
-
-    /**
-     * Gets ACL data for ION-2 signing-based unlock
-     */
-    public byte[] getCurrentAclData() {
+    public byte [] getCurrentAclData() {
         return currentAclData;
     }
 
-    /**
-     * Gets ACL signature data for ION-2 signing-based unlock
-     */
-    public byte[] getCurrentAclSignatureData() {
+    public byte [] getCurrentAclSignatureData() {
         return currentAclSignatureData;
     }
 
-    /**
-     * Sets ACL signature data for ION-2 signing-based unlock
-     */
-    public byte[] setCurrentAclSignatureData(byte[] currentAclSignatureData) {
+    public byte [] setCurrentAclSignatureData(byte [] currentAclSignatureData) {
         return this.currentAclSignatureData = currentAclSignatureData;
     }
 
-    /**
-     * Gets command signature data for ION-2 signing-based unlock
-     */
-    public byte[] getCurrentCommandSignatureData() {
+    public byte [] getCurrentCommandSignatureData() {
         return currentCommandSignatureData;
     }
 
-    /**
-     * Sets command signature data for ION-2 signing-based unlock
-     */
-    public byte[] setCurrentCommandSignatureData(byte[] currentCommandSignatureData) {
+    public byte [] setCurrentCommandSignatureData(byte [] currentCommandSignatureData) {
         return this.currentCommandSignatureData = currentCommandSignatureData;
     }
 
-    /**
-     * Checks if this is an ION-2 lock (hardware version E5 or 5E)
-     */
     public boolean isNokeIon2() {
         String hw = getHardwareVersion();
         boolean isIon2 = hw != null && (hw.contains("E5") || hw.contains("5E"));
         Log.d(TAG, "isNokeIon2() check: version=" + this.version + ", hw=" + hw + ", isIon2=" + isIon2);
         return isIon2;
-    }
-
-    /**
-     * Returns the encryption type used by this device.
-     * ION-2 locks (hardware E5/5E) use ECDSA signing; all others use symmetric encryption.
-     */
-    public NokeEncryptionType getEncryptionType() {
-        return (getHardwareVersion().contains("E5") || getHardwareVersion().contains("5E"))
-                ? NokeEncryptionType.SIGNING
-                : NokeEncryptionType.ENCRYPTION;
     }
 
     /**
@@ -622,26 +517,17 @@ public class NokeDevice {
 
     /**
      * Start unlock operation for ION-2 signing locks.
-     * Mirrors iOS: NokeDevice+Signing.swift unlockForSigning() method
-     * 
      * For new user-initiated unlocks, call resetSigningRetry() BEFORE calling this method.
      * For retry unlocks (after ACL refetch), call this directly without resetting counter.
-     *
-     * @param aclBinary Base64-encoded ACL data
-     * @param aclSignature Base64-encoded ACL signature
      */
     public void unlockForSigning(String aclBinary, String aclSignature) {
         startUnlock(aclBinary, aclSignature);
     }
 
-    /**
-     * Internal unlock method that performs validation and starts the ION-2 unlock flow
-     */
     private void startUnlock(String aclBinary, String aclSignature) {
         try {
             Log.d(TAG, "startUnlock: unlockOption=" + getUnlockOption());
 
-            // Check if emergency unlock is required but not being used
             if (isEmergencyUnlockRequired()) {
                 Log.w(TAG, "startUnlock: Emergency unlock is required but attempting ACL-based unlock. Failing with REQUIRES_EMERGENCY_UNLOCK error.");
                 if (mService != null && mService.getNokeListener() != null) {
@@ -653,7 +539,6 @@ public class NokeDevice {
                 return;
             }
             
-            // Check if override unlock is required but not being used
             if (isOverrideUnlockRequired()) {
                 Log.w(TAG, "startUnlock: Override unlock is required but attempting ACL-based unlock. Failing with REQUIRES_OVERRIDE_UNLOCK error.");
                 if (mService != null && mService.getNokeListener() != null) {
@@ -667,28 +552,240 @@ public class NokeDevice {
 
             Log.d(TAG, "startUnlock: Proceeding with ACL-based unlock");
 
-            // Decode ACL data from Base64
             currentAclData = Base64.decode(aclBinary, Base64.DEFAULT);
             currentAclSignatureData = Base64.decode(aclSignature, Base64.DEFAULT);
             
-            // Write time characteristic (step 1 of ION-2 unlock flow)
             long secondsSinceEpoch = System.currentTimeMillis() / 1000L;
             byte[] timeBytes = dataFromInt64LE(secondsSinceEpoch);
             Log.d(TAG, "startUnlock: Writing time characteristic, secondsSinceEpoch=" + secondsSinceEpoch);
             mService.writeTimeCharacteristic(this, timeBytes);
         } catch (IllegalArgumentException e) {
-            currentAclData = null;
-            Log.e(TAG, "startUnlock: Failed to decode ACL data", e);
-            // TODO: Handle Failure properly
+            currentAclData = null; // or new byte[0];
+            // TODO: Handle Failure
         }
     }
 
     /**
-     * Converts a long value (Int64) to a little-endian byte array.
-     * Used for time synchronization in ION-2 unlock flow.
+     * Sends a + delimited string of commands to the lock
+     *
+     * @param commands + delimited string returned from the unlock request
+     */
+    public void sendCommands(String commands) {
+        clearCommands();
+        List<String> commandArr = Arrays.asList(commands.split("\\+"));
+        this.commands.addAll(commandArr);
+        if (this.commands.size() > 1) {
+            this.connectionState = NokeDefines.NOKE_STATE_SYNCING;
+            mService.getNokeListener().onNokeSyncing(this);
+        }
+        mService.writeRXCharacteristic(this);
+    }
+
+    /**
+     * Sends an arrayList of commands to the lock
+     *
+     * @param commands an arrayList of strings (NOT USED WITH THE CORE API)
+     */
+    public void sendCommands(ArrayList<String> commands){
+        this.commands = commands;
+        if (this.commands.size() > 1) {
+            this.connectionState = NokeDefines.NOKE_STATE_SYNCING;
+            mService.getNokeListener().onNokeSyncing(this);
+        }
+        mService.writeRXCharacteristic(this);
+    }
+
+    /**
+     * Clears the command array. Used to prevent invalid commands from being sent to the lock and causing errors
+     */
+    public void clearCommands(){
+        if(this.commands != null){
+            try {
+                this.commands.clear();
+            } catch (Exception e) {
+                Log.d(TAG, "NokeDevice clearCommands exception: ${e.message}");
+            }
+        }
+    }
+
+    public Integer getCommandCount(){
+        if(this.commands != null){
+            return this.commands.size();
+        }else{
+            return 0;
+        }
+    }
+
+
+
+    public String scheduledOfflineUnlock() {
+        if (this.offlineUnlockCmd.length() == NokeDefines.UNLOCK_COMMAND_LENGTH && this.offlineKey.length() == NokeDefines.OFFLINE_KEY_LENGTH) {
+            byte unlockCommand[] = NokeDefines.hexToBytes(this.offlineUnlockCmd);
+
+            byte header[] = new byte[4];
+            header[0] = unlockCommand[0];
+            header[1] = unlockCommand[1];
+            header[2] = unlockCommand[2];
+            header[3] = unlockCommand[3];
+
+            byte commandpacket[] = new byte[20];
+            System.arraycopy(header, 0, commandpacket, 0, header.length);
+
+            byte cmddata[] = new byte[16];
+            System.arraycopy(unlockCommand, 4, cmddata, 0, 16);
+
+            long unixTime = System.currentTimeMillis() / 1000L;
+
+            byte preSessionKey[] = NokeDefines.hexToBytes(this.offlineKey);
+            byte sessionBytes[] = NokeDefines.hexToBytes(this.session);
+
+            for (int x = 0; x < preSessionKey.length; x++) {
+                int total = NokeDefines.toUnsigned(preSessionKey[x]) + NokeDefines.toUnsigned(sessionBytes[x]);
+                preSessionKey[x] = (byte) total;
+            }
+
+
+            System.arraycopy(encryptPacket(preSessionKey, cmddata), 0, commandpacket, 4, 16);
+            this.commands.add(NokeDefines.bytesToHex(commandpacket));
+            mService.writeRXCharacteristic(this);
+            return String.valueOf(unixTime);
+        } else {
+            mService.getNokeListener().onError(this, NokeMobileError.ERROR_INVALID_OFFLINE_KEY, "Offline key/command is invalid.");
+            return "";
+        }
+    }
+
+    /**
+     * Checks for a valid offline key and offline unlock and unlocks the lock without a network connection
+     */
+    public String offlineUnlock(String key, String command, Boolean addTimeStamp) {
+        this.offlineKey = key;
+        this.offlineUnlockCmd = command;
+        return offlineUnlock();
+    }
+
+
+    public String offlineUnlock() {
+        if (this.offlineUnlockCmd.length() == NokeDefines.UNLOCK_COMMAND_LENGTH && this.offlineKey.length() == NokeDefines.OFFLINE_KEY_LENGTH) {
+
+            Log.w(TAG, "CMD: " + this.offlineUnlockCmd + " KEY:" + this.offlineKey);
+            byte unlockCommand[] = NokeDefines.hexToBytes(this.offlineUnlockCmd);
+
+            byte header[] = new byte[4];
+            header[0] = unlockCommand[0];
+            header[1] = unlockCommand[1];
+            header[2] = unlockCommand[2];
+            header[3] = unlockCommand[3];
+
+            byte commandpacket[] = new byte[20];
+            System.arraycopy(header, 0, commandpacket, 0, header.length);
+
+            byte cmddata[] = new byte[16];
+            System.arraycopy(unlockCommand, 4, cmddata, 0, 16);
+
+            long unixTime = System.currentTimeMillis() / 1000L;
+
+            ByteBuffer buffer = ByteBuffer.allocate(Long.SIZE);
+            buffer.putLong(unixTime);
+            byte timestamp[] = buffer.array();
+
+            cmddata[2] = timestamp[7];
+            cmddata[3] = timestamp[6];
+            cmddata[4] = timestamp[5];
+            cmddata[5] = timestamp[4];
+
+            byte preSessionKey[] = NokeDefines.hexToBytes(this.offlineKey);
+            byte sessionBytes[] = NokeDefines.hexToBytes(this.session);
+
+            for (int x = 0; x < preSessionKey.length; x++) {
+                int total = NokeDefines.toUnsigned(preSessionKey[x]) + NokeDefines.toUnsigned(sessionBytes[x]);
+                preSessionKey[x] = (byte) total;
+            }
+
+            byte checksum = 0;
+            for (int x = 0; x < 15; x++) {
+                checksum += cmddata[x];
+            }
+
+            cmddata[15] = checksum;
+            System.arraycopy(encryptPacket(preSessionKey, cmddata), 0, commandpacket, 4, 16);
+
+
+            this.commands.add(NokeDefines.bytesToHex(commandpacket));
+            mService.writeRXCharacteristic(this);
+            return String.valueOf(unixTime);
+        } else {
+
+            mService.getNokeListener().onError(this, NokeMobileError.ERROR_INVALID_OFFLINE_KEY, "Offline key/command is invalid.");
+            return "";
+        }
+    }
+
+    /**
+     * Used to encrypt command packets going to the lock
+     *
+     * @param combinedkey key for encrypting the commands
+     * @param data        data to be encrypted
+     * @return returns encrypted data packet
+     */
+    private byte[] encryptPacket(byte combinedkey[], byte data[]) {
+        byte buffer[] = new byte[16];
+        byte tmpkey[] = new byte[16];
+        System.arraycopy(combinedkey, 0, tmpkey, 0, 16);
+
+        AesLibrary.aes_enc_dec(data, tmpkey, (byte) 1);
+        System.arraycopy(data, 0, buffer, 0, 16);
+        return buffer;
+    }
+
+    public int getLockState() {
+        return lockState;
+    }
+
+    public void setLockState(int lockState) {
+        this.lockState = lockState;
+    }
+
+    public String getHardwareVersion(){
+        if (this.version == null) {
+            return "";
+        }
+        return this.version.substring(0,2);
+    }
+
+    public String getSoftwareVersion(){
+        if (this.version == null) {
+            return "";
+        }
+        return this.version.substring(3);
+    }
+
+    public boolean isCanAutoUnlock() {
+        return canAutoUnlock;
+    }
+
+    public void setCanAutoUnlock(boolean canAutoUnlock) {
+        this.canAutoUnlock = canAutoUnlock;
+    }
+
+    /**
+     * Converts a long value (Int64) to a big-endian byte array.
      *
      * @param value the long value to convert
-     * @return 8-byte array in little-endian order
+     * @return 8-byte array in big-endian format
+     */
+    private byte[] dataFromInt64BE(long value) {
+        ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
+        buffer.order(java.nio.ByteOrder.BIG_ENDIAN);
+        buffer.putLong(value);
+        return buffer.array();
+    }
+
+    /**
+     * Converts a long value (Int64) to a little-endian byte array.
+     *
+     * @param value the long value to convert
+     * @return 8-byte array in little-endian format
      */
     private byte[] dataFromInt64LE(long value) {
         ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
@@ -697,4 +794,33 @@ public class NokeDevice {
         return buffer.array();
     }
 
+    /**
+     * Converts a big-endian byte array to a long value (Int64).
+     *
+     * @param data the byte array to convert (must be 8 bytes)
+     * @return the long value, or null if data length is invalid
+     */
+    private Long int64FromDataBE(byte[] data) {
+        if (data == null || data.length != Long.BYTES) {
+            return null;
+        }
+        ByteBuffer buffer = ByteBuffer.wrap(data);
+        buffer.order(java.nio.ByteOrder.BIG_ENDIAN);
+        return buffer.getLong();
+    }
+
+    /**
+     * Converts a little-endian byte array to a long value (Int64).
+     *
+     * @param data the byte array to convert (must be 8 bytes)
+     * @return the long value, or null if data length is invalid
+     */
+    private Long int64FromDataLE(byte[] data) {
+        if (data == null || data.length != Long.BYTES) {
+            return null;
+        }
+        ByteBuffer buffer = ByteBuffer.wrap(data);
+        buffer.order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        return buffer.getLong();
+    }
 }

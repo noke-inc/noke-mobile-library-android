@@ -101,24 +101,17 @@ class PhoneKeyFacade private constructor(
 
     /**
      * Get or create PhoneKeyManager + PhoneKeyPersistence for user/device.
-     * 
-     * **WARNING for noke-mobile-library-android users:**
-     * This method will throw UnsupportedOperationException at runtime in the standalone library.
-     * PhoneKeyFacade requires backend infrastructure not available in standalone SDK.
-     * 
-     * Use PhoneKeyAccessService with your own PhoneKeyCoreClient implementation instead.
-     * See TEMPLATE_PhoneKeyCoreClient.kt for an example.
+     * Uses singleton factory to ensure same instance across all code paths.
      */
-    @Suppress("DEPRECATION_ERROR")  // Allow compilation despite ERROR-level deprecation
     private fun getOrCreateManager(userId: String, deviceId: String): Pair<PhoneKeyManager, PhoneKeyPersistence> {
         // Reuse if same user/device
         if (currentUserId == userId && currentDeviceId == deviceId && currentManager != null && currentPersistence != null) {
             return currentManager!! to currentPersistence!!
         }
 
-        // Create new manager for this user/device
-        // NOTE: This will throw UnsupportedOperationException in noke-mobile-library-android
-        val manager = PhoneKeyManager(context, userId, deviceId)
+        // Get singleton PhoneKeyManager instance for this user/device
+        // This ensures NokeDeviceManagerService and PhoneKeyFacade share the same instance
+        val manager = PhoneKeyManager.getInstance(context, userId, deviceId)
         val persist = persistence ?: DefaultPhoneKeyPersistence(manager)
 
         // Cache for reuse
@@ -440,8 +433,6 @@ class PhoneKeyFacade private constructor(
     suspend fun clearAll(userId: String) = mutex.withLock {
         try {
             if (currentUserId == userId && currentPersistence != null && currentDeviceId != null) {
-                // Delete provisioning data (matches iOS behavior)
-                currentPersistence!!.deletePhoneKeyInfo(userId, currentDeviceId!!)
                 // Delete all ACLs
                 currentPersistence!!.deleteAllACLs()
                 Log.d(TAG, "clearAll - Cleared phone key info and ACLs for user=$userId")

@@ -166,29 +166,17 @@ class PhoneKeyAccessService private constructor(
         private var sharedInstance: PhoneKeyAccessService = PhoneKeyAccessService(null, null)
         
         /**
-         * Initialize the service with a context.
+         * Initialize the service with a context and default client.
          * 
-         * **DEPRECATED:** This method is no longer available in noke-mobile-library-android.
-         * Third-party developers must provide their own PhoneKeyCoreClient implementation.
-         * 
-         * Use [setSharedClient] instead with your own implementation.
-         * See TEMPLATE_PhoneKeyCoreClient.kt for an example implementation.
+         * Convenience method for quick setup with default implementation.
+         * Equivalent to calling setSharedClient with PhoneKeyCoreClientImpl.
          * 
          * @param context Application context
-         * @deprecated Provide your own PhoneKeyCoreClient implementation via setSharedClient()
          */
-        @Deprecated(
-            message = "Provide your own PhoneKeyCoreClient implementation via setSharedClient()",
-            replaceWith = ReplaceWith("setSharedClient(yourClientImpl, context)"),
-            level = DeprecationLevel.ERROR
-        )
         @JvmStatic
-        @Suppress("UNUSED_PARAMETER")
         fun initialize(context: Context) {
-            throw UnsupportedOperationException(
-                "PhoneKeyCoreClient implementation required. " +
-                "See TEMPLATE_PhoneKeyCoreClient.kt for an example implementation."
-            )
+            val client = PhoneKeyCoreClientImpl(context.applicationContext)
+            setSharedClient(client, context.applicationContext)
         }
 
         /**
@@ -511,7 +499,6 @@ class PhoneKeyAccessService private constructor(
      * )
      * ```
      */
-    @Suppress("UNUSED_PARAMETER")
     suspend fun generateAcl(
         userId: Int,
         lockMac: String,
@@ -652,7 +639,6 @@ class PhoneKeyAccessService private constructor(
         message = "This method depends on internal state. Use generateBulkAcls() directly with stored phone key ID.",
         level = DeprecationLevel.WARNING
     )
-    @Suppress("UNUSED_PARAMETER")
     suspend fun refreshAllAcls(
         userId: String,
         udid: String
@@ -736,7 +722,6 @@ class PhoneKeyAccessService private constructor(
      * @param deviceId Device identifier
      * @return Result with Unit on success, or error
      */
-    @Suppress("UNUSED_PARAMETER")
     suspend fun cleanupAclsForUser(userId: String, deviceId: String): Result<Unit> {
         val ctx = context ?: return Result.failure(NokeMobileLibraryError.NotInitialized)
         

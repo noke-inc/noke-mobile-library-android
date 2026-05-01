@@ -2,6 +2,7 @@ package com.noke.nokemobilelibrary.phonekey
 
 import android.util.Log
 import com.noke.nokemobilelibrary.phonekey.internal.PhoneKeyManager
+import com.noke.nokemobilelibrary.phonekey.models.BulkAclEnvelope
 import com.noke.nokemobilelibrary.phonekey.models.BulkAclResult
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.IOException
@@ -10,9 +11,9 @@ import kotlin.coroutines.resume
 /**
  * Coroutine-based extension functions for [PhoneKeyManager].
  * 
- * These extensions wrap internal PhoneKeyManager methods with modern Kotlin suspend functions,
- * providing structured concurrency support while maintaining compatibility with the callback-based
- * internal API.
+ * These extensions wrap existing callback-based PhoneKeyManager methods with
+ * modern Kotlin suspend functions, providing structured concurrency support
+ * while maintaining full backward compatibility with existing code.
  * 
  * ## Thread Safety
  * All suspend functions are thread-safe and can be called from any coroutine context.
@@ -35,8 +36,9 @@ private const val TAG = "PhoneKeyManagerExt"
 /**
  * Provision phone key with backend using suspend function.
  * 
- * This suspending version generates an ECDSA P-256 key pair in Android Keystore,
- * sends the public key to the backend, and stores the resulting phone key ID.
+ * This suspending version of [PhoneKeyManager.provisionPhoneCompletion] generates
+ * an ECDSA P-256 key pair in Android Keystore, sends the public key to the backend,
+ * and stores the resulting phone key ID.
  * 
  * ## Process
  * 1. Ensures ECDSA P-256 key pair exists in Android Keystore
@@ -71,6 +73,7 @@ private const val TAG = "PhoneKeyManagerExt"
  * 
  * ## Example
  * ```kotlin
+ * val manager = PhoneKeyManager(context, userId, udid)
  * val result = manager.provisionPhoneKeySuspend(userId, udid)
  * 
  * result.fold(
@@ -114,7 +117,7 @@ internal suspend fun PhoneKeyManager.provisionPhoneKeySuspend(
         ensureKeys()
         val publicKeyBase64 = getPublicKeyBase64()
         
-        Log.d(TAG, "Starting phone key provisioning for user=$userId, device=$udid")
+        Log.d(TAG, "Starting phone key provisioning")
         
         // Call callback-based provisioning
         provisionPhoneCompletion(udid, publicKeyBase64, userId) { keyId ->
@@ -164,8 +167,8 @@ internal suspend fun PhoneKeyManager.provisionPhoneKeySuspend(
 /**
  * Fetch ACL (Access Control List) for a specific lock using suspend function.
  * 
- * This suspending version retrieves the ACL envelope from the backend,
- * validates the signature, and stores it locally.
+ * This suspending version of [PhoneKeyManager.getAcl] retrieves the ACL envelope
+ * from the backend, validates the signature, and stores it locally.
  * 
  * ## Process
  * 1. Sends ACL request to backend with (userId, lockMac, phoneKeyId)
@@ -244,17 +247,17 @@ internal suspend fun PhoneKeyManager.getAclSuspend(
         return@suspendCancellableCoroutine
     }
     
-    Log.d(TAG, "Fetching ACL for lock=$lockMac, userId=$userId, phoneKeyId=$phoneKeyId")
+    Log.d(TAG, "Fetching ACL for lock")
     
     // Call callback-based ACL fetch
     getAcl(userId, lockMac, phoneKeyId) { success ->
         when {
             continuation.isActive && success -> {
-                Log.d(TAG, "ACL fetch succeeded for lock=$lockMac")
+                Log.d(TAG, "ACL fetch succeeded")
                 continuation.resume(Result.success(Unit))
             }
             continuation.isActive && !success -> {
-                Log.e(TAG, "ACL fetch failed for lock=$lockMac")
+                Log.e(TAG, "ACL fetch failed")
                 continuation.resume(
                     Result.failure(
                         NokeMobileLibraryError.AclFetchFailed(
@@ -272,16 +275,15 @@ internal suspend fun PhoneKeyManager.getAclSuspend(
 }
 
 /**
- * Fetch bulk ACLs for all locks accessible to the user using suspend function.
- * 
  * This is the **preferred method** for fetching ACLs in most scenarios:
  * - On successful login
  * - After provisioning
  * - On app startup (if user already logged in)
  * - Explicit ACL refresh
  * 
- * This suspending version retrieves all ACL envelopes in a single request,
- * which is much more efficient than fetching individual ACLs one-by-one.
+ * This suspending version of [PhoneKeyManager.getBulkAcls] retrieves all ACL
+ * envelopes in a single request, which is much more efficient than fetching
+ * individual ACLs one-by-one.
  * 
  * ## Process
  * 1. Sends bulk ACL request to backend with phoneKeyId
@@ -435,7 +437,7 @@ internal suspend fun PhoneKeyManager.getBulkAclsSuspend(
  * )
  * ```
  */
-internal suspend fun PhoneKeyManager.refreshAllAclsSuspend(): Result<BulkAclResult> {
+internal suspend fun PhoneKeyManager.refreshAllAclsSuspend(): Result<Boolean> {
     val phoneKeyIdString = getPhoneKeyId()
     
     if (phoneKeyIdString == null) {
@@ -453,5 +455,7 @@ internal suspend fun PhoneKeyManager.refreshAllAclsSuspend(): Result<BulkAclResu
         )
     }
     
-    return getBulkAclsSuspend(phoneKeyId)
+    return getBulkAclsSuspend(phoneKeyId).map { bulkResult ->
+        bulkResult.successCount > 0
+    }
 }

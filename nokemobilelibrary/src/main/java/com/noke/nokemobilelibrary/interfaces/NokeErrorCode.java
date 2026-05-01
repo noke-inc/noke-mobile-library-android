@@ -43,8 +43,7 @@ import java.lang.annotation.RetentionPolicy;
         NokeErrorCode.ERROR_MISSING_UPLOAD_URL,
         NokeErrorCode.ERROR_UNSTABLE_BLUETOOTH_STACK,
         NokeErrorCode.ERROR_CONNECTION_TIMEOUT,
-        NokeErrorCode.ERROR_BLUETOOTH_SCAN_PERMISSION,
-        NokeErrorCode.ERROR_SIGNING
+        NokeErrorCode.ERROR_BLUETOOTH_SCAN_PERMISSION
 })
 @Retention(RetentionPolicy.SOURCE)
 public @interface NokeErrorCode {
@@ -88,5 +87,4 @@ public @interface NokeErrorCode {
     int ERROR_UNSTABLE_BLUETOOTH_STACK = 317;
     int ERROR_CONNECTION_TIMEOUT = 318;
     int ERROR_BLUETOOTH_SCAN_PERMISSION = 319;
-    int ERROR_SIGNING = 320;
 }

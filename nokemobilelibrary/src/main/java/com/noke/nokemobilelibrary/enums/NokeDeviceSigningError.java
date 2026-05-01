@@ -102,17 +102,10 @@ public enum NokeDeviceSigningError {
     ),
 
     LOCK_LOCKED(
-            "You don't have access to lock this device.",
+            "Your lock has no key. Please contact your administrator to get access.",
             false,
-            true,
+            false,
             false
-    ),
-
-    LOCK_ALREADY_UNLOCKED(
-            "This device is already unlocked.",
-            false,
-            false,
-            true
     ),
 
     COMMAND_SIGNATURE_FAILED(

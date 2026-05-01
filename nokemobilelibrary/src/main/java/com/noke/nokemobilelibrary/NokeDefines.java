@@ -40,7 +40,7 @@ public class NokeDefines {
      */
     static final String NOKE_DEVICE_IDENTIFER_STRING                = "NOKE";
     /**
-     * Identifier string for Noke devices in firmware update mode
+     * Identifier string for Noke hardware devices in firmware update mode
      */
     static final String NOKE_FIRMWARE_DEVICE_IDENTIFIER_STRING = "_fw";
     /**
@@ -73,9 +73,6 @@ public class NokeDefines {
     static final byte FREEEXIT_ResultType                           =(byte)0x6F;
     static final byte INVALID_ResultType							=(byte)0xFF;
 
-    /**
-     * Diagnostic Packet Types
-     */
     static final byte DIAGNOSTIC_PacketType                         =(byte)0x9B;
 
     /**
@@ -85,7 +82,7 @@ public class NokeDefines {
     static final int APP_Dest                                       = 0x51;
 
     /**
-     * Noke device UUIDs
+     * Noke encryption device UUIDs
      */
     static final UUID CCCD = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
     static final UUID RX_SERVICE_UUID = UUID.fromString("1bc50001-0200-d29e-e511-446c609db825");
@@ -123,13 +120,10 @@ public class NokeDefines {
      */
     public static final int NOKE_LOCK_STATE_UNKNOWN          = -1;
     public static final int NOKE_LOCK_STATE_UNLOCKED         = 0;
-    public static final int NOKE_LOCK_STATE_UNSHACKLED       = 2;
-    public static final int NOKE_LOCK_STATE_LOCKED           = 3;
-    public static final int NOKE_LOCK_STATE_JAMMED_UNLOCKING = 4;
-    public static final int NOKE_LOCK_STATE_JAMMED_LOCKING   = 5;
-    public static final int NOKE_LOCK_STATE_UNSHACKLING      = 4;
-    public static final int NOKE_LOCK_STATE_UNLOCKING        = 5;
-    public static final int NOKE_LOCK_STATE_LOCKED_NO_MAGNET = 7;
+    public static final int NOKE_LOCK_STATE_UNSHACKLED       = 1;
+    public static final int NOKE_LOCK_STATE_LOCKED           = 2;
+    public static final int NOKE_LOCK_STATE_JAMMED_UNLOCKING = 3;
+    public static final int NOKE_LOCK_STATE_JAMMED_LOCKING   = -4;
 
     /**
      * Hardware Types
@@ -138,12 +132,16 @@ public class NokeDefines {
     public static final String NOKE_HW_TYPE_2ND_GEN_PADLOCK         = "3P";
     public static final String NOKE_HW_TYPE_ULOCK                   = "2U";
     public static final String NOKE_HW_TYPE_HD_LOCK                 = "I";
-    public static final String NOKE_HW_TYPE_DOOR_CONTROLLER         = "2E";
+    public static final String NOKE_HW_TYPE_DOOR_CONTROLLER         = "E";
     public static final String NOKE_HW_TYPE_PB12                    = "1C";
     public static final String NOKE_HW_TYPE_KEYPAD                  = "K";
     public static final String NOKE_HW_TYPE_THUNDERGUN              = "A";
 
-    ////Diagnostic Lock States (byte values reported in diagnostic packets)
+    /**
+     * Diagnostic Packet Types
+     */
+    ////Lock States
+
     static final byte LockStateUnlocked                             = (byte)0x00;
     static final byte LockStateUnshackled                           = (byte)0x01;
     static final byte LockStateLocked                               = (byte)0x02;
@@ -161,12 +159,15 @@ public class NokeDefines {
 
 
 
+
     /**
      * Shared Preferences
      */
     static final String PREFS_NAME                   = "nokeAPILibaryFile";
     static final String PREF_DEVICES                 = "nokedevices";
     static final String PREF_UPLOADDATA              = "uploaddata";
+
+    static final String DEF_NAME                     = "smartEntrySharedPreferences";
 
 
     /**
@@ -177,7 +178,6 @@ public class NokeDefines {
     public static final int NOKE_LIBRARY_PRODUCTION        = 1;
     public static final int NOKE_LIBRARY_DEVELOP           = 2;
     public static final int NOKE_LIBRARY_OPEN              = 3;
-    public static final int NOKE_LIBRARY_CUSTOM            = 4;
 
 
     /**
@@ -222,17 +222,19 @@ public class NokeDefines {
      * @return byte array
      */
     static byte[] hexToBytes(String hexstring) {
-        hexstring=hexstring.toUpperCase();
-        int len=hexstring.length()/2;
-        byte[] bytes = new byte[len];
-        for(int x=0;x<len;x++){
-            for(int y=0;y<hexArray.length;y++)
-            {
-                if(hexArray[y]==hexstring.charAt(2*x)){
-                    bytes[x]+=(byte)(y<<4);
-                }
-                if(hexArray[y]==hexstring.charAt(2*x+1)){
-                    bytes[x]+=(byte)y;
+        byte[] bytes = new byte[0];
+        if (hexstring != null) {
+            hexstring = hexstring.toUpperCase();
+            int len = hexstring.length() / 2;
+            bytes = new byte[len];
+            for (int x = 0; x < len; x++) {
+                for (int y = 0; y < hexArray.length; y++) {
+                    if (hexArray[y] == hexstring.charAt(2 * x)) {
+                        bytes[x] += (byte) (y << 4);
+                    }
+                    if (hexArray[y] == hexstring.charAt(2 * x + 1)) {
+                        bytes[x] += (byte) y;
+                    }
                 }
             }
         }

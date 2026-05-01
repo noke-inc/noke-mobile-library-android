@@ -1,6 +1,7 @@
 package com.noke.nokemobilelibrary.phonekey
 
 import android.content.Context
+import com.noke.nokemobilelibrary.phonekey.models.BulkAclResult
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -9,14 +10,12 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import com.noke.nokemobilelibrary.phonekey.models.BulkAclResult
 
 /**
  * Reactive state monitor for Phone Key provisioning and ACL status.
  * 
  * This class provides StateFlow-based observables for monitoring phone key
- * state changes in real-time, enabling reactive UI updates for third-party
- * applications.
+ * state changes in real-time, enabling reactive UI updates.
  * 
  * ## Features
  * 
@@ -33,9 +32,6 @@ import com.noke.nokemobilelibrary.phonekey.models.BulkAclResult
  * - Monitors ACL fetch results
  * - Provides error state
  * - Exposes loading indicators
- * 
- * This is designed for **third-party library usage**, providing a clean
- * reactive API for integrating phone key functionality into external apps.
  * 
  * ## Usage Example
  * 
@@ -101,49 +97,6 @@ import com.noke.nokemobilelibrary.phonekey.models.BulkAclResult
  *     aclState is AclState.Fetched && 
  *     aclState.result.successCount > 0
  * }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
- * ```
- * 
- * ### Integration with Demo App
- * 
- * ```kotlin
- * // In Application.onCreate()
- * PhoneKeyAccessService.initialize(
- *     context = this,
- *     baseUrl = "https://router.smartentry.noke.com/",
- *     authTokenProvider = { sessionManager.getToken() },
- *     userUuidProvider = { sessionManager.getUserUuid() }
- * )
- * 
- * val monitor = createPhoneKeyStateMonitor(this)
- * 
- * // In ViewModel
- * class ProvisionViewModel(
- *     private val monitor: PhoneKeyStateMonitor
- * ) : ViewModel() {
- *     
- *     val uiState = monitor.provisioningState.map { provState ->
- *         when (provState) {
- *             is ProvisioningState.Idle -> 
- *                 UiState.Idle
- *             is ProvisioningState.Checking -> 
- *                 UiState.Loading("Checking device...")
- *             is ProvisioningState.Provisioning -> 
- *                 UiState.Loading("Setting up device...")
- *             is ProvisioningState.Provisioned -> 
- *                 UiState.Success("Device ready!")
- *             is ProvisioningState.AlreadyProvisioned -> 
- *                 UiState.Success("Device already set up")
- *             is ProvisioningState.Error -> 
- *                 UiState.Error(provState.error.message ?: "Unknown error")
- *         }
- *     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), UiState.Idle)
- *     
- *     fun provision(userId: String, deviceId: String) {
- *         viewModelScope.launch {
- *             monitor.provisionDevice(userId, deviceId)
- *         }
- *     }
- * }
  * ```
  * 
  * @param context Application context
@@ -257,7 +210,8 @@ class PhoneKeyStateMonitor(
                             val provisionResult = phoneKeyService.provisionPhoneKey(userId, deviceId)
                             provisionResult.fold(
                                 onSuccess = { response ->
-                                    val keyId = response.keyId ?: throw IllegalStateException("Provisioning succeeded but keyId is null")
+                                    val keyId = response.keyId
+                                        ?: throw IllegalStateException("Provisioning succeeded but keyId is null")
                                     phoneKeyId = keyId
                                     _provisioningState.value = ProvisioningState.Provisioned(keyId)
                                 },
@@ -317,7 +271,6 @@ class PhoneKeyStateMonitor(
      * @param userId User identifier
      * @param deviceId Device identifier
      */
-    @Suppress("DEPRECATION")
     suspend fun refreshAcls(userId: String, deviceId: String) {
         mutex.withLock {
             try {
