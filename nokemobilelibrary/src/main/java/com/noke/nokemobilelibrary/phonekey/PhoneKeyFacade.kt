@@ -440,8 +440,6 @@ class PhoneKeyFacade private constructor(
     suspend fun clearAll(userId: String) = mutex.withLock {
         try {
             if (currentUserId == userId && currentPersistence != null && currentDeviceId != null) {
-                // Delete provisioning data (matches iOS behavior)
-                currentPersistence!!.deletePhoneKeyInfo(userId, currentDeviceId!!)
                 // Delete all ACLs
                 currentPersistence!!.deleteAllACLs()
                 Log.d(TAG, "clearAll - Cleared phone key info and ACLs for user=$userId")
