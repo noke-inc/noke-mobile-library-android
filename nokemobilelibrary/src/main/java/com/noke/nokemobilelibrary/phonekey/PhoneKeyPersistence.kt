@@ -174,7 +174,7 @@ internal class DefaultPhoneKeyPersistence(
     }
 
     override fun listACLs(): List<BulkAclEnvelope> {
-        return manager.listBulkAclEnvelopes()
+        return manager.listBulkAclEnvelopes() ?: emptyList()
     }
 
     override fun saveACL(userId: String, lockMac: String, acl: BulkAclEnvelope) {

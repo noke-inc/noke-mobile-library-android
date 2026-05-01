@@ -5,7 +5,7 @@ import com.noke.nokemobilelibrary.interfaces.CharacteristicType;
 import java.util.UUID;
 
 /**
- * Noke signing device Read Characteristics
+ * Noke signing device Write Characteristics
  */
 
 public enum SigningReadCharacteristicType implements CharacteristicType {
