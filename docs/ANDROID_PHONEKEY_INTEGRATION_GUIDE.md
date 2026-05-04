@@ -1,7 +1,7 @@
 # Phone Key Integration Guide for Third-Party Developers
 
 **Version:** 1.0.0  
-**Last Updated:** April 22, 2026  
+**Last Updated:** May 4, 2026  
 **Library:** noke-mobile-library-android  
 **Minimum Android SDK:** API 23  
 **Language:** Kotlin with Coroutines
@@ -13,19 +13,18 @@
 1. [Overview](#overview)
 2. [Quick Start](#quick-start)
 3. [Data Flow](#data-flow)
-4. [Architecture Mapping (iOS → Android)](#architecture-mapping-ios--android)
-5. [Platform-Specific Decisions](#platform-specific-decisions)
-6. [Core Components](#core-components)
-7. [Required Implementation](#required-implementation)
-8. [Optional Customization](#optional-customization)
-9. [View Model / State Management](#view-model--state-management)
-10. [Complete Integration Example](#complete-integration-example)
-11. [API Reference](#api-reference)
-12. [Error Handling](#error-handling)
-13. [Edge Cases / Considerations](#edge-cases--considerations)
-14. [Testing Guide](#testing-guide)
-15. [Best Practices](#best-practices)
-16. [FAQ](#faq)
+4. [iOS Terminology Reference](#ios-terminology-reference)
+5. [Core Components](#core-components)
+6. [Required Implementation](#required-implementation)
+7. [Optional Customization](#optional-customization)
+8. [View Model / State Management](#view-model--state-management)
+9. [Complete Integration Example](#complete-integration-example)
+10. [API Reference](#api-reference)
+11. [Error Handling](#error-handling)
+12. [Edge Cases / Considerations](#edge-cases--considerations)
+13. [Testing Guide](#testing-guide)
+14. [Best Practices](#best-practices)
+15. [FAQ](#faq)
 
 ---
 
@@ -68,11 +67,6 @@ viewModelScope.launch {
         service.generateBulkAcls(provision.keyId!!, userId, udid)
     }
 }
-
-// 3. On BLE connection — retrieve cached ACL and write to lock
-val aclEnvelope = service.getAcl(userId, udid, lockMac).getOrNull() ?: return
-val aclBytes = android.util.Base64.decode(aclEnvelope.acl, android.util.Base64.DEFAULT)
-writeToGattCharacteristic(gatt, ION_PROVISION_CHAR_UUID, aclBytes)
 ```
 
 ---
@@ -96,29 +90,27 @@ writeToGattCharacteristic(gatt, ION_PROVISION_CHAR_UUID, aclBytes)
    ↓
 8. PhoneKeyCoreClient fetches all ACLs from backend via YOUR API implementation
    ↓
-9. ACLs stored in EncryptedSharedPreferences per lock MAC
-   ↓
-10. On BLE connection: retrieve ACL envelope via PhoneKeyFacade.getACL(userId, lockMac)
-    ↓ Decode Base64 ACL bytes and write to lock over BLE GATT characteristic
+9. ACLs stored in EncryptedSharedPreferences per lock MAC — ready for retrieval
 ```
 
 ---
 
-## Architecture Mapping (iOS → Android)
+## iOS Terminology Reference
 
-| iOS Component                              | Android Equivalent                            | Notes                                     |
-| ------------------------------------------ | --------------------------------------------- | ----------------------------------------- |
-| `PhoneKeyFacade.shared`                    | `PhoneKeyAccessService.getInstance()`         | Singleton pattern, same intent            |
-| `PhoneKeyAccessService`                    | `PhoneKeyAccessService`                       | Orchestrates operations, identical naming |
-| `PhoneKeyCoreClient` (protocol)            | `PhoneKeyCoreClient` (interface)              | **YOU implement this**                    |
-| `PhoneKeyPersistence` (protocol)           | `PhoneKeyPersistence` (interface)             | Optional custom storage                   |
-| `DefaultPhoneKeyPersistence`               | `DefaultPhoneKeyPersistence`                  | Default keychain/keystore storage         |
-| iOS Keychain                               | Android Keystore + EncryptedSharedPreferences | Platform-appropriate secure storage       |
-| `completion: @escaping (Result<T, Error>)` | `suspend fun: Result<T>`                      | Kotlin coroutines instead of closures     |
-| GCD serial queue                           | `Dispatchers.IO` + `Mutex`                    | Structured concurrency                    |
-| `UIDevice.current.identifierForVendor`     | `Settings.Secure.ANDROID_ID`                  | Device UDID equivalent                    |
-| `BulkPhoneKeyAcl`                          | `BulkAclEnvelope`                             | Same data structure, different naming     |
-| `PhoneKeyInfoResponse.keyId: Int?`         | `PhoneKeyInfoResponse.keyId: Int?`            | ✅ Identical                              |
+If you are coming from the iOS NokeMobileLibrary, this table maps familiar iOS concepts and method names to their Android equivalents. The core provisioning workflow is identical across both platforms — only the language idioms differ.
+
+| iOS Concept / Method                                       | Android Equivalent                                                                                | Notes                                                           |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `PhoneKeyFacade.shared`                                    | `PhoneKeyAccessService.getInstance()`                                                             | Main entry point for all operations                             |
+| `PhoneKeyFacade.setSharedClient(_:)`                       | `PhoneKeyAccessService.setSharedClient(client, context)`                                          | Call once in `Application.onCreate()`                           |
+| `ensureProvisioned(userId:deviceId:completion:)`           | `service.initialize(userId, deviceId)`                                                            | Generates or restores the ECDSA key pair                        |
+| `provisionPhoneKey(userId:deviceId:completion:)`           | `service.provisionPhoneKey(userId, udid)`                                                         | Registers public key with backend                               |
+| `generateBulkAcls(phoneKeyId:userId:deviceId:completion:)` | `service.generateBulkAcls(phoneKeyId, userId, udid)`                                              | Fetches and caches all ACLs from backend                        |
+| `clearAll(userId:)`                                        | `service.cleanupAclsForUser(userId, deviceId)` + `service.clearManagerInstance(userId, deviceId)` | Call both in order on logout                                    |
+| Completion handler `(Result<T, Error>) -> Void`            | `suspend fun` returning `Result<T>`                                                               | Use inside a `viewModelScope.launch { }` block                  |
+| `NokeMobileLibraryError` (Swift `enum`)                    | `NokeMobileLibraryError` (Kotlin `sealed class`)                                                  | Same error cases; use `when` expression for exhaustive handling |
+| `UIDevice.current.identifierForVendor?.uuidString`         | `PhoneKeyAccessService.getDeviceUdid(context)`                                                    | Uses `Settings.Secure.ANDROID_ID`                               |
+| iOS Keychain                                               | Android Keystore + EncryptedSharedPreferences                                                     | Private keys never leave hardware on either platform            |
 
 ### Component Hierarchy
 
@@ -146,98 +138,6 @@ writeToGattCharacteristic(gatt, ION_PROVISION_CHAR_UUID, aclBytes)
         │   PhoneKeyPersistence     │ ◄── Storage interface
         │   (Default or Custom)     │     EncryptedSharedPreferences by default
         └───────────────────────────┘
-```
-
----
-
-## Platform-Specific Decisions
-
-### 1. Key Storage: Keychain → Android Keystore + EncryptedSharedPreferences
-
-**iOS:** Private keys stored in iOS Keychain (OS-managed, device-bound encryption).
-
-**Android:** Private keys are generated **inside Android Keystore** — they physically never leave the secure hardware. They cannot be exported or read from outside the Keystore.
-
-```kotlin
-// Private key STAYS in Keystore, we only use it via Signature API
-val keyPairGenerator = KeyPairGenerator.getInstance("EC", "AndroidKeyStore")
-keyPairGenerator.initialize(
-    KeyGenParameterSpec.Builder(keystoreAlias, KeyProperties.PURPOSE_SIGN)
-        .setAlgorithmParameterSpec(ECGenParameterSpec("secp256r1"))
-        .setDigests(KeyProperties.DIGEST_SHA256)
-        .setUserAuthenticationRequired(false) // No biometric required
-        .build()
-)
-```
-
-ACLs and provisioning metadata are stored in **EncryptedSharedPreferences** (AES-256-GCM, master key in Keystore).
-
-### 2. Threading: GCD → Kotlin Coroutines
-
-**iOS:** Uses `DispatchQueue` with serial queues and `@escaping` closures.
-
-**Android:** Uses Kotlin coroutines (`suspend` functions) with `Dispatchers.IO` and `Mutex` for serialization.
-
-```kotlin
-// iOS: Completion handler
-PhoneKeyFacade.shared.ensureProvisioned(userId: userId, deviceId: deviceId) { result in ... }
-
-// Android: Suspend function in coroutine scope
-viewModelScope.launch {
-    val result = service.provisionPhoneKey(userId, deviceId)
-    result.fold(
-        onSuccess = { /* update UI */ },
-        onFailure = { /* handle error */ }
-    )
-}
-```
-
-### 3. Error Handling: Swift throws/Error → Kotlin sealed class
-
-**iOS:** `NokeMobileLibraryError` as a Swift `enum` conforming to `Error`.
-
-**Android:** `NokeMobileLibraryError` as a Kotlin `sealed class` extending `Exception`.
-
-```kotlin
-// Android: Exhaustive when-expression on sealed class
-when (error) {
-    is NokeMobileLibraryError.NotInitialized -> { /* ... */ }
-    is NokeMobileLibraryError.ProvisioningFailed -> { /* error.reason */ }
-    is NokeMobileLibraryError.AclFetchFailed -> { /* error.lockMac, error.reason */ }
-    is NokeMobileLibraryError.NetworkError -> { /* error.underlying */ }
-    else -> { /* catch-all */ }
-}
-```
-
-### 4. Device UDID: identifierForVendor → ANDROID_ID
-
-**iOS:** `UIDevice.current.identifierForVendor?.uuidString`
-
-**Android:** `Settings.Secure.ANDROID_ID` — unique per device and app signing key. Resets on factory reset but not on app reinstall.
-
-```kotlin
-val udid = PhoneKeyAccessService.getDeviceUdid(context)
-// Equivalent to: Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
-```
-
-### 5. Result Type: Swift Result<T, Error> → Kotlin Result<T>
-
-**iOS:** `Result<T, Error>` with `.success` / `.failure` cases.
-
-**Android:** `kotlin.Result<T>` with `.fold { onSuccess, onFailure }`. Errors are `NokeMobileLibraryError` instances.
-
-### 6. Reactive Patterns: Combine → Kotlin Flow
-
-**iOS:** Combine framework (`Publisher`, `@Published`).
-
-**Android:** Kotlin Flow (`Flow<T>`, `StateFlow<T>`, `SharedFlow<T>`) with lifecycle-aware collection.
-
-```kotlin
-// Use viewModelScope + StateFlow for reactive UI
-class ProvisionViewModel : ViewModel() {
-    val provisioningState: StateFlow<ProvisioningState> =
-        PhoneKeyStateMonitor(service, viewModelScope).provisioningState
-}
 ```
 
 ---
@@ -346,8 +246,7 @@ interface PhoneKeyCoreClient {
 **When to Use:**
 
 - ✅ Check provisioning status without a network call
-- ✅ Retrieve cached ACLs before BLE connection
-- ✅ Validate cached ACL expiration
+- ✅ Read cached ACLs or provisioning data stored on-device
 
 ```kotlin
 val facade = PhoneKeyFacade.getInstance(context)
@@ -390,36 +289,6 @@ interface PhoneKeyPersistence {
     fun deleteACL(userId: String, lockMac: String)
     fun deleteAllACLs()
 }
-```
-
----
-
-### 5. PhoneKeyStateMonitor (Reactive State)
-
-**Purpose:** Observable state for provisioning and ACL operations via Kotlin Flow.
-
-**When to Use:**
-
-- ✅ Building reactive UI that reacts to provisioning steps
-- ✅ ViewModel integration with `StateFlow`
-
-```kotlin
-val monitor = PhoneKeyStateMonitor(service, coroutineScope)
-
-// Observe provisioning state
-monitor.provisioningState.collect { state ->
-    when (state) {
-        is ProvisioningState.Idle -> showIdle()
-        is ProvisioningState.Checking -> showProgress("Checking...")
-        is ProvisioningState.Provisioning -> showProgress("Setting up...")
-        is ProvisioningState.Provisioned -> navigateToLockList()
-        is ProvisioningState.AlreadyProvisioned -> navigateToLockList()
-        is ProvisioningState.Error -> showError(state.error)
-    }
-}
-
-// Start provisioning
-monitor.provisionDevice(userId, deviceId)
 ```
 
 ---
@@ -647,73 +516,6 @@ class ProvisioningViewModel(
 }
 ```
 
-### Reactive with PhoneKeyStateMonitor
-
-```kotlin
-class ProvisionViewModel(
-    private val service: PhoneKeyAccessService = PhoneKeyAccessService.getInstance()
-) : ViewModel() {
-
-    private val monitor = PhoneKeyStateMonitor(service, viewModelScope)
-
-    // Expose state for UI
-    val provisioningState: StateFlow<ProvisioningState> = monitor.provisioningState
-    val aclState: StateFlow<AclState> = monitor.aclState
-    val isSetupComplete: Flow<Boolean> = monitor.isSetupComplete
-
-    fun provision(userId: String, deviceId: String) {
-        viewModelScope.launch {
-            monitor.provisionDevice(userId, deviceId)
-        }
-    }
-}
-
-// In Activity/Fragment
-lifecycleScope.launch {
-    repeatOnLifecycle(Lifecycle.State.STARTED) {
-        viewModel.provisioningState.collect { state ->
-            when (state) {
-                is ProvisioningState.Idle -> binding.progressGroup.isVisible = false
-                is ProvisioningState.Checking -> binding.statusText.text = "Checking..."
-                is ProvisioningState.Provisioning -> binding.statusText.text = "Setting up..."
-                is ProvisioningState.Provisioned -> navigateToLocks()
-                is ProvisioningState.AlreadyProvisioned -> navigateToLocks()
-                is ProvisioningState.Error -> showError(state.error.message)
-            }
-        }
-    }
-}
-```
-
-### Reactive with Flow Extensions
-
-```kotlin
-// In ViewModel
-fun setupWithFlow(userId: String, deviceId: String) {
-    viewModelScope.launch {
-        service.completeProvisioningWorkflowFlow(userId, deviceId)
-            .collect { event ->
-                when (event) {
-                    is ProvisioningEvent.CheckingStatus ->
-                        _status.value = "Checking provisioning status..."
-                    is ProvisioningEvent.AlreadyProvisioned ->
-                        _status.value = "Already set up"
-                    is ProvisioningEvent.Provisioning ->
-                        _status.value = "Setting up phone key..."
-                    is ProvisioningEvent.Provisioned ->
-                        _status.value = "Phone key ready (ID: ${event.phoneKeyId})"
-                    is ProvisioningEvent.FetchingAcls ->
-                        _status.value = "Loading lock access..."
-                    is ProvisioningEvent.AclsFetched ->
-                        _status.value = "${event.result.successCount} locks ready"
-                    is ProvisioningEvent.Error ->
-                        _status.value = "Error: ${event.error.message}"
-                }
-            }
-    }
-}
-```
-
 ---
 
 ## Complete Integration Example
@@ -791,31 +593,6 @@ class LockActivity : AppCompatActivity() {
             },
             onFailure = { showError("ACL fetch failed: ${it.message}") }
         )
-    }
-
-    // Called when ION-2 lock is connected over BLE
-    private fun onIon2LockConnected(lockMac: String, gatt: BluetoothGatt) {
-        lifecycleScope.launch {
-            // Check for valid cached ACL
-            val hasCachedAcl = service.hasCachedAcl(userId, deviceId, lockMac)
-                .getOrDefault(false)
-
-            if (!hasCachedAcl) {
-                // Fetch ACL for this specific lock
-                val phoneKeyId = service.getPhoneKeyId(userId, deviceId).getOrNull()
-                    ?: return@launch
-
-                service.generateAcl(userId.toInt(), lockMac, phoneKeyId, deviceId)
-            }
-
-            // Get ACL envelope for BLE transmission
-            val aclEnvelope = service.getAcl(userId, deviceId, lockMac).getOrNull()
-                ?: return@launch
-
-            // Decode ACL bytes and write to lock over BLE
-            val aclBytes = android.util.Base64.decode(aclEnvelope.acl, android.util.Base64.DEFAULT)
-            writeAclToLock(gatt, aclBytes)
-        }
     }
 
     fun logout() {
@@ -1014,34 +791,7 @@ service.cleanupAclsForUser(userId, deviceId)
 service.clearManagerInstance(userId, deviceId)
 ```
 
-### 4. ACL Expiration
-
-ACLs have a server-assigned `expiresAt` timestamp. Before attempting BLE unlock:
-
-```kotlin
-val hasCached = service.hasCachedAcl(userId, deviceId, lockMac).getOrDefault(false)
-if (!hasCached) {
-    // Fetch fresh ACL before connecting
-    service.generateAcl(userId.toInt(), lockMac, phoneKeyId, deviceId)
-}
-```
-
-### 5. BLE ACL Transmission
-
-Retrieve the cached ACL envelope and pass the decoded bytes directly to the lock over BLE:
-
-```kotlin
-// Get ACL envelope from cache
-val envelope = service.getAcl(userId, deviceId, lockMac).getOrNull() ?: return
-
-// Decode base64 ACL bytes and write to the BLE GATT characteristic
-val aclBytes = Base64.decode(envelope.acl, Base64.DEFAULT)
-writeToGattCharacteristic(gatt, ION_PROVISION_CHAR_UUID, aclBytes)
-```
-
-The lock handles signing verification on its end using the ACL signature already embedded in the envelope returned by the backend.
-
-### 6. API Parameter Naming
+### 4. API Parameter Naming
 
 Android uses **snake_case** in JSON request bodies:
 
@@ -1052,7 +802,7 @@ Android uses **snake_case** in JSON request bodies:
 | Public Key      | `"public_key"` | —                                         |
 | Response Key ID | `"key_id"`     | Returned from backend                     |
 
-### 7. Thread Safety
+### 5. Thread Safety
 
 All `suspend` functions in `PhoneKeyAccessService` are thread-safe. However:
 
@@ -1162,14 +912,11 @@ class PhoneKeyAccessServiceTest {
 
 ✅ **DO:**
 
-- Use `hasCachedAcl()` before BLE connection to check if ACL fetch is needed
 - Call `cleanupAclsForUser()` + `clearManagerInstance()` on logout (in that order)
 - Use `generateBulkAcls()` at app startup to pre-fetch all ACLs
 
 ❌ **DON'T:**
 
-- Fetch individual ACLs per lock when bulk fetch covers all accessible locks
-- Use expired ACLs for BLE transmission
 - Skip logout cleanup (causes stale data across user sessions)
 
 ### 3. Error Handling
@@ -1231,18 +978,6 @@ class PhoneKeyAccessServiceTest {
 - **`PhoneKeyFacade`**: Low-level, local-only access to cached phone key info and ACLs stored on the device. No network calls. Use it to read cached ACLs or provisioning status directly.
 - **`PhoneKeyAccessService`**: High-level coroutine API that orchestrates the full provisioning workflow — initializing keys, calling your backend (via `PhoneKeyCoreClient`), and persisting results. This is the primary entry point for most operations.
 
-### Q: How do I handle ACL expiration?
-
-**A:** Check `BulkAclEnvelope.isExpired` or use `hasCachedAcl()` (which only returns `true` for non-expired ACLs). If expired, call `generateAcl()` for a specific lock or `generateBulkAcls()` to refresh all locks at once:
-
-```kotlin
-val hasCached = service.hasCachedAcl(userId, udid, lockMac).getOrDefault(false)
-if (!hasCached) {
-    val phoneKeyId = service.getPhoneKeyId(userId, udid).getOrNull() ?: return
-    service.generateAcl(userId.toInt(), lockMac, phoneKeyId, udid)
-}
-```
-
 ### Q: Can I use Java instead of Kotlin?
 
 **A:** Yes. All public APIs in `PhoneKeyAccessService`, `PhoneKeyFacade`, and `PhoneKeyCoreClient` are fully Java-compatible. For `suspend` functions, use the `BuildersKt.launch` or `CoroutineScope` utilities from the Kotlin coroutines Java interop layer, or wrap calls using `ListenableFuture` / `CompletableFuture` adapters.
@@ -1294,5 +1029,5 @@ For questions or issues:
 ---
 
 **Version:** 1.0.0  
-**Last Updated:** April 22, 2026  
+**Last Updated:** May 4, 2026  
 **License:** Apache 2.0
