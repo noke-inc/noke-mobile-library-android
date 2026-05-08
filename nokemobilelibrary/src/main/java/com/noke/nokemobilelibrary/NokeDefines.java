@@ -69,7 +69,14 @@ public class NokeDefines {
     static final byte FAILEDTOLOCK_ResultType                       =(byte)0x68;
     static final byte FAILEDTOUNLOCK_ResultType                     =(byte)0x69;
     static final byte FAILEDTOUNSHACKLE_ResultType                  =(byte)0x6A;
+    static final byte OUTOFSCHEDULEUNLOCK_ResultType                =(byte)0x6D;
+    static final byte FREEEXIT_ResultType                           =(byte)0x6F;
     static final byte INVALID_ResultType							=(byte)0xFF;
+
+    /**
+     * Diagnostic Packet Types
+     */
+    static final byte DIAGNOSTIC_PacketType                         =(byte)0x9B;
 
     /**
      * Lock response destination types
@@ -92,6 +99,9 @@ public class NokeDefines {
     static final UUID FIRMWARE_RX_SERVICE_UUID = UUID.fromString("00001530-1212-efde-1523-785feabcd123");
     static final UUID FIRMWARE_TX_CHAR_UUID = UUID.fromString("00001531-1212-efde-1523-785feabcd123");
 
+    /**
+     * Noke firmware mode UUIDs
+     */
     static final UUID FIRMWARE_4I_RX_SERVICE_UUID = UUID.fromString("8ec90002-f315-4f60-9fb8-838830daea50");
     static final UUID FIRMWARE_4I_TX_CHAR_UUID = UUID.fromString("8ec90001-f315-4f60-9fb8-838830daea50");
     static final UUID FIRMWARE_2I_RX_SERVICE_UUID = UUID.fromString("8ec90002-f315-4f60-9fb8-838830daea50");
@@ -100,23 +110,25 @@ public class NokeDefines {
     /**
      * Noke Connection States
      */
-    static final int NOKE_STATE_DISCONNECTED         = 0;
-    static final int NOKE_STATE_DISCOVERED           = 1;
-    static final int NOKE_STATE_CONNECTING           = 2;
-    static final int NOKE_STATE_CONNECTED            = 3;
-    static final int NOKE_STATE_SYNCING              = 4;
-    static final int NOKE_STATE_UNLOCKED             = 5;
-    static final int NOKE_GATT_ERROR                 = 133;
+    public static final int NOKE_STATE_DISCONNECTED         = 0;
+    public static final int NOKE_STATE_DISCOVERED           = 1;
+    public static final int NOKE_STATE_CONNECTING           = 2;
+    public static final int NOKE_STATE_CONNECTED            = 3;
+    public static final int NOKE_STATE_SYNCING              = 4;
+    public static final int NOKE_STATE_UNLOCKED             = 5;
+    public static final int NOKE_GATT_ERROR                 = 133;
 
     /**
      * Noke Lock States
      */
-    public static final int NOKE_LOCK_STATE_UNKNOWN         = -1;
-    public static final int NOKE_LOCK_STATE_UNLOCKED        = 0;
-    public static final int NOKE_LOCK_STATE_UNSHACKLED      = 2;
-    public static final int NOKE_LOCK_STATE_LOCKED          = 3;
-    public static final int NOKE_LOCK_STATE_UNSHACKLING     = 4;
-    public static final int NOKE_LOCK_STATE_UNLOCKING       = 5;
+    public static final int NOKE_LOCK_STATE_UNKNOWN          = -1;
+    public static final int NOKE_LOCK_STATE_UNLOCKED         = 0;
+    public static final int NOKE_LOCK_STATE_UNSHACKLED       = 2;
+    public static final int NOKE_LOCK_STATE_LOCKED           = 3;
+    public static final int NOKE_LOCK_STATE_JAMMED_UNLOCKING = 4;
+    public static final int NOKE_LOCK_STATE_JAMMED_LOCKING   = 5;
+    public static final int NOKE_LOCK_STATE_UNSHACKLING      = 4;
+    public static final int NOKE_LOCK_STATE_UNLOCKING        = 5;
     public static final int NOKE_LOCK_STATE_LOCKED_NO_MAGNET = 7;
 
     /**
@@ -128,6 +140,24 @@ public class NokeDefines {
     public static final String NOKE_HW_TYPE_HD_LOCK                 = "I";
     public static final String NOKE_HW_TYPE_DOOR_CONTROLLER         = "2E";
     public static final String NOKE_HW_TYPE_PB12                    = "1C";
+    public static final String NOKE_HW_TYPE_KEYPAD                  = "K";
+    public static final String NOKE_HW_TYPE_THUNDERGUN              = "A";
+
+    ////Diagnostic Lock States (byte values reported in diagnostic packets)
+    static final byte LockStateUnlocked                             = (byte)0x00;
+    static final byte LockStateUnshackled                           = (byte)0x01;
+    static final byte LockStateLocked                               = (byte)0x02;
+    static final byte LockStateJammedWhileUnlocking                 = (byte)0x03;
+    static final byte LockStateJammedWhileLocking                   = (byte)0x04;
+
+    ////LED State
+    static final byte RedLED                                        = (byte)0x02;
+    static final byte GreenLED                                      = (byte)0x01;
+    static final byte OffLED                                        = (byte)0x00;
+
+    ////Touch Sensor
+    static final byte Touched                                       = 1;
+    static final byte NotTouched                                    = 0;
 
 
 

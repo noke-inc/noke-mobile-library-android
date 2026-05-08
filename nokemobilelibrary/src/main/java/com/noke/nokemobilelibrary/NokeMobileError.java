@@ -48,6 +48,8 @@ public class NokeMobileError {
     public static final int DEVICE_ERROR_FAILED_TO_LOCK             = 268;
     public static final int DEVICE_ERROR_FAILED_TO_UNLOCK           = 269;
     public static final int DEVICE_ERROR_FAILED_TO_REMOVE_SHACKLE   = 270;
+    public static final int DEVICE_OUT_OF_SCHEDULE_UNLOCK           = 271;
+    public static final int DEVICE_FREE_EXIT_UNLOCK                 = 311;
     public static final int DEVICE_ERROR_UNKNOWN                    = 299;
 
     //Noke Device Manager Service Errors
@@ -63,8 +65,10 @@ public class NokeMobileError {
     public static final int ERROR_INVALID_OFFLINE_KEY           = 309;
     public static final int ERROR_JSON_UPLOAD                   = 315;
     public static final int ERROR_MISSING_UPLOAD_URL            = 316;
-    public static final int ERROR_CONNECTION_TIMEOUT            = 317;
+    public static final int ERROR_UNSTABLE_BLUETOOTH_STACK      = 317;
+    public static final int ERROR_CONNECTION_TIMEOUT            = 318;
     public static final int ERROR_BLUETOOTH_SCAN_PERMISSION     = 319;
+    public static final int ERROR_SIGNING                       = 320; // ION-2 signing unlock error
 
 
 

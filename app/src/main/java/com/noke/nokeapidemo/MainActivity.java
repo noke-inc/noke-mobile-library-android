@@ -1,5 +1,7 @@
 package com.noke.nokeapidemo;
 
+import com.noke.nokeapidemo.R;
+
 import android.Manifest;
 import android.annotation.TargetApi;
 import android.content.ComponentName;
@@ -174,6 +176,21 @@ public class MainActivity extends AppCompatActivity implements DemoWebClient.Dem
             setStatusText("NOKE UNLOCKED: " + noke.getName());
             setLockLayoutColor(getResources().getColor(R.color.unlockGreen));
         }
+
+        @Override
+        public void onNokeJammedLocking(NokeDevice noke) {}
+
+        @Override
+        public void onNokeJammedUnlocking(NokeDevice noke) {}
+
+        @Override
+        public void successPacketReceived(NokeDevice noke) {}
+
+        @Override
+        public void shouldUploadData(org.json.JSONArray data) {}
+
+        @Override
+        public void nokeDeviceDidSendDiagnostics(org.json.JSONObject data, NokeDevice noke) {}
 
         @Override
         public void onNokeShutdown(NokeDevice noke, Boolean isLocked, Boolean didTimeout) {

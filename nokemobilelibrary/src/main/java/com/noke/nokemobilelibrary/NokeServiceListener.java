@@ -1,5 +1,8 @@
 package com.noke.nokemobilelibrary;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 /************************************************************************************************************************************************
  * Copyright © 2018 Nokē Inc. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,7 +21,7 @@ package com.noke.nokemobilelibrary;
  * Listener for handling callbacks from NokeService
  */
 
-public interface NokeServiceListener  {
+public interface NokeServiceListener {
 
     void onNokeDiscovered(NokeDevice noke);
 
@@ -29,6 +32,8 @@ public interface NokeServiceListener  {
     void onNokeSyncing(NokeDevice noke);
 
     void onNokeUnlocked(NokeDevice noke);
+    void onNokeJammedLocking(NokeDevice noke);
+    void onNokeJammedUnlocking(NokeDevice noke);
 
     void onNokeShutdown(NokeDevice noke, Boolean isLocked, Boolean didTimeout);
 
@@ -39,5 +44,11 @@ public interface NokeServiceListener  {
     void onBluetoothStatusChanged(int bluetoothStatus);
 
     void onError(NokeDevice noke, int error, String message);
+
+    void shouldUploadData(JSONArray data);
+
+    void nokeDeviceDidSendDiagnostics(JSONObject data, NokeDevice noke);
+
+    void successPacketReceived(NokeDevice noke);
 
 }

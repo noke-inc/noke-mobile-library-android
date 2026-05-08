@@ -1,0 +1,92 @@
+package com.noke.nokemobilelibrary.interfaces;
+
+import androidx.annotation.IntDef;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+
+@IntDef({
+        NokeErrorCode.SUCCESS,
+        NokeErrorCode.API_ERROR_INTERNAL_SERVER,
+        NokeErrorCode.API_ERROR_API_KEY,
+        NokeErrorCode.API_ERROR_INPUT,
+        NokeErrorCode.API_ERROR_REQUEST_METHOD,
+        NokeErrorCode.API_ERROR_INVALID_ENDPOINT,
+        NokeErrorCode.API_ERROR_COMPANY_NOT_FOUND,
+        NokeErrorCode.API_ERROR_LOCK_NOT_FOUND,
+        NokeErrorCode.API_ERROR_UNKNOWN,
+        NokeErrorCode.GO_ERROR_UNLOCK,
+        NokeErrorCode.GO_ERROR_UPLOAD,
+        NokeErrorCode.DEVICE_ERROR_INVALID_KEY,
+        NokeErrorCode.DEVICE_ERROR_INVALID_CMD,
+        NokeErrorCode.DEVICE_ERROR_INVALID_PERMISSION,
+        NokeErrorCode.DEVICE_SHUTDOWN_RESULT,
+        NokeErrorCode.DEVICE_ERROR_INVALID_DATA,
+        NokeErrorCode.DEVICE_BATTERY_RESULT,
+        NokeErrorCode.DEVICE_ERROR_INVALID_RESULT,
+        NokeErrorCode.DEVICE_ERROR_FAILED_TO_LOCK,
+        NokeErrorCode.DEVICE_ERROR_FAILED_TO_UNLOCK,
+        NokeErrorCode.DEVICE_ERROR_FAILED_TO_REMOVE_SHACKLE,
+        NokeErrorCode.DEVICE_OUT_OF_SCHEDULE_UNLOCK,
+        NokeErrorCode.DEVICE_FREE_EXIT_UNLOCK,
+        NokeErrorCode.DEVICE_ERROR_UNKNOWN,
+        NokeErrorCode.ERROR_LOCATION_PERMISSIONS_NEEDED,
+        NokeErrorCode.ERROR_LOCATION_SERVICES_DISABLED,
+        NokeErrorCode.ERROR_BLUETOOTH_DISABLED,
+        NokeErrorCode.ERROR_BLUETOOTH_GATT,
+        NokeErrorCode.ERROR_INVALID_NOKE_DEVICE,
+        NokeErrorCode.ERROR_GPS_ENABLED,
+        NokeErrorCode.ERROR_NETWORK_ENABLED,
+        NokeErrorCode.ERROR_BLUETOOTH_SCANNING,
+        NokeErrorCode.ERROR_MISSING_API_KEY,
+        NokeErrorCode.ERROR_INVALID_OFFLINE_KEY,
+        NokeErrorCode.ERROR_JSON_UPLOAD,
+        NokeErrorCode.ERROR_MISSING_UPLOAD_URL,
+        NokeErrorCode.ERROR_UNSTABLE_BLUETOOTH_STACK,
+        NokeErrorCode.ERROR_CONNECTION_TIMEOUT,
+        NokeErrorCode.ERROR_BLUETOOTH_SCAN_PERMISSION,
+        NokeErrorCode.ERROR_SIGNING
+})
+@Retention(RetentionPolicy.SOURCE)
+public @interface NokeErrorCode {
+    // Mirror the values in NokeMobileError:
+    int SUCCESS = 0;
+    int API_ERROR_INTERNAL_SERVER = 1;
+    int API_ERROR_API_KEY = 2;
+    int API_ERROR_INPUT = 3;
+    int API_ERROR_REQUEST_METHOD = 4;
+    int API_ERROR_INVALID_ENDPOINT = 5;
+    int API_ERROR_COMPANY_NOT_FOUND = 6;
+    int API_ERROR_LOCK_NOT_FOUND = 7;
+    int API_ERROR_UNKNOWN = 99;
+    int GO_ERROR_UNLOCK = 100;
+    int GO_ERROR_UPLOAD = 101;
+    int DEVICE_ERROR_INVALID_KEY = 261;
+    int DEVICE_ERROR_INVALID_CMD = 262;
+    int DEVICE_ERROR_INVALID_PERMISSION = 263;
+    int DEVICE_SHUTDOWN_RESULT = 264;
+    int DEVICE_ERROR_INVALID_DATA = 265;
+    int DEVICE_BATTERY_RESULT = 266;
+    int DEVICE_ERROR_INVALID_RESULT = 267;
+    int DEVICE_ERROR_FAILED_TO_LOCK = 268;
+    int DEVICE_ERROR_FAILED_TO_UNLOCK = 269;
+    int DEVICE_ERROR_FAILED_TO_REMOVE_SHACKLE = 270;
+    int DEVICE_OUT_OF_SCHEDULE_UNLOCK = 271;
+    int DEVICE_FREE_EXIT_UNLOCK = 311;
+    int DEVICE_ERROR_UNKNOWN = 299;
+    int ERROR_LOCATION_PERMISSIONS_NEEDED = 300;
+    int ERROR_LOCATION_SERVICES_DISABLED = 301;
+    int ERROR_BLUETOOTH_DISABLED = 302;
+    int ERROR_BLUETOOTH_GATT = 303;
+    int ERROR_INVALID_NOKE_DEVICE = 304;
+    int ERROR_GPS_ENABLED = 305;
+    int ERROR_NETWORK_ENABLED = 306;
+    int ERROR_BLUETOOTH_SCANNING = 307;
+    int ERROR_MISSING_API_KEY = 308;
+    int ERROR_INVALID_OFFLINE_KEY = 309;
+    int ERROR_JSON_UPLOAD = 315;
+    int ERROR_MISSING_UPLOAD_URL = 316;
+    int ERROR_UNSTABLE_BLUETOOTH_STACK = 317;
+    int ERROR_CONNECTION_TIMEOUT = 318;
+    int ERROR_BLUETOOTH_SCAN_PERMISSION = 319;
+    int ERROR_SIGNING = 320;
+}

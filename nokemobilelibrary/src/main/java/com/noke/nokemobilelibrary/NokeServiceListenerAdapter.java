@@ -1,5 +1,8 @@
 package com.noke.nokemobilelibrary;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 /************************************************************************************************************************************************
  * Copyright © 2018 Nokē Inc. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,7 +22,7 @@ package com.noke.nokemobilelibrary;
  */
 
 @SuppressWarnings("unused")
-public class NokeServiceListenerAdapter implements NokeServiceListener{
+public class NokeServiceListenerAdapter implements NokeServiceListener {
 
     @Override
     public void onNokeDiscovered(NokeDevice noke) {
@@ -47,6 +50,16 @@ public class NokeServiceListenerAdapter implements NokeServiceListener{
     }
 
     @Override
+    public void onNokeJammedLocking(NokeDevice noke) {
+        //empty default implementation
+    }
+
+    @Override
+    public void onNokeJammedUnlocking(NokeDevice noke) {
+        //empty default implementation
+    }
+
+    @Override
     public void onNokeShutdown(NokeDevice noke, Boolean isLocked, Boolean didTimeout) {
         //empty default implementation
     }
@@ -68,6 +81,21 @@ public class NokeServiceListenerAdapter implements NokeServiceListener{
 
     @Override
     public void onError(NokeDevice noke, int error, String message) {
+        //empty default implementation
+    }
+
+    @Override
+    public void shouldUploadData(JSONArray data) {
+        //empty default implementation
+    }
+
+    @Override
+    public void nokeDeviceDidSendDiagnostics(JSONObject data, NokeDevice noke) {
+        //empty default implementation
+    }
+
+    @Override
+    public void successPacketReceived(NokeDevice noke) {
         //empty default implementation
     }
 }
