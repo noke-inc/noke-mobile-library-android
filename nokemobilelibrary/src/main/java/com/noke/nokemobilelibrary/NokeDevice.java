@@ -621,6 +621,15 @@ public class NokeDevice {
     }
 
     /**
+     * Initiates an offline unlock for ION-2 signing locks using the locally cached Phone Key ACL.
+     * No network call is required — the ACL stored by the Phone Key is used for offline unlock.
+     *
+     */
+    public void signingOfflineUnlock() {
+      mService.unlockSigningDevice(this);
+    }
+
+    /**
      * Start unlock operation for ION-2 signing locks.
      * Mirrors iOS: NokeDevice+Signing.swift unlockForSigning() method
      * 
@@ -630,7 +639,7 @@ public class NokeDevice {
      * @param aclBinary Base64-encoded ACL data
      * @param aclSignature Base64-encoded ACL signature
      */
-    public void unlockForSigning(String aclBinary, String aclSignature) {
+    protected void unlockForSigning(String aclBinary, String aclSignature) {
         startUnlock(aclBinary, aclSignature);
     }
 

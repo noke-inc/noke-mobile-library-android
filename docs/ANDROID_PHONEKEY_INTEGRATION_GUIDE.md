@@ -318,8 +318,9 @@ import kotlinx.coroutines.withContext
 class MyPhoneKeyCoreClient(
     private val context: Context,
     private val baseUrl: String,
-    private val authTokenProvider: () -> String,
-    private val userUuidProvider: () -> String
+    private val apiKeyProvider: () -> String,
+    private val userUuidProvider: () -> String,
+    private val extraHeaders: Map<String, String> = emptyMap()
 ) : PhoneKeyCoreClient {
 
     private val mutex = Mutex()
@@ -330,8 +331,11 @@ class MyPhoneKeyCoreClient(
         val securityService: SecurityService = SecurityServiceImpl(
             context = context,
             baseUrl = baseUrl,
-            authTokenProvider = authTokenProvider,
-            userUuidProvider = userUuidProvider
+            // Gateway authenticates Phone Key requests via "Authorization: ApiKey <phoneKeyApiKey>".
+            authTokenProvider = apiKeyProvider,
+            userUuidProvider = userUuidProvider,
+            tokenScheme = "ApiKey",
+            extraHeaders = extraHeaders
         )
         return PhoneKeyManager.getInstance(context, userId, deviceId, securityService)
     }
@@ -411,11 +415,18 @@ class MyApplication : Application() {
         super.onCreate()
 
         // Initialize Phone Key system
+        // The gateway authenticates via "Authorization: ApiKey <phoneKeyApiKey>".
+        // Email/CompanyId/SiteId are passed via extraHeaders.
         val client = MyPhoneKeyCoreClient(
             context = this,
-            baseUrl = "https://router.smartentry.noke.com/",
-            authTokenProvider = { sessionManager.getAuthToken() },
-            userUuidProvider = { sessionManager.getUserUuid() }
+            baseUrl = "https://api-gateway.smartentry.noke.com/",
+            apiKeyProvider = { sessionManager.getApiKey() },
+            userUuidProvider = { sessionManager.getUserUuid() },
+            extraHeaders = mapOf(
+                "Email"     to sessionManager.getEmail(),
+                "CompanyId" to sessionManager.getCompanyId(),
+                "SiteId"    to sessionManager.getSiteId()
+            )
         )
         PhoneKeyAccessService.setSharedClient(client, this)
     }

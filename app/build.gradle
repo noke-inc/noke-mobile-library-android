@@ -2,6 +2,13 @@ apply plugin: 'com.android.application'
 
 apply plugin: 'kotlin-android'
 
+// Load Phone Key configuration from local.properties (not committed to version control)
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(localPropertiesFile.newDataInputStream())
+}
+
 android {
     compileSdkVersion 34
     defaultConfig {
@@ -11,6 +18,27 @@ android {
         versionCode 20
         versionName "0.11.0"
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+
+        // Phone Key configuration — set these in local.properties (never commit credentials)
+        // phoneKeyUserId      : Integer user ID from Noke backend (required for ION-2 unlock)
+        // phoneKeyApiKey      : API key for the smart-entry gateway; sent as
+        //                       "Authorization: ApiKey <phoneKeyApiKey>" for Phone Key requests
+        // phoneKeyEmail       : Email associated with the gateway tenant account
+        // phoneKeyCompanyId   : Company ID for the gateway (header: CompanyId)
+        // phoneKeySiteId      : Site ID for the gateway (header: SiteId)
+        // phoneKeyBaseUrl     : Override base URL (defaults to api-gateway.smartentry.noke.com)
+        buildConfigField "String", "PHONE_KEY_USER_ID",
+                "\"${localProperties.getProperty('phoneKeyUserId', '')}\""
+        buildConfigField "String", "PHONE_KEY_BASE_URL",
+                "\"${localProperties.getProperty('phoneKeyBaseUrl', 'https://api-gateway.smartentry.noke.dev/')}\""
+        buildConfigField "String", "PHONE_KEY_API_KEY",
+                "\"${localProperties.getProperty('phoneKeyApiKey', '')}\""
+        buildConfigField "String", "PHONE_KEY_EMAIL",
+                "\"${localProperties.getProperty('phoneKeyEmail', '')}\""
+        buildConfigField "String", "PHONE_KEY_COMPANY_ID",
+                "\"${localProperties.getProperty('phoneKeyCompanyId', '')}\""
+        buildConfigField "String", "PHONE_KEY_SITE_ID",
+                "\"${localProperties.getProperty('phoneKeySiteId', '')}\""
     }
     buildTypes {
         release {
@@ -23,6 +51,7 @@ android {
     }
     buildFeatures {
         viewBinding true
+        buildConfig true
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17

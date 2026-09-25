@@ -209,9 +209,9 @@ class MyCustomPhoneKeyCoreClient(
                             NokeMobileLibraryError.NotInitialized as Throwable
                         )
 
-                    val success = kotlin.coroutines.suspendCoroutine<Boolean> { continuation ->
-                        manager.getAcl(userId, lockMac, phoneKeyId) { result ->
-                            continuation.resume(result)
+                    val (success, exception) = kotlin.coroutines.suspendCoroutine<Pair<Boolean, Exception?>> { continuation ->
+                        manager.getAcl(userId, lockMac, phoneKeyId) { result, aclException ->
+                            continuation.resume(Pair(result, aclException))
                         }
                     }
 
@@ -219,11 +219,11 @@ class MyCustomPhoneKeyCoreClient(
                         Log.d(TAG, "ACL generated for lock=$lockMac")
                         Result.success(Unit)
                     } else {
-                        Log.e(TAG, "ACL generation failed")
+                        Log.e(TAG, "ACL generation failed: ${exception?.message}")
                         Result.failure(
                             NokeMobileLibraryError.AclFetchFailed(
                                 lockMac = lockMac,
-                                reason = "Backend request failed or storage error"
+                                reason = exception?.message ?: "Backend request failed or storage error"
                             ) as Throwable
                         )
                     }
@@ -264,10 +264,20 @@ class MyCustomPhoneKeyCoreClient(
                             NokeMobileLibraryError.NotInitialized as Throwable
                         )
 
-                    val (successCount, totalCount) = kotlin.coroutines.suspendCoroutine<Pair<Int, Int>> { continuation ->
-                        manager.getBulkAcls(phoneKeyId) { success, total ->
-                            continuation.resume(Pair(success, total))
+                    val (successCount, totalCount, exception) = kotlin.coroutines.suspendCoroutine<Triple<Int, Int, Exception?>> { continuation ->
+                        manager.getBulkAcls(phoneKeyId) { success, total, bulkException ->
+                            continuation.resume(Triple(success, total, bulkException))
                         }
+                    }
+
+                    if (exception != null) {
+                        Log.e(TAG, "Bulk ACL fetch failed: ${exception.message}")
+                        return@withContext Result.failure(
+                            NokeMobileLibraryError.BulkAclFetchFailed(
+                                phoneKeyId = phoneKeyId,
+                                reason = exception.message ?: "Backend request failed"
+                            ) as Throwable
+                        )
                     }
 
                     val bulkResult = BulkAclResult(

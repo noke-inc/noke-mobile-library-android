@@ -35,7 +35,8 @@ internal class SecurityServiceRetryInterceptor(
     private val context: Context,
     private val authTokenProvider: () -> String,
     private val maxRetries: Int = 1,
-    private val retryDelayMs: Long = 3000
+    private val retryDelayMs: Long = 3000,
+    private val tokenScheme: String = "Bearer"
 ) : Interceptor {
 
     init {
@@ -64,12 +65,14 @@ internal class SecurityServiceRetryInterceptor(
         while (attempt <= maxRetries) {
             try {
                 // Build request (with fresh token on auth error retries)
-                val requestToExecute = if (attempt > 0 && lastStatusCode in listOf(401, 403)) {
-                    // Auth error retry: fetch fresh token and rebuild request
+                val requestToExecute = if (attempt > 0 && lastStatusCode == 401) {
+                    // 401 Unauthenticated: fetch fresh token and rebuild request.
+                    // Note: 403 (Forbidden/permission-denied) is NOT retried — the token is valid
+                    // but the caller lacks permission. Refreshing the same ApiKey won't help.
                     Log.d(TAG, "ION-2 - Auth error detected, fetching fresh token before retry (attempt ${attempt + 1}/${maxRetries + 1})")
                     val freshToken = authTokenProvider()
                     originalRequest.newBuilder()
-                        .header("Authorization", "Bearer $freshToken")
+                        .header("Authorization", "$tokenScheme $freshToken")
                         .build()
                 } else {
                     // First attempt or non-auth retry: use original request
@@ -177,11 +180,13 @@ internal class SecurityServiceRetryInterceptor(
      */
     private fun shouldRetryHttpError(statusCode: Int): Boolean {
         return when (statusCode) {
-            401, 403 -> true  // Auth errors
+            401 -> true       // Unauthenticated — worth retrying with fresh token
+            // 403 is NOT retried: permission-denied means the caller lacks authorization.
+            // Refreshing the same ApiKey token won't change server-side access control.
             408, 504 -> true  // Timeout errors
             429 -> true       // Rate limit
             500, 502, 503 -> true  // Server errors
-            else -> false     // All other errors (including 400, 404, etc.)
+            else -> false     // All other errors (including 400, 403, 404, etc.)
         }
     }
 

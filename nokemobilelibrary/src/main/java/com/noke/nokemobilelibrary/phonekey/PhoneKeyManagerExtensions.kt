@@ -247,19 +247,19 @@ internal suspend fun PhoneKeyManager.getAclSuspend(
     Log.d(TAG, "Fetching ACL for lock=$lockMac, userId=$userId, phoneKeyId=$phoneKeyId")
     
     // Call callback-based ACL fetch
-    getAcl(userId, lockMac, phoneKeyId) { success ->
+    getAcl(userId, lockMac, phoneKeyId) { success, exception ->
         when {
             continuation.isActive && success -> {
                 Log.d(TAG, "ACL fetch succeeded for lock=$lockMac")
                 continuation.resume(Result.success(Unit))
             }
             continuation.isActive && !success -> {
-                Log.e(TAG, "ACL fetch failed for lock=$lockMac")
+                Log.e(TAG, "ACL fetch failed for lock=$lockMac: ${exception?.message}")
                 continuation.resume(
                     Result.failure(
                         NokeMobileLibraryError.AclFetchFailed(
                             lockMac = lockMac,
-                            reason = "Backend request failed or storage error occurred"
+                            reason = exception?.message ?: "Backend request failed or storage error occurred"
                         )
                     )
                 )
@@ -353,9 +353,23 @@ internal suspend fun PhoneKeyManager.getBulkAclsSuspend(
     Log.d(TAG, "Fetching bulk ACLs for phoneKeyId=$phoneKeyId")
     
     // Call callback-based bulk ACL fetch
-    getBulkAcls(phoneKeyId) { successCount, totalCount ->
+    getBulkAcls(phoneKeyId) { successCount, totalCount, exception ->
         if (!continuation.isActive) {
             Log.d(TAG, "Bulk ACL fetch callback invoked but continuation already completed (cancelled)")
+            return@getBulkAcls
+        }
+
+        // Surface backend errors immediately rather than treating them as empty success
+        if (exception != null) {
+            Log.e(TAG, "Bulk ACL fetch error for phoneKeyId=$phoneKeyId: ${exception.message}")
+            continuation.resume(
+                Result.failure(
+                    NokeMobileLibraryError.BulkAclFetchFailed(
+                        phoneKeyId = phoneKeyId,
+                        reason = exception.message ?: "Backend request failed"
+                    )
+                )
+            )
             return@getBulkAcls
         }
         

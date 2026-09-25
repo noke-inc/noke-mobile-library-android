@@ -259,26 +259,46 @@ internal class PhoneKeyManager constructor(
                 return prefsCache.getOrPut(cacheKey) {
                     val prefsFileName = "${PREFS_FILE_PREFIX}_${userId}_${udid}"
                     val masterKeyAlias = "${MASTER_KEY_ALIAS_PREFIX}_${userId}_${udid}"
-                    
-                    // Create device-specific MasterKey in Android Keystore
-                    val masterKey = MasterKey.Builder(context, masterKeyAlias)
-                        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                        .setUserAuthenticationRequired(false)
-                        .build()
-                    
-                    // Create device-specific EncryptedSharedPreferences file
-                    val prefs = EncryptedSharedPreferences.create(
-                        context,
-                        prefsFileName,
-                        masterKey,
-                        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-                    )
-                    
-                    Log.d(TAG, "ION-2 - Created NEW EncryptedSharedPreferences for user=$userId, device=$udid")
-                    prefs
+
+                    try {
+                        createEncryptedPrefs(context, prefsFileName, masterKeyAlias)
+                    } catch (e: Exception) {
+                        // Keystore key and encrypted file can get out of sync (e.g. keystore key
+                        // invalidated/recreated while the old encrypted XML file persists), which
+                        // surfaces as AEADBadTagException/KeyStoreException on decrypt. Recover by
+                        // wiping the stale file + keystore alias and recreating fresh storage
+                        // instead of crashing the app.
+                        Log.w(TAG, "ION-2 - EncryptedSharedPreferences corrupted for user=$userId, device=$udid, recreating: ${e.message}", e)
+                        context.deleteSharedPreferences(prefsFileName)
+                        try {
+                            KeyStore.getInstance("AndroidKeyStore").apply {
+                                load(null)
+                                if (containsAlias(masterKeyAlias)) deleteEntry(masterKeyAlias)
+                            }
+                        } catch (keystoreException: Exception) {
+                            Log.w(TAG, "ION-2 - Failed to delete stale master key alias $masterKeyAlias: ${keystoreException.message}")
+                        }
+                        createEncryptedPrefs(context, prefsFileName, masterKeyAlias)
+                    }.also {
+                        Log.d(TAG, "ION-2 - Created NEW EncryptedSharedPreferences for user=$userId, device=$udid")
+                    }
                 }
             }
+        }
+
+        private fun createEncryptedPrefs(context: Context, prefsFileName: String, masterKeyAlias: String): SharedPreferences {
+            val masterKey = MasterKey.Builder(context, masterKeyAlias)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .setUserAuthenticationRequired(false)
+                .build()
+
+            return EncryptedSharedPreferences.create(
+                context,
+                prefsFileName,
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
         }
         
         /**
@@ -737,13 +757,13 @@ internal class PhoneKeyManager constructor(
      * @param userId User ID for ACL request (as Int)
      * @param lockMac MAC address of the lock
      * @param phoneKeyId Phone key ID from provisioning
-     * @param completion Callback with success/failure (true = stored successfully)
+     * @param completion Callback with success/failure and the exception on failure (null on success)
      */
     fun getAcl(
         userId: Int,
         lockMac: String,
         phoneKeyId: Int,
-        completion: (Boolean) -> Unit
+        completion: (Boolean, Exception?) -> Unit
     ) {
         securityService.getACLEnvelope(userId, lockMac, phoneKeyId, object : SecurityService.AclEnvelopeCallback {
             override fun onSuccess(phoneKeyAcl: PhoneKeyAcl, aclSignature: String, aclBinary: String) {
@@ -756,17 +776,17 @@ internal class PhoneKeyManager constructor(
                     )
                     storeAclEnvelope(envelope)
                     Log.d(TAG, "ION-2 - ACL envelope stored for lock $lockMac with signature and binary (${aclBinary.length} chars)")
-                    completion(true)
+                    completion(true, null)
                 } catch (e: Exception) {
                     // Storage failure should be treated as ACL fetch failure
                     Log.e(TAG, "ION-2 - ACL received but storage failed for lock $lockMac: ${e.message}", e)
-                    completion(false)
+                    completion(false, e)
                 }
             }
 
             override fun onFailure(exception: Exception) {
                 Log.e(TAG, "ION-2 - Failed to get ACL: ${exception.message}", exception)
-                completion(false)
+                completion(false, exception)
             }
         })
     }
@@ -788,7 +808,7 @@ internal class PhoneKeyManager constructor(
      */
     fun getBulkAcls(
         phoneKeyId: Int,
-        completion: (successCount: Int, totalCount: Int) -> Unit
+        completion: (successCount: Int, totalCount: Int, exception: Exception?) -> Unit
     ) {
         Log.d(TAG, "ION-2 - Starting bulk ACL fetch for phoneKeyId $phoneKeyId")
         
@@ -823,12 +843,12 @@ internal class PhoneKeyManager constructor(
                 }
                 
                 Log.d(TAG, "ION-2 - Bulk ACL fetch completed: $successCount/$totalCount ACLs stored successfully")
-                completion(successCount, totalCount)
+                completion(successCount, totalCount, null)
             }
 
             override fun onFailure(exception: Exception) {
                 Log.e(TAG, "ION-2 - Failed to get bulk ACLs: ${exception.message}", exception)
-                completion(0, 0)
+                completion(0, 0, exception)
             }
         })
     }
@@ -855,7 +875,7 @@ internal class PhoneKeyManager constructor(
         }
         
         Log.d(TAG, "ION-2 - Explicit ACL refresh requested")
-        getBulkAcls(keyId) { successCount, totalCount ->
+        getBulkAcls(keyId) { successCount, totalCount, _ ->
             val success = successCount > 0
             Log.d(TAG, "ION-2 - ACL refresh completed: $successCount/$totalCount ACLs refreshed successfully")
             completion(success)
