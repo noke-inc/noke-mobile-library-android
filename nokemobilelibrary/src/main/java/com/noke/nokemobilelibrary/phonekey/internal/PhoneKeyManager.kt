@@ -754,7 +754,7 @@ internal class PhoneKeyManager constructor(
     /**
      * Fetch ACL envelope from backend for a specific lock.
      * 
-     * @param userId User ID for ACL request (as Int)
+     * @param userId Retained for signature compatibility; not sent to the backend
      * @param lockMac MAC address of the lock
      * @param phoneKeyId Phone key ID from provisioning
      * @param completion Callback with success/failure and the exception on failure (null on success)

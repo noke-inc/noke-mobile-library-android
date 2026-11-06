@@ -104,7 +104,7 @@ class NokeDemoPhoneKeyCoreClient(
         }
 
     /**
-     * Registers the device's [publicKey] with the Noke backend under [userId]/[deviceId].
+     * Registers the device's [publicKey] with the Noke backend for [deviceId] (userId is only used locally).
      * Stores the returned phone key ID in encrypted local storage for future ACL requests.
      *
      * If the phone is already provisioned (state persisted from a previous session), the

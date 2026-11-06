@@ -319,6 +319,7 @@ class MyPhoneKeyCoreClient(
     private val context: Context,
     private val baseUrl: String,
     private val apiKeyProvider: () -> String,
+    // Retained for SecurityServiceImpl compatibility; the user ID is no longer sent to the backend.
     private val userUuidProvider: () -> String,
     private val extraHeaders: Map<String, String> = emptyMap()
 ) : PhoneKeyCoreClient {
@@ -806,12 +807,13 @@ service.clearManagerInstance(userId, deviceId)
 
 Android uses **snake_case** in JSON request bodies:
 
-| Field           | Android JSON   | Notes                                     |
-| --------------- | -------------- | ----------------------------------------- |
-| User ID         | `"user_id"`    | Backend contract — confirm with your team |
-| Phone UDID      | `"phone_udid"` | —                                         |
-| Public Key      | `"public_key"` | —                                         |
-| Response Key ID | `"key_id"`     | Returned from backend                     |
+| Field           | Android JSON   | Notes                 |
+| --------------- | -------------- | --------------------- |
+| Phone UDID      | `"phone_udid"` | —                     |
+| Public Key      | `"public_key"` | —                     |
+| Response Key ID | `"key_id"`     | Returned from backend |
+
+`user_id` / `userId` is **not** sent to the backend (provisioning, single ACL, bulk ACL). `userId` is still used locally to namespace the Keystore alias and encrypted storage.
 
 ### 5. Thread Safety
 

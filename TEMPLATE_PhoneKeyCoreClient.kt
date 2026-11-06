@@ -146,10 +146,9 @@ class MyCustomPhoneKeyCoreClient(
                     // TODO: Replace with your actual provisioning API call
                     // Example:
                     // val response = myApiClient.provisionPhoneKey(
-                    //     userId = userId,
                     //     deviceId = deviceId,
                     //     publicKey = publicKey
-                    // )
+                    // )  // userId is not sent to the backend
                     
                     // For now, using PhoneKeyManager's provisionPhoneCompletion
                     val manager = getOrCreateManager(userId, deviceId)
@@ -195,10 +194,9 @@ class MyCustomPhoneKeyCoreClient(
                     // TODO: Replace with your actual ACL fetch API call
                     // Example:
                     // val aclEnvelope = myApiClient.fetchAcl(
-                    //     userId = userId,
                     //     lockMac = lockMac,
                     //     phoneKeyId = phoneKeyId
-                    // )
+                    // )  // userId is not sent to the backend
                     //
                     // Then store using PhoneKeyManager:
                     // manager.storeAclEnvelope(aclEnvelope)
