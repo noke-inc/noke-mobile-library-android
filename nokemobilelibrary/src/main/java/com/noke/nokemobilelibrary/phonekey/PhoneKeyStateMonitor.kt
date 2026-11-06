@@ -109,7 +109,7 @@ import com.noke.nokemobilelibrary.phonekey.models.BulkAclResult
  * // In Application.onCreate()
  * PhoneKeyAccessService.initialize(
  *     context = this,
- *     baseUrl = "https://router.smartentry.noke.com/",
+ *     baseUrl = "https://api-gateway.smartentry.noke.com/",
  *     authTokenProvider = { sessionManager.getToken() },
  *     userUuidProvider = { sessionManager.getUserUuid() }
  * )

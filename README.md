@@ -21,7 +21,7 @@ class MyApp : Application() {
 
         PhoneKeyAccessService.initialize(
             context = this,
-            baseUrl = "https://router.smartentry.noke.com/",
+            baseUrl = "https://api-gateway.smartentry.noke.com/",
             authTokenProvider = { getAuthToken() },
             userUuidProvider = { getUserUuid() }
         )

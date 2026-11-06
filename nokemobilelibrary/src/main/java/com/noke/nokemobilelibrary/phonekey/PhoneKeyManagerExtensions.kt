@@ -41,7 +41,7 @@ private const val TAG = "PhoneKeyManagerExt"
  * ## Process
  * 1. Ensures ECDSA P-256 key pair exists in Android Keystore
  * 2. Extracts public key in X9.62 format (Base64)
- * 3. Sends provisioning request to backend with (udid, publicKey, userId)
+ * 3. Sends provisioning request to backend with (udid, publicKey) - userId is not sent
  * 4. Stores phone key ID and provisioning metadata on success
  * 
  * ## Thread Safety
@@ -168,7 +168,7 @@ internal suspend fun PhoneKeyManager.provisionPhoneKeySuspend(
  * validates the signature, and stores it locally.
  * 
  * ## Process
- * 1. Sends ACL request to backend with (userId, lockMac, phoneKeyId)
+ * 1. Sends ACL request to backend with (lockMac, phoneKeyId) - userId is not sent
  * 2. Receives ACL envelope with signature and binary representation
  * 3. Stores envelope locally in encrypted storage
  * 
@@ -188,7 +188,7 @@ internal suspend fun PhoneKeyManager.provisionPhoneKeySuspend(
  * the coroutine will be cancelled but the network request may still complete.
  * 
  * @receiver PhoneKeyManager instance
- * @param userId User ID (as Int, matching backend API)
+ * @param userId User ID (as Int; not sent to the backend)
  * @param lockMac Lock MAC address (e.g., "AA:BB:CC:DD:EE:FF")
  * @param phoneKeyId Phone key ID from provisioning
  * @return [Result] with Unit on success, or [NokeMobileLibraryError] on failure
@@ -247,19 +247,19 @@ internal suspend fun PhoneKeyManager.getAclSuspend(
     Log.d(TAG, "Fetching ACL for lock=$lockMac, userId=$userId, phoneKeyId=$phoneKeyId")
     
     // Call callback-based ACL fetch
-    getAcl(userId, lockMac, phoneKeyId) { success ->
+    getAcl(userId, lockMac, phoneKeyId) { success, exception ->
         when {
             continuation.isActive && success -> {
                 Log.d(TAG, "ACL fetch succeeded for lock=$lockMac")
                 continuation.resume(Result.success(Unit))
             }
             continuation.isActive && !success -> {
-                Log.e(TAG, "ACL fetch failed for lock=$lockMac")
+                Log.e(TAG, "ACL fetch failed for lock=$lockMac: ${exception?.message}")
                 continuation.resume(
                     Result.failure(
                         NokeMobileLibraryError.AclFetchFailed(
                             lockMac = lockMac,
-                            reason = "Backend request failed or storage error occurred"
+                            reason = exception?.message ?: "Backend request failed or storage error occurred"
                         )
                     )
                 )
@@ -353,9 +353,23 @@ internal suspend fun PhoneKeyManager.getBulkAclsSuspend(
     Log.d(TAG, "Fetching bulk ACLs for phoneKeyId=$phoneKeyId")
     
     // Call callback-based bulk ACL fetch
-    getBulkAcls(phoneKeyId) { successCount, totalCount ->
+    getBulkAcls(phoneKeyId) { successCount, totalCount, exception ->
         if (!continuation.isActive) {
             Log.d(TAG, "Bulk ACL fetch callback invoked but continuation already completed (cancelled)")
+            return@getBulkAcls
+        }
+
+        // Surface backend errors immediately rather than treating them as empty success
+        if (exception != null) {
+            Log.e(TAG, "Bulk ACL fetch error for phoneKeyId=$phoneKeyId: ${exception.message}")
+            continuation.resume(
+                Result.failure(
+                    NokeMobileLibraryError.BulkAclFetchFailed(
+                        phoneKeyId = phoneKeyId,
+                        reason = exception.message ?: "Backend request failed"
+                    )
+                )
+            )
             return@getBulkAcls
         }
         

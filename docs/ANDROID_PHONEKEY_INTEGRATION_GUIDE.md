@@ -318,8 +318,10 @@ import kotlinx.coroutines.withContext
 class MyPhoneKeyCoreClient(
     private val context: Context,
     private val baseUrl: String,
-    private val authTokenProvider: () -> String,
-    private val userUuidProvider: () -> String
+    private val apiKeyProvider: () -> String,
+    // Retained for SecurityServiceImpl compatibility; the user ID is no longer sent to the backend.
+    private val userUuidProvider: () -> String,
+    private val extraHeaders: Map<String, String> = emptyMap()
 ) : PhoneKeyCoreClient {
 
     private val mutex = Mutex()
@@ -330,8 +332,11 @@ class MyPhoneKeyCoreClient(
         val securityService: SecurityService = SecurityServiceImpl(
             context = context,
             baseUrl = baseUrl,
-            authTokenProvider = authTokenProvider,
-            userUuidProvider = userUuidProvider
+            // Gateway authenticates Phone Key requests via "Authorization: ApiKey <phoneKeyApiKey>".
+            authTokenProvider = apiKeyProvider,
+            userUuidProvider = userUuidProvider,
+            tokenScheme = "ApiKey",
+            extraHeaders = extraHeaders
         )
         return PhoneKeyManager.getInstance(context, userId, deviceId, securityService)
     }
@@ -411,11 +416,18 @@ class MyApplication : Application() {
         super.onCreate()
 
         // Initialize Phone Key system
+        // The gateway authenticates via "Authorization: ApiKey <phoneKeyApiKey>".
+        // Email/CompanyId/SiteId are passed via extraHeaders.
         val client = MyPhoneKeyCoreClient(
             context = this,
-            baseUrl = "https://router.smartentry.noke.com/",
-            authTokenProvider = { sessionManager.getAuthToken() },
-            userUuidProvider = { sessionManager.getUserUuid() }
+            baseUrl = "https://api-gateway.smartentry.noke.com/",
+            apiKeyProvider = { sessionManager.getApiKey() },
+            userUuidProvider = { sessionManager.getUserUuid() },
+            extraHeaders = mapOf(
+                "Email"     to sessionManager.getEmail(),
+                "CompanyId" to sessionManager.getCompanyId(),
+                "SiteId"    to sessionManager.getSiteId()
+            )
         )
         PhoneKeyAccessService.setSharedClient(client, this)
     }
@@ -795,12 +807,13 @@ service.clearManagerInstance(userId, deviceId)
 
 Android uses **snake_case** in JSON request bodies:
 
-| Field           | Android JSON   | Notes                                     |
-| --------------- | -------------- | ----------------------------------------- |
-| User ID         | `"user_id"`    | Backend contract — confirm with your team |
-| Phone UDID      | `"phone_udid"` | —                                         |
-| Public Key      | `"public_key"` | —                                         |
-| Response Key ID | `"key_id"`     | Returned from backend                     |
+| Field           | Android JSON   | Notes                 |
+| --------------- | -------------- | --------------------- |
+| Phone UDID      | `"phone_udid"` | —                     |
+| Public Key      | `"public_key"` | —                     |
+| Response Key ID | `"key_id"`     | Returned from backend |
+
+`user_id` / `userId` is **not** sent to the backend (provisioning, single ACL, bulk ACL). `userId` is still used locally to namespace the Keystore alias and encrypted storage.
 
 ### 5. Thread Safety
 

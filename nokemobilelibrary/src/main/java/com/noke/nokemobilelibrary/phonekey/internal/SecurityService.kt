@@ -36,7 +36,8 @@ internal interface SecurityService {
      * Success transitions CryptoState: PROVISIONED -> READY
      * Failure transitions CryptoState: PROVISIONED -> FAILED
      *
-     * @param userId User ID for ACL request
+     * @param userId Retained for signature/call-site compatibility; no longer sent to the backend
+     * (the ACL is resolved from phoneKeyId alone)
      * @param lockMac MAC address of the lock
      * @param phoneKeyId Phone key ID from provisioning
      * @param callback Result callback with ACL envelope or error
@@ -79,7 +80,8 @@ internal interface SecurityService {
      *
      * @param udid Unique device identifier
      * @param publicKey Base64-encoded ECDSA P-256 public key
-     * @param userID User ID string
+     * @param userID Retained for signature/call-site compatibility; no longer sent to the backend
+     * (the phone key is tied to udid alone)
      * @param callback Result callback with key ID or error
      */
     fun provisionPhone(
@@ -112,7 +114,7 @@ internal interface SecurityService {
  * specific auth/configuration implementations. Callers provide:
  * - Base URL for API endpoints
  * - Auth token provider function
- * - User UUID provider function
+ * - User UUID provider function (retained for compatibility; not used in requests)
  *
  * Automatically retries failed requests for transient errors (network issues, auth errors,
  * timeouts, rate limits, server errors). Non-retryable client errors (400, 404, etc.) fail
@@ -123,9 +125,10 @@ internal interface SecurityService {
  * Callbacks are invoked on background threads - callers must handle UI thread switching.
  *
  * @param context Android context (should be application context to avoid leaks)
- * @param baseUrl Base URL for API endpoints (e.g., "https://router.smartentry.noke.com/")
+ * @param baseUrl Base URL for API endpoints (e.g., "https://api-gateway.smartentry.noke.com/")
  * @param authTokenProvider Function that returns current auth token (invoked on background thread)
- * @param userUuidProvider Function that returns current user UUID (invoked on background thread)
+ * @param userUuidProvider Retained for constructor/call-site compatibility; no longer used to
+ * build request bodies (the backend no longer requires userId)
  * @param maxRetries Maximum number of retry attempts (default: 1, matching ApiClient behavior)
  * @param retryDelayMs Delay in milliseconds between retry attempts (default: 3000ms, matching RetryManager)
  *
@@ -137,8 +140,25 @@ internal class SecurityServiceImpl(
     private val authTokenProvider: () -> String,
     private val userUuidProvider: () -> String,
     maxRetries: Int = 1,
-    retryDelayMs: Long = 3000
+    retryDelayMs: Long = 3000,
+    /** Auth scheme placed before the token (e.g. "Bearer" or "ApiKey"). Default: "Bearer" */
+    private val tokenScheme: String = "Bearer",
+    /** Extra headers added to every outbound request (e.g. ApiKey, Email, CompanyId, SiteId). */
+    private val extraHeaders: Map<String, String> = emptyMap()
 ) : SecurityService {
+
+    /**
+     * Java-compatible secondary constructor that preserves the original 6-parameter signature.
+     * Defaults to Bearer token scheme with no extra headers.
+     */
+    internal constructor(
+        context: Context,
+        baseUrl: String,
+        authTokenProvider: () -> String,
+        userUuidProvider: () -> String,
+        maxRetries: Int,
+        retryDelayMs: Long
+    ) : this(context, baseUrl, authTokenProvider, userUuidProvider, maxRetries, retryDelayMs, "Bearer", emptyMap())
 
     companion object {
         private const val TAG = "SecurityService"
@@ -164,7 +184,8 @@ internal class SecurityServiceImpl(
                 context = context.applicationContext,
                 authTokenProvider = authTokenProvider,
                 maxRetries = maxRetries,
-                retryDelayMs = retryDelayMs
+                retryDelayMs = retryDelayMs,
+                tokenScheme = tokenScheme
             )
         )
         .build()
@@ -198,8 +219,8 @@ internal class SecurityServiceImpl(
         }
         
         try {
+            // Backend resolves the ACL from phoneKeyId alone - userId is no longer required/sent.
             val body = JSONObject().apply {
-                put("userId", userId)
                 put("lockMac", lockMac)
                 put("phoneKeyId", phoneKeyId)
             }
@@ -209,7 +230,8 @@ internal class SecurityServiceImpl(
 
             val request = Request.Builder()
                 .url("${baseUrl}nse-phone-acl/api/v1/acls")
-                .addHeader("Authorization", "Bearer $token")
+                .addHeader("Authorization", "$tokenScheme $token")
+                .apply { extraHeaders.forEach { (k, v) -> addHeader(k, v) } }
                 .post(requestBody)
                 .build()
 
@@ -236,8 +258,10 @@ internal class SecurityServiceImpl(
                                 }
                                 Log.e(TAG, "ION-2 - ACL HTTP ${it.code} for lock $lockMac: $errorMessage")
                                 Log.e(TAG, "ION-2 - ACL error body: $errorBody")
+                                // Include raw backend body in exception so callers (PROVISIONING_ISSUE_DEBUG) see the actual server reason
+                                val detail = if (!errorBody.isNullOrBlank()) "$errorMessage | body=$errorBody" else errorMessage
                                 callback.onFailure(
-                                    IOException("ACL fetch failed - $errorMessage")
+                                    IOException("ACL fetch failed - $detail")
                                 )
                                 return
                             }
@@ -370,6 +394,7 @@ internal class SecurityServiceImpl(
         }
         
         try {
+            // Backend resolves ACLs from phoneKeyId alone - userId is no longer required/sent.
             val body = JSONObject().apply {
                 put("phoneKeyId", phoneKeyId)
             }
@@ -379,7 +404,8 @@ internal class SecurityServiceImpl(
 
             val request = Request.Builder()
                 .url("${baseUrl}nse-phone-acl/api/v1/acls/me")
-                .addHeader("Authorization", "Bearer $token")
+                .addHeader("Authorization", "$tokenScheme $token")
+                .apply { extraHeaders.forEach { (k, v) -> addHeader(k, v) } }
                 .post(requestBody)
                 .build()
 
@@ -406,8 +432,9 @@ internal class SecurityServiceImpl(
                                 }
                                 Log.e(TAG, "ION-2 - Bulk ACL HTTP ${it.code}: $errorMessage")
                                 Log.e(TAG, "ION-2 - Bulk ACL error body: $errorBody")
+                                val detail = if (!errorBody.isNullOrBlank()) "$errorMessage | body=$errorBody" else errorMessage
                                 callback.onFailure(
-                                    IOException("Bulk ACL fetch failed - $errorMessage")
+                                    IOException("Bulk ACL fetch failed - $detail")
                                 )
                                 return
                             }
@@ -421,7 +448,8 @@ internal class SecurityServiceImpl(
                             }
 
                             val root = JSONObject(jsonString)
-                            Log.d(TAG, "ION-2 - Bulk ACL response received")
+                            // Log the first 500 chars of the raw response to help diagnose empty/unexpected results
+                            Log.d(TAG, "ION-2 - Bulk ACL raw response (first 500): ${jsonString.take(500)}")
 
                             // Validate response structure
                             if (!root.has("result")) {
@@ -558,10 +586,10 @@ internal class SecurityServiceImpl(
         }
         
         try {
+            // Backend ties the phone key to phone_udid alone - user_id is no longer required/sent.
             val body = JSONObject().apply {
                 put("phone_udid", udid)
                 put("public_key", publicKey)
-                put("user_id", userID)
             }
             Log.d(TAG, "ION-2 - Provisioning request body created for user $userID")
 
@@ -569,7 +597,8 @@ internal class SecurityServiceImpl(
 
             val request = Request.Builder()
                 .url("${baseUrl}nse-provisioning-device/v1/phone-keys")
-                .addHeader("Authorization", "Bearer $token")
+                .addHeader("Authorization", "$tokenScheme $token")
+                .apply { extraHeaders.forEach { (k, v) -> addHeader(k, v) } }
                 .post(requestBody)
                 .build()
 
@@ -597,8 +626,10 @@ internal class SecurityServiceImpl(
                                 }
                                 Log.e(TAG, "ION-2 - Provisioning HTTP ${it.code} for user $userID: $errorMessage")
                                 Log.e(TAG, "ION-2 - Provisioning error body: $errorBody")
+                                // Include raw backend body so callers (PROVISIONING_ISSUE_DEBUG) see the actual server reason
+                                val detail = if (!errorBody.isNullOrBlank()) "$errorMessage | body=$errorBody" else errorMessage
                                 callback.onFailure(
-                                    IOException("Provisioning failed - $errorMessage")
+                                    IOException("Provisioning failed - $detail")
                                 )
                                 return
                             }
