@@ -143,8 +143,8 @@ internal class SecurityServiceImpl(
     retryDelayMs: Long = 3000,
     /** Auth scheme placed before the token (e.g. "Bearer" or "ApiKey"). Default: "Bearer" */
     private val tokenScheme: String = "Bearer",
-    /** Extra headers added to every outbound request (e.g. ApiKey, Email, CompanyId, SiteId). */
-    private val extraHeaders: Map<String, String> = emptyMap()
+    /** Extra headers (e.g. Email, CompanyId, SiteId); evaluated on every request so changes are picked up. */
+    private val extraHeadersProvider: () -> Map<String, String> = { emptyMap() }
 ) : SecurityService {
 
     /**
@@ -158,7 +158,19 @@ internal class SecurityServiceImpl(
         userUuidProvider: () -> String,
         maxRetries: Int,
         retryDelayMs: Long
-    ) : this(context, baseUrl, authTokenProvider, userUuidProvider, maxRetries, retryDelayMs, "Bearer", emptyMap())
+    ) : this(context, baseUrl, authTokenProvider, userUuidProvider, maxRetries, retryDelayMs, "Bearer", { emptyMap() })
+
+    /** Fixed-headers variant; use the provider-based primary constructor when header values can change. */
+    internal constructor(
+        context: Context,
+        baseUrl: String,
+        authTokenProvider: () -> String,
+        userUuidProvider: () -> String,
+        maxRetries: Int = 1,
+        retryDelayMs: Long = 3000,
+        tokenScheme: String,
+        extraHeaders: Map<String, String>
+    ) : this(context, baseUrl, authTokenProvider, userUuidProvider, maxRetries, retryDelayMs, tokenScheme, { extraHeaders })
 
     companion object {
         private const val TAG = "SecurityService"
@@ -231,7 +243,7 @@ internal class SecurityServiceImpl(
             val request = Request.Builder()
                 .url("${baseUrl}nse-phone-acl/api/v1/acls")
                 .addHeader("Authorization", "$tokenScheme $token")
-                .apply { extraHeaders.forEach { (k, v) -> addHeader(k, v) } }
+                .apply { extraHeadersProvider().forEach { (k, v) -> addHeader(k, v) } }
                 .post(requestBody)
                 .build()
 
@@ -258,10 +270,8 @@ internal class SecurityServiceImpl(
                                 }
                                 Log.e(TAG, "ION-2 - ACL HTTP ${it.code} for lock $lockMac: $errorMessage")
                                 Log.e(TAG, "ION-2 - ACL error body: $errorBody")
-                                // Include raw backend body in exception so callers (PROVISIONING_ISSUE_DEBUG) see the actual server reason
-                                val detail = if (!errorBody.isNullOrBlank()) "$errorMessage | body=$errorBody" else errorMessage
                                 callback.onFailure(
-                                    IOException("ACL fetch failed - $detail")
+                                    IOException("ACL fetch failed - $errorMessage")
                                 )
                                 return
                             }
@@ -405,7 +415,7 @@ internal class SecurityServiceImpl(
             val request = Request.Builder()
                 .url("${baseUrl}nse-phone-acl/api/v1/acls/me")
                 .addHeader("Authorization", "$tokenScheme $token")
-                .apply { extraHeaders.forEach { (k, v) -> addHeader(k, v) } }
+                .apply { extraHeadersProvider().forEach { (k, v) -> addHeader(k, v) } }
                 .post(requestBody)
                 .build()
 
@@ -432,9 +442,8 @@ internal class SecurityServiceImpl(
                                 }
                                 Log.e(TAG, "ION-2 - Bulk ACL HTTP ${it.code}: $errorMessage")
                                 Log.e(TAG, "ION-2 - Bulk ACL error body: $errorBody")
-                                val detail = if (!errorBody.isNullOrBlank()) "$errorMessage | body=$errorBody" else errorMessage
                                 callback.onFailure(
-                                    IOException("Bulk ACL fetch failed - $detail")
+                                    IOException("Bulk ACL fetch failed - $errorMessage")
                                 )
                                 return
                             }
@@ -448,8 +457,6 @@ internal class SecurityServiceImpl(
                             }
 
                             val root = JSONObject(jsonString)
-                            // Log the first 500 chars of the raw response to help diagnose empty/unexpected results
-                            Log.d(TAG, "ION-2 - Bulk ACL raw response (first 500): ${jsonString.take(500)}")
 
                             // Validate response structure
                             if (!root.has("result")) {
@@ -598,7 +605,7 @@ internal class SecurityServiceImpl(
             val request = Request.Builder()
                 .url("${baseUrl}nse-provisioning-device/v1/phone-keys")
                 .addHeader("Authorization", "$tokenScheme $token")
-                .apply { extraHeaders.forEach { (k, v) -> addHeader(k, v) } }
+                .apply { extraHeadersProvider().forEach { (k, v) -> addHeader(k, v) } }
                 .post(requestBody)
                 .build()
 
@@ -626,10 +633,8 @@ internal class SecurityServiceImpl(
                                 }
                                 Log.e(TAG, "ION-2 - Provisioning HTTP ${it.code} for user $userID: $errorMessage")
                                 Log.e(TAG, "ION-2 - Provisioning error body: $errorBody")
-                                // Include raw backend body so callers (PROVISIONING_ISSUE_DEBUG) see the actual server reason
-                                val detail = if (!errorBody.isNullOrBlank()) "$errorMessage | body=$errorBody" else errorMessage
                                 callback.onFailure(
-                                    IOException("Provisioning failed - $detail")
+                                    IOException("Provisioning failed - $errorMessage")
                                 )
                                 return
                             }

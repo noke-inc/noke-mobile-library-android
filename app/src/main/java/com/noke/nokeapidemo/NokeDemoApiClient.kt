@@ -180,8 +180,8 @@ class NokeDemoApiClient {
             if (json.optString("result") == "success") {
                 val data = json.getJSONObject("data")
                 val commands = data.getString("commands")
-                val offlineKey = data.optString("offline_key", null)
-                val offlineUnlockCmd = data.optString("offline_unlock_cmd", null)
+                val offlineKey = if (data.isNull("offline_key")) null else data.getString("offline_key")
+                val offlineUnlockCmd = if (data.isNull("offline_unlock_cmd")) null else data.getString("offline_unlock_cmd")
                 onSuccess(commands, offlineKey, offlineUnlockCmd)
             } else {
                 val errorCode = json.optInt("errorCode", -1)

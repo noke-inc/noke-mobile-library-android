@@ -6,7 +6,7 @@ apply plugin: 'kotlin-android'
 def localProperties = new Properties()
 def localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
-    localProperties.load(localPropertiesFile.newDataInputStream())
+    localPropertiesFile.withInputStream { localProperties.load(it) }
 }
 
 android {

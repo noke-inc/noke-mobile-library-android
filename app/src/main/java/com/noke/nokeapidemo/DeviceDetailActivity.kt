@@ -76,7 +76,6 @@ class DeviceDetailActivity : AppCompatActivity() {
             // already fired in MainActivity — it will NOT fire again in nokeServiceListener.
             // Therefore we must trigger provisioning here for ION-2 devices.
             val noke = connectedDevice
-            Log.d(TAG, "PROVISIONING_ISSUE_DEBUG onServiceConnected: connectedDevice=${noke?.mac}, isNokeIon2=${noke?.isNokeIon2}")
             if (noke != null && noke.isNokeIon2) {
                 lifecycleScope.launch { ensurePhoneKeyProvisioned(noke) }
             }
@@ -323,8 +322,7 @@ class DeviceDetailActivity : AppCompatActivity() {
             Log.d(TAG, "ION-2 device — routing offline unlock to unlockSigningDevice (Phone Key ACL)")
             updateStatus(getString(R.string.status_offline_unlock))
             setButtonsEnabled(false)
-            // service.unlockSigningDevice(noke);
-            noke.signingOfflineUnlock();
+            noke.signingOfflineUnlock()
         } else {
             // Classic/legacy device: use pre-cached offline key + unlock command.
             if (noke.offlineKey.isNullOrBlank()) {
@@ -369,10 +367,7 @@ class DeviceDetailActivity : AppCompatActivity() {
         val userId = getPhoneKeyUserId()
         val udid = PhoneKeyAccessService.getDeviceUdid(applicationContext)
 
-        Log.d(TAG, "PROVISIONING_ISSUE_DEBUG ensurePhoneKeyProvisioned: userId='$userId', udid='$udid', lockMac=${noke.mac}")
-
         if (userId.isEmpty()) {
-            Log.w(TAG, "PROVISIONING_ISSUE_DEBUG userId is empty — phoneKeyUserId not set in local.properties")
             Log.w(TAG, "ION-2 provisioning skipped — phoneKeyUserId not configured in local.properties")
             updateStatus(getString(R.string.error_phone_key_not_configured))
             return
@@ -381,7 +376,6 @@ class DeviceDetailActivity : AppCompatActivity() {
         // Fast-path: ACL already cached locally — nothing to do.
         // Note: hasAclForDevice checks manager.isProvisioned() + getAclEnvelope() — no PhoneKeyFacade.
         val hasAcl = nokeService?.hasAclForDevice(noke.mac) ?: false
-        Log.d(TAG, "PROVISIONING_ISSUE_DEBUG hasAclForDevice(${noke.mac})=$hasAcl")
         if (hasAcl) {
             Log.d(TAG, "ION-2 — ACL already cached for ${noke.mac}")
             updateDeviceInfo()
@@ -393,7 +387,6 @@ class DeviceDetailActivity : AppCompatActivity() {
         Log.d(TAG, "ION-2 — Initializing Phone Key for user=$userId, device=$udid")
 
         val initResult = service.initialize(userId, udid)
-        Log.d(TAG, "PROVISIONING_ISSUE_DEBUG initialize result: isSuccess=${initResult.isSuccess}, error=${initResult.exceptionOrNull()?.message}")
         if (initResult.isFailure) {
             val error = initResult.exceptionOrNull()
             Log.e(TAG, "ION-2 — Phone Key initialization failed", error)
@@ -409,7 +402,6 @@ class DeviceDetailActivity : AppCompatActivity() {
         Log.d(TAG, "ION-2 — Provisioning Phone Key for user=$userId")
 
         val provisionResult = service.provisionPhoneKey(userId, udid)
-        Log.d(TAG, "PROVISIONING_ISSUE_DEBUG provisionPhoneKey result: isSuccess=${provisionResult.isSuccess}, error=${provisionResult.exceptionOrNull()?.message}")
         if (provisionResult.isFailure) {
             val error = provisionResult.exceptionOrNull()
             Log.e(TAG, "ION-2 — Phone Key provisioning failed", error)
@@ -426,7 +418,6 @@ class DeviceDetailActivity : AppCompatActivity() {
         }
 
         val phoneKeyId: Int = provisionResponse.keyId!!
-        Log.d(TAG, "PROVISIONING_ISSUE_DEBUG phoneKeyId=$phoneKeyId, userId=$userId, lockMac=${noke.mac}")
         Log.d(TAG, "ION-2 — Using phoneKeyId=$phoneKeyId for user=$userId")
 
         // ---- Step 3: Fetch bulk ACLs ----
@@ -435,7 +426,6 @@ class DeviceDetailActivity : AppCompatActivity() {
         Log.d(TAG, "ION-2 — Fetching bulk ACLs for ${noke.mac}")
 
         val bulkResult = service.generateBulkAcls(phoneKeyId, userId, udid)
-        Log.d(TAG, "PROVISIONING_ISSUE_DEBUG generateBulkAcls result: isSuccess=${bulkResult.isSuccess}, successCount=${bulkResult.getOrNull()?.successCount}, totalCount=${bulkResult.getOrNull()?.totalCount}, error=${bulkResult.exceptionOrNull()?.message}")
         if (bulkResult.isFailure) {
             Log.w(TAG, "ION-2 — Bulk ACL fetch failed (${bulkResult.exceptionOrNull()?.message}) — falling back to single ACL fetch for ${noke.mac}")
         } else {
@@ -444,7 +434,6 @@ class DeviceDetailActivity : AppCompatActivity() {
         }
 
         val hasAclAfterBulk = nokeService?.hasAclForDevice(noke.mac) ?: false
-        Log.d(TAG, "PROVISIONING_ISSUE_DEBUG hasAclForDevice(${noke.mac}) after bulk=$hasAclAfterBulk")
 
         // ---- Step 3b: Single-ACL fallback ----
         // Bulk ACL requires the user to have a unit/smartentry assignment on the backend.
@@ -459,7 +448,6 @@ class DeviceDetailActivity : AppCompatActivity() {
                 return
             }
             val singleResult = service.generateAcl(userId_int, noke.mac, phoneKeyId, udid)
-            Log.d(TAG, "PROVISIONING_ISSUE_DEBUG generateAcl(userId=$userId_int, lockMac=${noke.mac}, phoneKeyId=$phoneKeyId) result: isSuccess=${singleResult.isSuccess}, error=${singleResult.exceptionOrNull()?.message}")
             if (singleResult.isFailure) {
                 val error = singleResult.exceptionOrNull()
                 Log.e(TAG, "ION-2 — Single ACL fetch failed for ${noke.mac}: ${error?.message}", error)

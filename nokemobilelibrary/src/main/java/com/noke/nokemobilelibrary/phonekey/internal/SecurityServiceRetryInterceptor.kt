@@ -13,7 +13,7 @@ import java.io.IOException
  *
  * Retries requests that fail due to:
  * - Network errors (IOException)
- * - Authentication errors (401, 403) - fetches fresh token on retry
+ * - Authentication errors (401) - fetches fresh token on retry
  * - Timeout errors (408, 504)
  * - Rate limiting (429)
  * - Server errors (500, 502, 503)
@@ -21,7 +21,7 @@ import java.io.IOException
  * ## Retry Behavior
  * - Max retries: 1 (2 total attempts) - matches ApiClient.doRequest default
  * - Retry delay: 3 seconds - matches RetryManager default
- * - Non-retryable errors (4xx except 401/403/408/429) fail immediately
+ * - Non-retryable errors (4xx except 401/408/429) fail immediately
  *
  * ## Thread Safety
  * Runs on OkHttp's background dispatcher threads.
@@ -167,13 +167,13 @@ internal class SecurityServiceRetryInterceptor(
      * Determine if an HTTP error code should trigger a retry.
      *
      * ## Retryable Errors
-     * - 401, 403: Auth errors (will fetch fresh token)
+     * - 401: Auth error (will fetch fresh token)
      * - 408, 504: Timeout errors
      * - 429: Rate limiting
      * - 500, 502, 503: Server errors
      *
      * ## Non-retryable Errors
-     * - Other 4xx errors (400, 404, etc.) - client errors that won't change on retry
+     * - Other 4xx errors (400, 403, 404, etc.) - client errors that won't change on retry
      *
      * @param statusCode HTTP status code
      * @return true if error should be retried, false otherwise

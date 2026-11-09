@@ -2,6 +2,7 @@ package com.noke.nokemobilelibrary.phonekey.internal
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
@@ -16,6 +17,8 @@ import com.noke.nokemobilelibrary.phonekey.models.ProvisioningInfo
 import org.json.JSONArray
 import org.json.JSONObject
 import org.threeten.bp.Instant
+import java.io.File
+import java.security.GeneralSecurityException
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.PrivateKey
@@ -260,29 +263,48 @@ internal class PhoneKeyManager constructor(
                     val prefsFileName = "${PREFS_FILE_PREFIX}_${userId}_${udid}"
                     val masterKeyAlias = "${MASTER_KEY_ALIAS_PREFIX}_${userId}_${udid}"
 
-                    try {
-                        createEncryptedPrefs(context, prefsFileName, masterKeyAlias)
-                    } catch (e: Exception) {
-                        // Keystore key and encrypted file can get out of sync (e.g. keystore key
-                        // invalidated/recreated while the old encrypted XML file persists), which
-                        // surfaces as AEADBadTagException/KeyStoreException on decrypt. Recover by
-                        // wiping the stale file + keystore alias and recreating fresh storage
-                        // instead of crashing the app.
-                        Log.w(TAG, "ION-2 - EncryptedSharedPreferences corrupted for user=$userId, device=$udid, recreating: ${e.message}", e)
-                        context.deleteSharedPreferences(prefsFileName)
-                        try {
-                            KeyStore.getInstance("AndroidKeyStore").apply {
-                                load(null)
-                                if (containsAlias(masterKeyAlias)) deleteEntry(masterKeyAlias)
-                            }
-                        } catch (keystoreException: Exception) {
-                            Log.w(TAG, "ION-2 - Failed to delete stale master key alias $masterKeyAlias: ${keystoreException.message}")
-                        }
-                        createEncryptedPrefs(context, prefsFileName, masterKeyAlias)
-                    }.also {
+                    openEncryptedPrefs(context, prefsFileName, masterKeyAlias).also {
                         Log.d(TAG, "ION-2 - Created NEW EncryptedSharedPreferences for user=$userId, device=$udid")
                     }
                 }
+            }
+        }
+
+        /**
+         * Opens EncryptedSharedPreferences, wiping and recreating the file + master key only when the
+         * failure is a keystore/crypto mismatch. Other failures (e.g. disk IO) are rethrown so
+         * transient errors never destroy cached ACLs or provisioning state.
+         */
+        internal fun openEncryptedPrefs(context: Context, prefsFileName: String, masterKeyAlias: String): SharedPreferences {
+            return try {
+                createEncryptedPrefs(context, prefsFileName, masterKeyAlias)
+            } catch (e: Exception) {
+                if (!isKeystoreMismatch(e)) throw e
+                Log.w(TAG, "ION-2 - EncryptedSharedPreferences unreadable for $prefsFileName, recreating: ${e.message}", e)
+                deletePrefsFile(context, prefsFileName)
+                try {
+                    KeyStore.getInstance("AndroidKeyStore").apply {
+                        load(null)
+                        if (containsAlias(masterKeyAlias)) deleteEntry(masterKeyAlias)
+                    }
+                } catch (keystoreException: Exception) {
+                    Log.w(TAG, "ION-2 - Failed to delete stale master key alias $masterKeyAlias: ${keystoreException.message}")
+                }
+                createEncryptedPrefs(context, prefsFileName, masterKeyAlias)
+            }
+        }
+
+        private fun isKeystoreMismatch(e: Throwable): Boolean =
+            generateSequence(e) { it.cause }.any {
+                it is GeneralSecurityException || it.javaClass.simpleName == "InvalidProtocolBufferException"
+            }
+
+        private fun deletePrefsFile(context: Context, prefsFileName: String) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                context.deleteSharedPreferences(prefsFileName)
+            } else {
+                context.getSharedPreferences(prefsFileName, Context.MODE_PRIVATE).edit().clear().commit()
+                File(context.applicationInfo.dataDir, "shared_prefs/$prefsFileName.xml").delete()
             }
         }
 

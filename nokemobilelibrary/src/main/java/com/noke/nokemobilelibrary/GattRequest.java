@@ -66,6 +66,8 @@ public final class GattRequest {
     // BLE operation queue for serialization
     @Nullable private final BleOperationQueue bleQueue;
 
+    @Nullable private volatile Runnable onExecute;
+
     private GattRequest(
             @NonNull Context context,
             @NonNull NokeDevice noke,
@@ -148,6 +150,12 @@ public final class GattRequest {
                 == PackageManager.PERMISSION_GRANTED;
     }
 
+    /** Registers a hook run right before the GATT operation is issued (i.e. when this request becomes in-flight). */
+    public GattRequest setOnExecute(@Nullable Runnable onExecute) {
+        this.onExecute = onExecute;
+        return this;
+    }
+
     /** Execute the request on the main thread. */
     public void execute() {
         try {
@@ -209,6 +217,9 @@ public final class GattRequest {
             );
             return;
         }
+
+        final Runnable beforeExecute = onExecute;
+        if (beforeExecute != null) beforeExecute.run();
 
         switch (op) {
             case WRITE:

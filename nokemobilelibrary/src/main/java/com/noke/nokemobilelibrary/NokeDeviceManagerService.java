@@ -44,6 +44,7 @@ import com.noke.nokemobilelibrary.enums.SigningWriteCharacteristicType;
 import com.noke.nokemobilelibrary.interfaces.ResultCallback;
 import com.noke.nokemobilelibrary.interfaces.FailureHandler;
 import com.noke.nokemobilelibrary.interfaces.SuccessHandler;
+import com.noke.nokemobilelibrary.phonekey.internal.PhoneKeyCredentialStore;
 import com.noke.nokemobilelibrary.phonekey.internal.PhoneKeyManager;
 
 import org.json.JSONArray;
@@ -62,6 +63,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static com.noke.nokemobilelibrary.NokeMobileError.DEVICE_SHUTDOWN_RESULT;
 import static com.noke.nokemobilelibrary.NokeMobileError.ERROR_CONNECTION_TIMEOUT;
@@ -305,11 +307,12 @@ public class NokeDeviceManagerService extends Service {
     private ResultCallback<byte[]> readCommandIdCompletion;
 
     /**
-     * In-flight signing GattRequest, needed so the shared BluetoothGattCallback can dispatch
-     * the read/write result back into the request that started it (see GattRequest#dispatchOnCharacteristicRead).
+     * The signing GattRequest currently in flight, so the shared BluetoothGattCallback can hand the
+     * read/write result back to it (see GattRequest#dispatchOnCharacteristicRead). Set when the request
+     * actually executes (the BleOperationQueue serializes execution) and consumed from a binder thread.
      */
-    private GattRequest pendingSigningReadRequest;
-    private GattRequest pendingSigningWriteRequest;
+    private final AtomicReference<GattRequest> pendingSigningReadRequest = new AtomicReference<>();
+    private final AtomicReference<GattRequest> pendingSigningWriteRequest = new AtomicReference<>();
 
     /**
      * Retry counter for ACL signature failures
@@ -1401,6 +1404,8 @@ public class NokeDeviceManagerService extends Service {
                 }
             } else {
                 Log.e(TAG, "onServicesDiscovered: GATT service discovery failed for " + noke.getMac() + " with status " + status);
+                mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_BLUETOOTH_GATT, "Service discovery failed with status " + status);
+                disconnectNoke(noke);
             }
         }
         
@@ -1452,13 +1457,13 @@ public class NokeDeviceManagerService extends Service {
             // Dispatch to the in-flight signing GattRequest (if any) so ION-2 STATUS/COMMAND_ID
             // reads are actually processed — GattRequest.doRead() only kicks off the BLE read;
             // it relies on this dispatch to deliver the result to its readCallback.
-            if (pendingSigningReadRequest != null) {
-                GattRequest req = pendingSigningReadRequest;
-                pendingSigningReadRequest = null;
+            GattRequest req = pendingSigningReadRequest.getAndSet(null);
+            if (req != null) {
                 req.dispatchOnCharacteristicRead(characteristic, status);
             }
 
-            if (status == BluetoothGatt.GATT_SUCCESS) {
+            // A failed signing read must still release the queue, otherwise it stalls until its timeout.
+            if (status == BluetoothGatt.GATT_SUCCESS || req != null) {
                 // Notify BLE operation queue that read is complete
                 if (bleOperationQueue != null) {
                     bleOperationQueue.notifyOperationComplete();
@@ -1497,9 +1502,8 @@ public class NokeDeviceManagerService extends Service {
 
             // Dispatch to the in-flight signing GattRequest (if any) so write failures are
             // surfaced via its ErrorReporter instead of being silently swallowed.
-            if (pendingSigningWriteRequest != null) {
-                GattRequest req = pendingSigningWriteRequest;
-                pendingSigningWriteRequest = null;
+            GattRequest req = pendingSigningWriteRequest.getAndSet(null);
+            if (req != null) {
                 req.dispatchOnCharacteristicWrite(characteristic, status);
             }
 
@@ -1944,6 +1948,8 @@ public class NokeDeviceManagerService extends Service {
 
         // Clear BLE operation queue immediately to prevent further operations
         bleOperationQueue.clear();
+        pendingSigningReadRequest.set(null);
+        pendingSigningWriteRequest.set(null);
 
         disconnectHandler.post(() -> {
             if (noke.gatt != null) {
@@ -2278,20 +2284,23 @@ public class NokeDeviceManagerService extends Service {
             // Create SecurityService implementation.
             // Gateway authenticates Phone Key requests via "Authorization: ApiKey <phoneKeyApiKey>".
             final SharedPreferences finalPref = pref;
-            java.util.Map<String, String> extraHeaders = new java.util.HashMap<>();
-            extraHeaders.put("Email", finalPref.getString(PREF_EMAIL, ""));
-            extraHeaders.put("CompanyId", finalPref.getString(PREF_COMPANY_ID, ""));
-            extraHeaders.put("SiteId", finalPref.getString(PREF_SITE_ID, ""));
+            final Context appContext = getApplicationContext();
             com.noke.nokemobilelibrary.phonekey.internal.SecurityService securityService = 
                 new com.noke.nokemobilelibrary.phonekey.internal.SecurityServiceImpl(
-                    getApplicationContext(),
+                    appContext,
                     baseUrl,
-                    () -> finalPref.getString(PREF_API_KEY, ""),
+                    () -> resolvePhoneKeyApiKey(finalPref),
                     () -> finalPref.getString(PREF_USER_UUID, ""),
                     1,
                     3000,
                     "ApiKey",
-                    extraHeaders
+                    () -> {
+                        java.util.Map<String, String> headers = new java.util.HashMap<>();
+                        headers.put("Email", finalPref.getString(PREF_EMAIL, ""));
+                        headers.put("CompanyId", finalPref.getString(PREF_COMPANY_ID, ""));
+                        headers.put("SiteId", finalPref.getString(PREF_SITE_ID, ""));
+                        return headers;
+                    }
                 );
             phoneKeyManager = PhoneKeyManager.getInstance(
                 getApplicationContext(), 
@@ -2302,6 +2311,23 @@ public class NokeDeviceManagerService extends Service {
         }
         
         return phoneKeyManager;
+    }
+
+    /** Encrypted key set via {@link #setPhoneKeyApiKey(String)} wins over the legacy plaintext "apikey" pref. */
+    private String resolvePhoneKeyApiKey(SharedPreferences pref) {
+        String encrypted = PhoneKeyCredentialStore.getApiKey(getApplicationContext());
+        return encrypted != null ? encrypted : pref.getString(PREF_API_KEY, "");
+    }
+
+    /**
+     * Stores the Phone Key gateway API key in encrypted storage and removes any plaintext copy from
+     * the library preferences. Pass null or empty to clear it.
+     *
+     * @throws IllegalStateException if the key cannot be persisted
+     */
+    public void setPhoneKeyApiKey(String apiKey) {
+        PhoneKeyCredentialStore.setApiKey(getApplicationContext(), apiKey);
+        getSharedPreferences(NokeDefines.PREFS_NAME, MODE_PRIVATE).edit().remove(PREF_API_KEY).apply();
     }
 
     /**
@@ -2614,6 +2640,7 @@ public class NokeDeviceManagerService extends Service {
                     Log.e(TAG, "ACL retry limit exhausted for " + noke.getMac());
                     noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
                     mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, NokeDeviceSigningError.ACL_REJECTED.getDescription());
+                    disconnectNoke(noke);
                     mGlobalNokeListener.onNokeDisconnected(noke);
                 }
                 break;
@@ -2628,6 +2655,7 @@ public class NokeDeviceManagerService extends Service {
                     Log.e(TAG, "ACL retry limit exhausted for " + noke.getMac());
                     noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
                     mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, NokeDeviceSigningError.ACL_REJECTED.getDescription());
+                    disconnectNoke(noke);
                     mGlobalNokeListener.onNokeDisconnected(noke);
                 }
                 break;
@@ -2642,6 +2670,7 @@ public class NokeDeviceManagerService extends Service {
                     Log.e(TAG, "ACL retry limit exhausted for " + noke.getMac());
                     noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
                     mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, NokeDeviceSigningError.ACL_TIME_INVALID.getDescription());
+                    disconnectNoke(noke);
                     mGlobalNokeListener.onNokeDisconnected(noke);
                 }
                 break;
@@ -2840,7 +2869,7 @@ public class NokeDeviceManagerService extends Service {
                     bleOperationQueue
             );
 
-            pendingSigningWriteRequest = request;
+            request.setOnExecute(() -> pendingSigningWriteRequest.set(request));
             request.execute();
 
         } catch (NullPointerException e) {
@@ -2890,7 +2919,7 @@ public class NokeDeviceManagerService extends Service {
                     bleOperationQueue
             );
 
-            pendingSigningReadRequest = request;
+            request.setOnExecute(() -> pendingSigningReadRequest.set(request));
             request.execute();
 
         } catch (NullPointerException e) {

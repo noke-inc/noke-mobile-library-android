@@ -188,7 +188,7 @@ class NokeDemoPhoneKeyCoreClient(
                         Result.success(Unit)
                     } else {
                         val reason = aclException?.message ?: "Backend request failed or ACL storage error"
-                        Log.e(TAG, "PROVISIONING_ISSUE_DEBUG ACL fetch failed for lock=$lockMac: $reason", aclException)
+                        Log.e(TAG, "ACL fetch failed for lock=$lockMac: $reason", aclException)
                         Result.failure(
                             NokeMobileLibraryError.AclFetchFailed(
                                 lockMac = lockMac,
@@ -230,7 +230,7 @@ class NokeDemoPhoneKeyCoreClient(
 
                     if (bulkException != null) {
                         val reason = bulkException!!.message ?: "Backend request failed"
-                        Log.e(TAG, "PROVISIONING_ISSUE_DEBUG generateBulkAcls backend error: $reason", bulkException)
+                        Log.e(TAG, "generateBulkAcls backend error: $reason", bulkException)
                         return@withLock Result.failure(
                             NokeMobileLibraryError.UnknownError("generateBulkAcls", bulkException!!)
                         )
@@ -320,11 +320,13 @@ class NokeDemoPhoneKeyCoreClient(
                 authTokenProvider = { prefs.getString(PREF_API_KEY, "") ?: "" },
                 userUuidProvider = { prefs.getString(PREF_USER_UUID, "") ?: "" },
                 tokenScheme = "ApiKey",
-                extraHeaders = mapOf(
-                    "Email"     to (prefs.getString(PREF_EMAIL,      "") ?: ""),
-                    "CompanyId" to (prefs.getString(PREF_COMPANY_ID, "") ?: ""),
-                    "SiteId"    to (prefs.getString(PREF_SITE_ID,    "") ?: "")
-                )
+                extraHeadersProvider = {
+                    mapOf(
+                        "Email"     to (prefs.getString(PREF_EMAIL,      "") ?: ""),
+                        "CompanyId" to (prefs.getString(PREF_COMPANY_ID, "") ?: ""),
+                        "SiteId"    to (prefs.getString(PREF_SITE_ID,    "") ?: "")
+                    )
+                }
             )
 
             PhoneKeyManager.getInstance(
