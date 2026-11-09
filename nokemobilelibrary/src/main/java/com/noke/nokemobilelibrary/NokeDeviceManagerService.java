@@ -318,11 +318,19 @@ public class NokeDeviceManagerService extends Service {
     private static final int MAX_SIGNING_RETRIES = 1;
 
     /**
-     * MTU requested on connect. The default 23-byte MTU (20-byte payload) forces large
-     * ION-2 signing writes (e.g. ~148-byte ACL binary) into a queued prepare-write sequence
-     * that can overflow the lock's ATT prepare queue (status=9, "Prepare Queue Full").
+     * MTU requested for ION-2 signing devices only. The default 23-byte MTU (20-byte payload) forces
+     * large signing writes (e.g. ~148-byte ACL binary) into a queued prepare-write sequence that can
+     * overflow the lock's ATT prepare queue (status=9, "Prepare Queue Full"). Legacy locks must NOT
+     * receive this request: on Samsung One UI 7 it stalls service discovery.
      */
-    private static final int REQUESTED_MTU = 247;
+    private static final int REQUESTED_MTU = 512;
+
+    /** Max wait for onMtuChanged before falling back to service discovery. */
+    private static final long MTU_NEGOTIATION_TIMEOUT_MS = 500;
+    /** Settle time after refreshing the GATT cache before calling discoverServices(). */
+    private static final long SERVICE_DISCOVERY_DELAY_MS = 200;
+    /** Wait for onMtuChanged after a post-discovery MTU request before reporting connected. */
+    private static final long POST_DISCOVERY_MTU_WAIT_MS = 1000;
 
     /**
      * SharedPreferences key for user UUID
@@ -1091,6 +1099,15 @@ public class NokeDeviceManagerService extends Service {
         return true;
     }
 
+    /** True for ION-2 signing devices; false if the hardware version is unavailable. */
+    private boolean isSigningDevice(NokeDevice noke) {
+        try {
+            return noke != null && noke.isNokeIon2();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     /**
      * Implementation of the the BluetoothGatt callbacks.
      * Read more here: <a href="https://developer.android.com/reference/android/bluetooth/BluetoothGattCallback.html">https://developer.android.com/reference/android/bluetooth/BluetoothGattCallback.html</a>
@@ -1148,21 +1165,46 @@ public class NokeDeviceManagerService extends Service {
                 handler.post(new Runnable() {
                     @Override
                     public void run() {
-
-                        if (noke.gatt == null) {
-                            noke.gatt = gatt;
-                        }
-
-                        // Negotiate a larger MTU before discovering services; onMtuChanged
-                        // triggers discoverServices() once negotiation completes (success or failure).
-                        boolean mtuRequested = noke.gatt.requestMtu(REQUESTED_MTU);
-                        Log.i(TAG, "Requesting MTU " + REQUESTED_MTU + ": " + mtuRequested);
-                        if (!mtuRequested && discoveringMacs.add(noke.getMac())) {
-                            Log.w(TAG, "requestMtu() failed to start — falling back to discoverServices() directly");
-                            boolean started = noke.gatt.discoverServices();
-                            if (!started) {
-                                discoveringMacs.remove(noke.getMac());
+                        try {
+                            if (noke.gatt == null) {
+                                noke.gatt = gatt;
                             }
+
+                            try {
+                                boolean priorityRequested = noke.gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH);
+                                Log.i(TAG, "Connection priority HIGH requested: " + priorityRequested);
+                            } catch (Exception e) {
+                                Log.e(TAG, "Exception in requestConnectionPriority", e);
+                            }
+
+                            // Only ION-2 signing devices need a large MTU. Legacy locks (<=20-byte packets)
+                            // can stall service discovery on Samsung One UI 7 if sent requestMtu().
+                            // On Android <= 12 (API <= 31) requestMtu() may return true but never fire
+                            // onMtuChanged, so those devices negotiate post-discovery instead
+                            // (see onServicesDiscovered).
+                            if (isSigningDevice(noke) && Build.VERSION.SDK_INT > Build.VERSION_CODES.S) {
+                                try {
+                                    boolean mtuRequested = noke.gatt.requestMtu(REQUESTED_MTU);
+                                    Log.i(TAG, "MTU " + REQUESTED_MTU + " requested: " + mtuRequested);
+                                    if (!mtuRequested) {
+                                        startServiceDiscovery(noke);
+                                    } else {
+                                        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                                            if (noke.connectionState == NokeDefines.NOKE_STATE_CONNECTING) {
+                                                Log.w(TAG, "MTU change timeout, proceeding with service discovery anyway");
+                                                startServiceDiscovery(noke);
+                                            }
+                                        }, MTU_NEGOTIATION_TIMEOUT_MS);
+                                    }
+                                } catch (Exception e) {
+                                    Log.e(TAG, "Exception in requestMtu", e);
+                                    startServiceDiscovery(noke);
+                                }
+                            } else {
+                                startServiceDiscovery(noke);
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "onConnectionStateChange -> STATE_CONNECTED exception", e);
                         }
                     }
                 });
@@ -1229,6 +1271,43 @@ public class NokeDeviceManagerService extends Service {
             }
         }
 
+        /**
+         * Starts service discovery after refreshing the GATT cache. Idempotent per MAC via discoveringMacs,
+         * since the MTU timeout and onMtuChanged can both reach this with state == CONNECTING.
+         */
+        private void startServiceDiscovery(final NokeDevice noke) {
+            if (noke == null || noke.gatt == null) {
+                return;
+            }
+
+            if (!discoveringMacs.add(noke.getMac())) {
+                Log.w(TAG, "startServiceDiscovery: discovery already started for " + noke.getMac() + ", skipping duplicate call");
+                return;
+            }
+
+            // A stale/corrupt GATT cache (seen on Samsung One UI 7 with legacy locks) makes discoverServices()
+            // start without ever firing onServicesDiscovered.
+            refreshDeviceCache(noke.gatt, true);
+
+            // Cache invalidation is internally asynchronous on some stacks despite refresh() being synchronous.
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                if (noke.gatt == null || noke.connectionState != NokeDefines.NOKE_STATE_CONNECTING) {
+                    discoveringMacs.remove(noke.getMac());
+                    return;
+                }
+                try {
+                    boolean started = noke.gatt.discoverServices();
+                    Log.i(TAG, "Starting service discovery: " + started);
+                    if (!started) {
+                        discoveringMacs.remove(noke.getMac());
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Exception in discoverServices", e);
+                    discoveringMacs.remove(noke.getMac());
+                }
+            }, SERVICE_DISCOVERY_DELAY_MS);
+        }
+
         void refreshDeviceCache(final BluetoothGatt gatt, final boolean force) {
             /*
              * If the device is bonded this is up to the Service Changed characteristic to notify Android that the services has changed.
@@ -1236,19 +1315,19 @@ public class NokeDeviceManagerService extends Service {
              * If not bonded, the Android should not keep the services cached when the Service Changed characteristic is present in the target device database.
              * However, due to the Android bug (still exists in Android 5.0.1), it is keeping them anyway and the only way to clear services is by using this hidden refresh method.
              */
-            if (force || gatt.getDevice().getBondState() == BluetoothDevice.BOND_NONE) {
-                /*
-                 * There is a refresh() method in BluetoothGatt class but for now it's hidden. We will call it using reflections.
-                 */
-                try {
+            try {
+                if (gatt != null && (force || gatt.getDevice().getBondState() == BluetoothDevice.BOND_NONE)) {
+                    /*
+                     * There is a refresh() method in BluetoothGatt class but for now it's hidden. We will call it using reflections.
+                     */
                     @SuppressWarnings("JavaReflectionMemberAccess") final Method refresh = gatt.getClass().getMethod("refresh");
                     if (refresh != null) {
                         final boolean success = (Boolean) refresh.invoke(gatt);
                         Log.d(TAG, "Refreshing Result: " + success);
                     }
-                } catch (Exception e) {
-                    //Log.e(TAG, "REFRESH DEVICE CACHE");
                 }
+            } catch (Exception e) {
+                Log.e(TAG, "refreshDeviceCache -> Exception -> " + e.getMessage());
             }
         }
 
@@ -1264,18 +1343,10 @@ public class NokeDeviceManagerService extends Service {
                 Log.w(TAG, "MTU change failed with status " + status + " for " + noke.getMac() + ", using default MTU");
             }
 
-            // MTU negotiation complete (success or failure) — proceed with service discovery
-            // Atomic guard: if this MAC is already being discovered, skip duplicate call.
+            // Pre-discovery MTU negotiation complete (success or failure) — proceed with service discovery.
+            // A post-discovery MTU result (state CONNECTED) needs no action; onServicesDiscovered handles it.
             if (noke.connectionState == NokeDefines.NOKE_STATE_CONNECTING) {
-                if (discoveringMacs.add(noke.getMac())) {
-                    boolean started = noke.gatt.discoverServices();
-                    Log.i(TAG, "Starting service discovery from onMtuChanged: " + started);
-                    if (!started) {
-                        discoveringMacs.remove(noke.getMac());
-                    }
-                } else {
-                    Log.w(TAG, "onMtuChanged: discovery already started for " + noke.getMac() + ", skipping duplicate call");
-                }
+                startServiceDiscovery(noke);
             }
         }
 
@@ -1304,6 +1375,25 @@ public class NokeDeviceManagerService extends Service {
                     // Classic (non-ION-2) devices fall through to the normal state-read path.
                     if (signingService != null) {
                         noke.connectionState = NokeDefines.NOKE_STATE_CONNECTED;
+
+                        // On Android <= 12 the pre-discovery MTU request is skipped (onMtuChanged may never
+                        // fire), so negotiate here after discovery; this is safe on every Android version.
+                        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S && noke.gatt != null) {
+                            final NokeDevice connectedNoke = noke;
+                            try {
+                                if (noke.gatt.requestMtu(REQUESTED_MTU)) {
+                                    // Proceed after the timeout regardless so unlock is never blocked.
+                                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                                        if (connectedNoke.connectionState == NokeDefines.NOKE_STATE_CONNECTED) {
+                                            mGlobalNokeListener.onNokeConnected(connectedNoke);
+                                        }
+                                    }, POST_DISCOVERY_MTU_WAIT_MS);
+                                    return;
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "onServicesDiscovered: post-discovery MTU request exception", e);
+                            }
+                        }
                         mGlobalNokeListener.onNokeConnected(noke);
                     } else {
                         readStateCharacteristic(noke);
