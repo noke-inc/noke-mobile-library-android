@@ -295,9 +295,11 @@ currentNoke.sendCommands(commandString);
 
 - Once the Nokē device receives the command, it will verify that the keys are correct and unlock.
 
+**Note:** ION-2 locks (hardware type `5E`) do not use the session-based online unlock described above. They unlock with a Phone Key and a signed ACL instead (see [ION-2 (5E) locks: `signingOfflineUnlock()`](#ion-2-5e-locks-signingofflineunlock) and the [Phone Key Integration Guide](docs/ANDROID_PHONEKEY_INTEGRATION_GUIDE.md)).
+
 #### Unlocking Offline
 
-A Noke device can be unlocked without a network connection. The method depends on the lock type:
+Offline unlock works without a network connection once the required credentials are cached on the phone. The method depends on the lock hardware, and both methods are called on the connected `NokeDevice`:
 
 | Lock type                                   | Hardware                                    | Method                          | Offline credential                               |
 | ------------------------------------------- | ------------------------------------------- | ------------------------------- | ------------------------------------------------ |
@@ -307,12 +309,18 @@ A Noke device can be unlocked without a network connection. The method depends o
 Route on `noke.isNokeIon2()` (or `noke.getEncryptionType()`, which returns `SIGNING` for ION-2):
 
 ```kotlin
-if (noke.isNokeIon2) {
-    noke.signingOfflineUnlock()
-} else {
-    if (!noke.offlineKey.isNullOrBlank() && !noke.offlineUnlockCmd.isNullOrBlank()) {
+private fun performOfflineUnlock(noke: NokeDevice) {
+    if (noke.isNokeIon2) {
+        // ION-2 (5E): uses the cached Phone Key ACL
+        noke.signingOfflineUnlock()
+    } else {
+        // 1A, 3K, 4K, 4E, etc.: uses the cached offline key + unlock command
+        if (noke.offlineKey.isNullOrBlank() || noke.offlineUnlockCmd.isNullOrBlank()) {
+            showError("No offline key cached")
+            return
+        }
         val timestamp = noke.scheduledOfflineUnlock()
-        if (timestamp.isEmpty()) { /* invalid offline key/command; see onError */ }
+        if (timestamp.isEmpty()) showError("Offline key/command is invalid")
     }
 }
 ```
@@ -325,7 +333,8 @@ if (noke.isNokeIon2) {
 - If the lock rejects the cached ACL (rejected, expired or invalid time, signature failure), the library makes one automatic attempt to refetch the ACL from the backend and retry. That refetch needs connectivity and a numeric user ID; if it cannot complete, `ERROR_SIGNING` is reported.
 - Call `mNokeService.hasAclForDevice(noke.getMac())` to check whether an ACL is cached (e.g. to show or hide an "Offline unlock" button). It does not check the ACL's expiry.
 - Optionally call `noke.setUnlockOption(...)` beforehand. If the user's access requires `NokeUnlockOption.OVERRIDE` or `EMERGENCY`, the ACL-based unlock is rejected with `ERROR_SIGNING`.
-- Other failures (phone not provisioned, no ACL cached for the lock) are also reported through `NokeServiceListener.onError()` with `NokeMobileError.ERROR_SIGNING`.
+- Failures (phone not provisioned, no ACL cached for the lock, ACL rejected or signature failure) are reported through `NokeServiceListener.onError()` with `NokeMobileError.ERROR_SIGNING`. Success is reported through `onNokeUnlocked()`.
+- The lock must be connected via `NokeDeviceManagerService` with a `NokeServiceListener` registered.
 
 ```java
 // ION-2 (5E): uses the cached Phone Key ACL
@@ -336,7 +345,7 @@ if (noke.isNokeIon2() && mNokeService.hasAclForDevice(noke.getMac())) {
 
 ##### All other locks (1A, 3K, 4K, 4E, etc.): `scheduledOfflineUnlock()`
 
-- Requires an offline key and an unlock command, both of which can be received by the server via the [Noke Core API](https://github.com/noke-inc/noke-core-api-documentation). These two values should be cached on the phone to be used at a later time.
+- Requires an offline key and an unlock command, both of which can be received by the server via the [Noke Core API](https://github.com/noke-inc/noke-core-api-documentation). These two values should be cached on the phone to be used at a later time. Not used for ION-2 locks, which have no offline key.
 
 The offline key and unlock command should be set on the Noke device object before being used:
 
