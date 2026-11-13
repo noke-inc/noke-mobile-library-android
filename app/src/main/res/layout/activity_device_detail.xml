@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".DeviceDetailActivity">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Connection State Banner -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="12dp"
+            android:background="@color/colorPrimary">
+
+            <View
+                android:id="@+id/connection_indicator"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:background="@android:color/white" />
+
+            <TextView
+                android:id="@+id/tv_connection_state"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                tools:text="Connected" />
+
+            <View
+                android:id="@+id/lock_state_indicator"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:background="@color/disconnectGray" />
+
+            <TextView
+                android:id="@+id/tv_lock_state"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                tools:text="Locked" />
+
+        </LinearLayout>
+
+        <!-- Status -->
+        <TextView
+            android:id="@+id/tv_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#1A000000"
+            android:padding="10dp"
+            android:textAlignment="center"
+            android:textColor="@color/colorPrimary"
+            android:textSize="13sp"
+            tools:text="NOKE CONNECTED" />
+
+        <!-- Device Info Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_margin="12dp"
+            android:background="#FFFFFF"
+            android:elevation="2dp"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/section_device_info"
+                android:textColor="#757575"
+                android:textSize="11sp"
+                android:textAllCaps="true"
+                android:layout_marginBottom="12dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:layout_width="120dp"
+                    android:layout_height="wrap_content"
+                    android:text="@string/label_device_name"
+                    android:textColor="#757575"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/tv_device_name"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="13sp"
+                    android:textColor="#212121"
+                    tools:text="NOKE-ABC123" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:layout_width="120dp"
+                    android:layout_height="wrap_content"
+                    android:text="@string/label_mac_address"
+                    android:textColor="#757575"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/tv_device_mac"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="13sp"
+                    android:textColor="#212121"
+                    tools:text="AA:BB:CC:DD:EE:FF" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:layout_width="120dp"
+                    android:layout_height="wrap_content"
+                    android:text="@string/label_hardware_version"
+                    android:textColor="#757575"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/tv_hardware_version"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="13sp"
+                    android:textColor="#212121"
+                    tools:text="3P" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="120dp"
+                    android:layout_height="wrap_content"
+                    android:text="@string/label_software_version"
+                    android:textColor="#757575"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/tv_software_version"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="13sp"
+                    android:textColor="#212121"
+                    tools:text="2.10" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Offline Key Status Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="12dp"
+            android:layout_marginBottom="8dp"
+            android:background="#FFFFFF"
+            android:elevation="2dp"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/section_offline_key"
+                android:textColor="#757575"
+                android:textSize="11sp"
+                android:textAllCaps="true"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:id="@+id/tv_offline_key_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textColor="#212121"
+                tools:text="No offline key cached" />
+
+        </LinearLayout>
+
+        <!-- Unlock Actions Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="12dp"
+            android:layout_marginBottom="8dp"
+            android:background="#FFFFFF"
+            android:elevation="2dp"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/section_unlock_actions"
+                android:textColor="#757575"
+                android:textSize="11sp"
+                android:textAllCaps="true"
+                android:layout_marginBottom="12dp" />
+
+            <!-- Standard Unlock -->
+            <Button
+                android:id="@+id/btn_unlock"
+                style="@style/Widget.AppCompat.Button.Colored"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_unlock_online"
+                android:layout_marginBottom="8dp" />
+
+            <!-- Offline Unlock (shown only when offline key is available) -->
+            <Button
+                android:id="@+id/btn_offline_unlock"
+                style="@style/Widget.AppCompat.Button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_unlock_offline"
+                android:layout_marginBottom="8dp"
+                android:visibility="gone" />
+
+            <!-- Disconnect -->
+            <Button
+                android:id="@+id/btn_disconnect"
+                style="@style/Widget.AppCompat.Button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_disconnect"
+                android:textColor="#c62828" />
+
+        </LinearLayout>
+
+        <!-- Bottom padding -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="16dp" />
+
+    </LinearLayout>
+
+</ScrollView>

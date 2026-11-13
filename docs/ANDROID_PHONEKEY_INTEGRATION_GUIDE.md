@@ -19,12 +19,13 @@
 7. [Optional Customization](#optional-customization)
 8. [View Model / State Management](#view-model--state-management)
 9. [Complete Integration Example](#complete-integration-example)
-10. [API Reference](#api-reference)
-11. [Error Handling](#error-handling)
-12. [Edge Cases / Considerations](#edge-cases--considerations)
-13. [Testing Guide](#testing-guide)
-14. [Best Practices](#best-practices)
-15. [FAQ](#faq)
+10. [Offline Unlock](#offline-unlock)
+11. [API Reference](#api-reference)
+12. [Error Handling](#error-handling)
+13. [Edge Cases / Considerations](#edge-cases--considerations)
+14. [Testing Guide](#testing-guide)
+15. [Best Practices](#best-practices)
+16. [FAQ](#faq)
 
 ---
 
@@ -318,8 +319,10 @@ import kotlinx.coroutines.withContext
 class MyPhoneKeyCoreClient(
     private val context: Context,
     private val baseUrl: String,
-    private val authTokenProvider: () -> String,
-    private val userUuidProvider: () -> String
+    private val apiKeyProvider: () -> String,
+    // Retained for SecurityServiceImpl compatibility; the user ID is no longer sent to the backend.
+    private val userUuidProvider: () -> String,
+    private val extraHeaders: Map<String, String> = emptyMap()
 ) : PhoneKeyCoreClient {
 
     private val mutex = Mutex()
@@ -330,8 +333,11 @@ class MyPhoneKeyCoreClient(
         val securityService: SecurityService = SecurityServiceImpl(
             context = context,
             baseUrl = baseUrl,
-            authTokenProvider = authTokenProvider,
-            userUuidProvider = userUuidProvider
+            // Gateway authenticates Phone Key requests via "Authorization: ApiKey <phoneKeyApiKey>".
+            authTokenProvider = apiKeyProvider,
+            userUuidProvider = userUuidProvider,
+            tokenScheme = "ApiKey",
+            extraHeaders = extraHeaders
         )
         return PhoneKeyManager.getInstance(context, userId, deviceId, securityService)
     }
@@ -411,11 +417,18 @@ class MyApplication : Application() {
         super.onCreate()
 
         // Initialize Phone Key system
+        // The gateway authenticates via "Authorization: ApiKey <phoneKeyApiKey>".
+        // Email/CompanyId/SiteId are passed via extraHeaders.
         val client = MyPhoneKeyCoreClient(
             context = this,
-            baseUrl = "https://router.smartentry.noke.com/",
-            authTokenProvider = { sessionManager.getAuthToken() },
-            userUuidProvider = { sessionManager.getUserUuid() }
+            baseUrl = "https://api-gateway.smartentry.noke.com/",
+            apiKeyProvider = { sessionManager.getApiKey() },
+            userUuidProvider = { sessionManager.getUserUuid() },
+            extraHeaders = mapOf(
+                "Email"     to sessionManager.getEmail(),
+                "CompanyId" to sessionManager.getCompanyId(),
+                "SiteId"    to sessionManager.getSiteId()
+            )
         )
         PhoneKeyAccessService.setSharedClient(client, this)
     }
@@ -609,6 +622,81 @@ class LockActivity : AppCompatActivity() {
 
 ---
 
+## Offline Unlock
+
+Offline unlock works without a network connection once the required credentials are cached on the phone. The method depends on the lock hardware, and both are called on the connected `NokeDevice`:
+
+| Lock type                                   | Hardware                                  | Method                          | Offline credential                               |
+| ------------------------------------------- | ----------------------------------------- | ------------------------------- | ------------------------------------------------ |
+| ION-2                                       | `5E` / `E5` (`noke.isNokeIon2` is `true`) | `noke.signingOfflineUnlock()`   | Phone Key ACL (cached by `generateBulkAcls`)     |
+| All other locks (NOKE 1A, 3K, 4K, 4E, etc.) | everything else                           | `noke.scheduledOfflineUnlock()` | Offline key + unlock command (from the Core API) |
+
+Route on `noke.isNokeIon2` (or `noke.encryptionType`, which is `NokeEncryptionType.SIGNING` for ION-2):
+
+```kotlin
+private fun performOfflineUnlock(noke: NokeDevice) {
+    if (noke.isNokeIon2) {
+        // ION-2 (5E): uses the cached Phone Key ACL
+        noke.signingOfflineUnlock()
+    } else {
+        // 1A, 3K, 4K, 4E, etc.: uses the cached offline key + unlock command
+        if (noke.offlineKey.isNullOrBlank() || noke.offlineUnlockCmd.isNullOrBlank()) {
+            showError("No offline key cached")
+            return
+        }
+        val timestamp = noke.scheduledOfflineUnlock()
+        if (timestamp.isEmpty()) showError("Offline key/command is invalid")
+    }
+}
+```
+
+### ION-2 (5E): `signingOfflineUnlock()`
+
+```java
+public void signingOfflineUnlock()
+```
+
+Initiates an offline unlock using the locally cached Phone Key ACL. No offline key or unlock command is used, and no network call is made unless the lock rejects the cached ACL (see below).
+
+**Prerequisites**
+
+- The phone is provisioned (`provisionPhoneKey()`), and `generateBulkAcls()` (or `generateAcl()`) has succeeded at least once while online, so an ACL is cached for the lock's MAC.
+- The host app has stored the signed-in user's ID under the key `user_uuid` in the `SharedPreferences` file `nokeAPILibaryFile` (`MODE_PRIVATE`). `NokeDeviceManagerService` resolves the user from there, and it must equal the `userId` used when provisioning. If it is empty the unlock fails with `ERROR_SIGNING` ("No user logged in"). The `apikey`, `email`, `companyId` and `siteId` keys in the same file are used only for the ACL refetch described below (this is what `NokeDemoApplication` does in the sample app).
+- The lock is connected via `NokeDeviceManagerService`, and a `NokeServiceListener` is registered.
+
+**Automatic ACL refetch.** If the lock rejects the cached ACL (rejected, expired, invalid time, or signature failure), the library makes one attempt to refetch the ACL from the backend and retry. This requires connectivity and a numeric user ID; if it cannot complete, `ERROR_SIGNING` is reported.
+
+**Checking availability** (for example, to show or hide an "Offline unlock" button). `hasAclForDevice()` does not check the ACL's expiry:
+
+```kotlin
+val canUnlockOffline = noke.isNokeIon2 && nokeService.hasAclForDevice(noke.mac)
+```
+
+**Unlock options.** Optionally call `noke.setUnlockOption(NokeUnlockOption.NONE | OVERRIDE | EMERGENCY)` before unlocking. If the user's access requires `OVERRIDE` or `EMERGENCY`, the ACL-based unlock is rejected with `ERROR_SIGNING`.
+
+**Errors.** Failures (phone not provisioned, no ACL cached for the lock, ACL rejected or signature failure) are reported through `NokeServiceListener.onError()` with `NokeMobileError.ERROR_SIGNING`. Success is reported through `onNokeUnlocked()`.
+
+### All other locks (1A, 3K, 4K, 4E, etc.): `scheduledOfflineUnlock()`
+
+```java
+public String scheduledOfflineUnlock()
+```
+
+Sends an unlock using a cached offline key and unlock command. Both values are obtained from your server via the Noke Core API during an online unlock and must be set on the device before use:
+
+```kotlin
+noke.setOfflineKey(offlineKey)             // 32 hex characters
+noke.setOfflineUnlockCmd(offlineUnlockCmd) // 40 hex characters
+```
+
+- **Returns** the current Unix time (seconds), or an empty string if the key or command has the wrong length. In that case the listener also receives `NokeMobileError.ERROR_INVALID_OFFLINE_KEY`.
+- Both values must be set first; calling it while either is `null` throws a `NullPointerException`.
+- The cached command is sent as-is; the timestamp embedded in it is not overwritten. The older `offlineUnlock()` instead stamps the current phone time into the command.
+- Logs, errors, and callbacks behave the same as an online unlock.
+- Not used for ION-2 locks, which have no offline key.
+
+---
+
 ## API Reference
 
 ### Data Models
@@ -795,12 +883,13 @@ service.clearManagerInstance(userId, deviceId)
 
 Android uses **snake_case** in JSON request bodies:
 
-| Field           | Android JSON   | Notes                                     |
-| --------------- | -------------- | ----------------------------------------- |
-| User ID         | `"user_id"`    | Backend contract — confirm with your team |
-| Phone UDID      | `"phone_udid"` | —                                         |
-| Public Key      | `"public_key"` | —                                         |
-| Response Key ID | `"key_id"`     | Returned from backend                     |
+| Field           | Android JSON   | Notes                 |
+| --------------- | -------------- | --------------------- |
+| Phone UDID      | `"phone_udid"` | —                     |
+| Public Key      | `"public_key"` | —                     |
+| Response Key ID | `"key_id"`     | Returned from backend |
+
+`user_id` / `userId` is **not** sent to the backend (provisioning, single ACL, bulk ACL). `userId` is still used locally to namespace the Keystore alias and encrypted storage.
 
 ### 5. Thread Safety
 
