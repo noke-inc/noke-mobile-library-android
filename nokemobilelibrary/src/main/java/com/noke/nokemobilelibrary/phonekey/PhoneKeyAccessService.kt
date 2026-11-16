@@ -370,7 +370,7 @@ class PhoneKeyAccessService private constructor(
      * ## Process
      * 1. Ensure keys are initialized via [initialize]
      * 2. Extract public key in X9.62 format (Base64-encoded)
-     * 3. Send provisioning request to backend: (userId, deviceId, publicKey)
+     * 3. Send provisioning request to backend: (deviceId, publicKey) - userId is not sent
      * 4. Store phone key ID and metadata locally
      * 
      * ## Per-Device Isolation
@@ -481,7 +481,7 @@ class PhoneKeyAccessService private constructor(
      * ## Thread Safety
      * Thread-safe - can be called from any coroutine context.
      * 
-     * @param userId User ID as integer (matching backend API)
+     * @param userId User ID as integer (not sent to the backend; the ACL is resolved from [phoneKeyId])
      * @param lockMac Lock MAC address (e.g., "AA:BB:CC:DD:EE:FF")
      * @param phoneKeyId Phone key ID from [provisionPhoneKey]
      * @return [Result] with Unit on success, or [NokeMobileLibraryError] on failure

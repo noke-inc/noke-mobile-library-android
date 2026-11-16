@@ -1,0 +1,28 @@
+## Copy this file to `local.properties` and fill in your values.
+# `local.properties` must NOT be checked into version control.
+#
+# Location of the Android SDK. Only used by Gradle.
+sdk.dir=/path/to/Android/sdk
+
+# =============================================================================
+# Phone Key Configuration (required for ION-2 device unlock)
+# =============================================================================
+# These values are injected as BuildConfig fields and stored in SharedPreferences
+# at app startup. Never commit real credentials to version control.
+#
+# phoneKeyUserId    : Your integer user ID from the Noke backend (nokeUser from JWT).
+#                     Must be a numeric string used in ACL and provisioning requests.
+# phoneKeyApiKey    : REQUIRED API key for the smart-entry gateway. Sent as
+#                     "Authorization: ApiKey <phoneKeyApiKey>" for all Phone Key requests.
+# phoneKeyEmail     : Email associated with the gateway tenant account (header: Email).
+# phoneKeyCompanyId : Company ID for the gateway (header: CompanyId).
+# phoneKeySiteId    : Site ID for the gateway (header: SiteId).
+# phoneKeyBaseUrl   : (Optional) Override the API base URL.
+#                     Defaults to the dev gateway: https://api-gateway.smartentry.noke.dev/
+#
+phoneKeyUserId=<your-user-id>
+phoneKeyApiKey=<your-api-key>
+phoneKeyEmail=<your-tenant-email>
+phoneKeyCompanyId=<your-company-id>
+phoneKeySiteId=<your-site-id>
+phoneKeyBaseUrl=https://api-gateway.smartentry.noke.dev/

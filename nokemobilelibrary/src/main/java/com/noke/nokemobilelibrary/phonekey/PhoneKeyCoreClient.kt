@@ -159,7 +159,7 @@ interface PhoneKeyCoreClient {
      * ## Backend Integration
      * Implementations should:
      * 1. Make authenticated request to phone key provisioning endpoint
-     * 2. Send payload: { userId, phoneUdid, publicKey }
+     * 2. Send payload: { phone_udid, public_key } (userId is not sent)
      * 3. Parse response and extract phone key ID
      * 4. Store phone key ID locally for future use
      *
@@ -204,7 +204,7 @@ interface PhoneKeyCoreClient {
      * ## Backend Integration
      * Implementations should:
      * 1. Make authenticated request to ACL generation endpoint
-     * 2. Send payload: { userId, lockMac, phoneKeyId }
+     * 2. Send payload: { lockMac, phoneKeyId } (userId is not sent)
      * 3. Parse response and extract ACL envelope (binary, signature, permissions)
      * 4. Store ACL locally via PhoneKeyManager
      *
@@ -215,7 +215,7 @@ interface PhoneKeyCoreClient {
      * ## Thread Safety
      * Must be thread-safe and safe to call from any coroutine context.
      *
-     * @param userId User ID as integer
+     * @param userId User ID as integer (not sent to the backend)
      * @param lockMac Lock MAC address (e.g., "AA:BB:CC:DD:EE:FF")
      * @param phoneKeyId Phone key ID from provisioning
      * @return [Result] with Unit on success (ACL stored), or error on failure

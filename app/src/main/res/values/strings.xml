@@ -1,10 +1,91 @@
 <resources>
     <string name="app_name">Nokē Mobile Library Demo</string>
-    <string name="location_access_required" translatable="false">Location Access Required</string>
-    <string name="location_permission_request_message" translatable="false">The Noke Mobile Library requires Bluetooth access in order to scan for Noke devices</string>
-    <string name="bluetooth_access_required" translatable="false">Location Access Required</string>
-    <string name="bluetooth_permission_request_message" translatable="false">The Noke Mobile Library requires Bluetooth access in order to scan for Noke devices</string>
-    <string name="functionality_limited" translatable="false">Functionality Limited</string>
-    <string name="no_location_message" translatable="false">Location access has not been granted. App will not be able to discover Noke devices.</string>
-    <string name="no_bluetooth_message" translatable="false">Bluetooth has not been granted. App will not be able to discover Noke devices.</string>
+
+    <!-- Permissions -->
+    <string name="location_access_required">Location Access Required</string>
+    <string name="location_permission_request_message">Location access is required by the Noke library to scan for nearby Bluetooth devices. Please tap Allow to continue.</string>
+    <string name="bluetooth_access_required">Bluetooth Access Required</string>
+    <string name="bluetooth_permission_request_message">Bluetooth Scan and Connect permissions are required to discover and connect to Noke devices on Android 12+.</string>
+    <string name="functionality_limited">Functionality Limited</string>
+    <string name="no_location_message">Location access was not granted. The app cannot discover nearby Noke devices.</string>
+    <string name="no_bluetooth_message">Bluetooth permission was not granted. The app cannot discover nearby Noke devices.</string>
+    <string name="location_services_required_title">Location Services Required</string>
+    <string name="location_services_required_message">Location services must be enabled to scan for nearby Bluetooth devices. Please enable location in Settings.</string>
+    <string name="btn_open_settings">Open Settings</string>
+    <string name="status_location_disabled">Location services are disabled. Enable in Settings to scan.</string>
+
+    <!-- Scan Screen -->
+    <string name="btn_scan">Scan for Devices</string>
+    <string name="btn_scanning">Scanning…</string>
+    <string name="section_discovered_devices">Discovered Devices</string>
+    <string name="empty_no_devices">No Noke devices found.\nMake sure your device is powered on and nearby.</string>
+    <string name="hint_search_devices">Search by device name</string>
+    <string name="clear_search">Clear search</string>
+    <string name="empty_no_matching_devices">No devices match \"%1$s\".</string>
+    <string name="status_idle">Ready to scan</string>
+    <string name="status_scanning">Scanning for Noke devices…</string>
+    <string name="status_connecting">Connecting to %1$s…</string>
+    <string name="status_bluetooth_off">Bluetooth is disabled. Please enable it to scan.</string>
+
+    <!-- Device Detail Screen -->
+    <string name="section_device_info">Device Information</string>
+    <string name="section_offline_key">Offline Key</string>
+    <string name="section_unlock_actions">Unlock Actions</string>
+    <string name="label_device_name">Name</string>
+    <string name="label_mac_address">MAC Address</string>
+    <string name="label_hardware_version">Hardware</string>
+    <string name="label_software_version">Firmware</string>
+    <string name="value_unknown">Unknown</string>
+    <string name="offline_key_available">Offline key cached — offline unlock available</string>
+    <string name="offline_key_unavailable">No offline key cached. Perform an online unlock to cache one.</string>
+    <string name="offline_key_available_ion2">Phone Key ACL cached — offline unlock available</string>
+    <string name="offline_key_unavailable_ion2">Phone Key not provisioned. Ensure Phone Key setup is complete.</string>
+    <string name="btn_unlock_online">Unlock (Online)</string>
+    <string name="btn_unlock_offline">Unlock (Offline — No Network)</string>
+    <string name="btn_disconnect">Disconnect</string>
+    <string name="connection_state_connected">Connected</string>
+    <string name="connection_state_disconnected">Disconnected</string>
+    <string name="lock_state_locked">Locked</string>
+    <string name="lock_state_unlocked">Unlocked</string>
+    <string name="lock_state_unshackled">Unshackled</string>
+    <string name="lock_state_unknown">Unknown</string>
+
+    <!-- Status Messages -->
+    <string name="status_connected">Connected to %1$s</string>
+    <string name="status_syncing">Syncing with %1$s…</string>
+    <string name="status_unlocked">%1$s unlocked</string>
+    <string name="status_disconnected">%1$s disconnected</string>
+    <string name="status_shutdown">%1$s shut down</string>
+    <string name="status_jammed_locking">Lock jammed while locking — check device</string>
+    <string name="status_jammed_unlocking">Lock jammed while unlocking — check device</string>
+    <string name="status_requesting_unlock">Requesting unlock commands from server…</string>
+    <string name="status_offline_unlock">Sending offline unlock…</string>
+
+    <!-- Error Messages -->
+    <string name="error_no_device">No device connected</string>
+    <string name="error_unlock_failed">Unlock failed: %1$s</string>
+    <string name="error_no_offline_key">No offline key available. Perform an online unlock first.</string>
+    <string name="error_offline_unlock_failed">Offline unlock failed. Ensure offline key is valid.</string>
+    <string name="error_invalid_key">Invalid key — contact Nokē support</string>
+    <string name="error_gatt">Bluetooth GATT error — try reconnecting</string>
+    <string name="error_invalid_permission">Invalid permission — check access rights</string>
+    <string name="error_out_of_schedule">Access denied — outside allowed schedule</string>
+    <string name="error_signing">ION-2 signing error — ensure Phone Key is provisioned</string>
+    <string name="error_device_incompatible">Could not communicate with device. Check device firmware and try again.</string>
+    <string name="error_connection_timeout">Connection timed out. Move closer to the device and try again.</string>
+    <string name="error_generic">Error %1$d: %2$s</string>
+
+    <!-- Phone Key Provisioning -->
+    <string name="status_phone_key_initializing">Initializing Phone Key for ION-2…</string>
+    <string name="status_phone_key_provisioning">Provisioning Phone Key with backend…</string>
+    <string name="status_phone_key_fetching_acls">Fetching access credentials…</string>
+    <string name="status_phone_key_ready">%1$s ready — Phone Key provisioned</string>
+    <string name="error_phone_key_not_configured">ION-2 unlock unavailable — set phoneKeyUserId and phoneKeyApiKey in local.properties</string>
+    <string name="error_phone_key_init_failed">Phone Key init failed: %1$s</string>
+    <string name="error_phone_key_provision_failed">Phone Key provisioning failed: %1$s</string>
+    <string name="error_phone_key_acl_failed">Access credential fetch failed: %1$s</string>
+
+    <!-- Content Descriptions (Accessibility) -->
+    <string name="content_desc_lock_icon">Lock icon</string>
+    <string name="content_desc_connect">Connect to device</string>
 </resources>

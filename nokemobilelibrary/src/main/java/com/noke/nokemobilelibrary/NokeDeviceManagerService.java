@@ -44,6 +44,7 @@ import com.noke.nokemobilelibrary.enums.SigningWriteCharacteristicType;
 import com.noke.nokemobilelibrary.interfaces.ResultCallback;
 import com.noke.nokemobilelibrary.interfaces.FailureHandler;
 import com.noke.nokemobilelibrary.interfaces.SuccessHandler;
+import com.noke.nokemobilelibrary.phonekey.internal.PhoneKeyCredentialStore;
 import com.noke.nokemobilelibrary.phonekey.internal.PhoneKeyManager;
 
 import org.json.JSONArray;
@@ -62,6 +63,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static com.noke.nokemobilelibrary.NokeMobileError.DEVICE_SHUTDOWN_RESULT;
 import static com.noke.nokemobilelibrary.NokeMobileError.ERROR_CONNECTION_TIMEOUT;
@@ -305,15 +307,44 @@ public class NokeDeviceManagerService extends Service {
     private ResultCallback<byte[]> readCommandIdCompletion;
 
     /**
+     * The signing GattRequest currently in flight, so the shared BluetoothGattCallback can hand the
+     * read/write result back to it (see GattRequest#dispatchOnCharacteristicRead). Set when the request
+     * actually executes (the BleOperationQueue serializes execution) and consumed from a binder thread.
+     */
+    private final AtomicReference<GattRequest> pendingSigningReadRequest = new AtomicReference<>();
+    private final AtomicReference<GattRequest> pendingSigningWriteRequest = new AtomicReference<>();
+
+    /**
      * Retry counter for ACL signature failures
      */
     private int signingRetries = 0;
     private static final int MAX_SIGNING_RETRIES = 1;
 
     /**
+     * MTU requested for ION-2 signing devices only. The default 23-byte MTU (20-byte payload) forces
+     * large signing writes (e.g. ~148-byte ACL binary) into a queued prepare-write sequence that can
+     * overflow the lock's ATT prepare queue (status=9, "Prepare Queue Full"). Legacy locks must NOT
+     * receive this request: on Samsung One UI 7 it stalls service discovery.
+     */
+    private static final int REQUESTED_MTU = 512;
+
+    /** Max wait for onMtuChanged before falling back to service discovery. */
+    private static final long MTU_NEGOTIATION_TIMEOUT_MS = 500;
+    /** Settle time after refreshing the GATT cache before calling discoverServices(). */
+    private static final long SERVICE_DISCOVERY_DELAY_MS = 200;
+    /** Wait for onMtuChanged after a post-discovery MTU request before reporting connected. */
+    private static final long POST_DISCOVERY_MTU_WAIT_MS = 1000;
+
+    /**
      * SharedPreferences key for user UUID
      */
     private static final String PREF_USER_UUID = "user_uuid";
+
+    /** SharedPreferences keys for Phone Key gateway auth/tenant headers (set by the host app). */
+    private static final String PREF_API_KEY = "apikey";
+    private static final String PREF_EMAIL = "email";
+    private static final String PREF_COMPANY_ID = "companyId";
+    private static final String PREF_SITE_ID = "siteId";
 
     // ==================== End ION-2 Variables ====================
 
@@ -1071,6 +1102,15 @@ public class NokeDeviceManagerService extends Service {
         return true;
     }
 
+    /** True for ION-2 signing devices; false if the hardware version is unavailable. */
+    private boolean isSigningDevice(NokeDevice noke) {
+        try {
+            return noke != null && noke.isNokeIon2();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     /**
      * Implementation of the the BluetoothGatt callbacks.
      * Read more here: <a href="https://developer.android.com/reference/android/bluetooth/BluetoothGattCallback.html">https://developer.android.com/reference/android/bluetooth/BluetoothGattCallback.html</a>
@@ -1128,14 +1168,46 @@ public class NokeDeviceManagerService extends Service {
                 handler.post(new Runnable() {
                     @Override
                     public void run() {
+                        try {
+                            if (noke.gatt == null) {
+                                noke.gatt = gatt;
+                            }
 
-                        if (noke.gatt != null) {
-                            Log.i(TAG, "Gatt not null. Attempting to start service discovery:" +
-                                    noke.gatt.discoverServices());
-                        } else {
-                            noke.gatt = gatt;
-                            Log.i(TAG, "Gatt was null. Attempting to start service discovery:" +
-                                    noke.gatt.discoverServices());
+                            try {
+                                boolean priorityRequested = noke.gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH);
+                                Log.i(TAG, "Connection priority HIGH requested: " + priorityRequested);
+                            } catch (Exception e) {
+                                Log.e(TAG, "Exception in requestConnectionPriority", e);
+                            }
+
+                            // Only ION-2 signing devices need a large MTU. Legacy locks (<=20-byte packets)
+                            // can stall service discovery on Samsung One UI 7 if sent requestMtu().
+                            // On Android <= 12 (API <= 31) requestMtu() may return true but never fire
+                            // onMtuChanged, so those devices negotiate post-discovery instead
+                            // (see onServicesDiscovered).
+                            if (isSigningDevice(noke) && Build.VERSION.SDK_INT > Build.VERSION_CODES.S) {
+                                try {
+                                    boolean mtuRequested = noke.gatt.requestMtu(REQUESTED_MTU);
+                                    Log.i(TAG, "MTU " + REQUESTED_MTU + " requested: " + mtuRequested);
+                                    if (!mtuRequested) {
+                                        startServiceDiscovery(noke);
+                                    } else {
+                                        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                                            if (noke.connectionState == NokeDefines.NOKE_STATE_CONNECTING) {
+                                                Log.w(TAG, "MTU change timeout, proceeding with service discovery anyway");
+                                                startServiceDiscovery(noke);
+                                            }
+                                        }, MTU_NEGOTIATION_TIMEOUT_MS);
+                                    }
+                                } catch (Exception e) {
+                                    Log.e(TAG, "Exception in requestMtu", e);
+                                    startServiceDiscovery(noke);
+                                }
+                            } else {
+                                startServiceDiscovery(noke);
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "onConnectionStateChange -> STATE_CONNECTED exception", e);
                         }
                     }
                 });
@@ -1202,6 +1274,43 @@ public class NokeDeviceManagerService extends Service {
             }
         }
 
+        /**
+         * Starts service discovery after refreshing the GATT cache. Idempotent per MAC via discoveringMacs,
+         * since the MTU timeout and onMtuChanged can both reach this with state == CONNECTING.
+         */
+        private void startServiceDiscovery(final NokeDevice noke) {
+            if (noke == null || noke.gatt == null) {
+                return;
+            }
+
+            if (!discoveringMacs.add(noke.getMac())) {
+                Log.w(TAG, "startServiceDiscovery: discovery already started for " + noke.getMac() + ", skipping duplicate call");
+                return;
+            }
+
+            // A stale/corrupt GATT cache (seen on Samsung One UI 7 with legacy locks) makes discoverServices()
+            // start without ever firing onServicesDiscovered.
+            refreshDeviceCache(noke.gatt, true);
+
+            // Cache invalidation is internally asynchronous on some stacks despite refresh() being synchronous.
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                if (noke.gatt == null || noke.connectionState != NokeDefines.NOKE_STATE_CONNECTING) {
+                    discoveringMacs.remove(noke.getMac());
+                    return;
+                }
+                try {
+                    boolean started = noke.gatt.discoverServices();
+                    Log.i(TAG, "Starting service discovery: " + started);
+                    if (!started) {
+                        discoveringMacs.remove(noke.getMac());
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Exception in discoverServices", e);
+                    discoveringMacs.remove(noke.getMac());
+                }
+            }, SERVICE_DISCOVERY_DELAY_MS);
+        }
+
         void refreshDeviceCache(final BluetoothGatt gatt, final boolean force) {
             /*
              * If the device is bonded this is up to the Service Changed characteristic to notify Android that the services has changed.
@@ -1209,19 +1318,19 @@ public class NokeDeviceManagerService extends Service {
              * If not bonded, the Android should not keep the services cached when the Service Changed characteristic is present in the target device database.
              * However, due to the Android bug (still exists in Android 5.0.1), it is keeping them anyway and the only way to clear services is by using this hidden refresh method.
              */
-            if (force || gatt.getDevice().getBondState() == BluetoothDevice.BOND_NONE) {
-                /*
-                 * There is a refresh() method in BluetoothGatt class but for now it's hidden. We will call it using reflections.
-                 */
-                try {
+            try {
+                if (gatt != null && (force || gatt.getDevice().getBondState() == BluetoothDevice.BOND_NONE)) {
+                    /*
+                     * There is a refresh() method in BluetoothGatt class but for now it's hidden. We will call it using reflections.
+                     */
                     @SuppressWarnings("JavaReflectionMemberAccess") final Method refresh = gatt.getClass().getMethod("refresh");
                     if (refresh != null) {
                         final boolean success = (Boolean) refresh.invoke(gatt);
                         Log.d(TAG, "Refreshing Result: " + success);
                     }
-                } catch (Exception e) {
-                    //Log.e(TAG, "REFRESH DEVICE CACHE");
                 }
+            } catch (Exception e) {
+                Log.e(TAG, "refreshDeviceCache -> Exception -> " + e.getMessage());
             }
         }
 
@@ -1237,18 +1346,10 @@ public class NokeDeviceManagerService extends Service {
                 Log.w(TAG, "MTU change failed with status " + status + " for " + noke.getMac() + ", using default MTU");
             }
 
-            // MTU negotiation complete (success or failure) — proceed with service discovery
-            // Atomic guard: if this MAC is already being discovered, skip duplicate call.
+            // Pre-discovery MTU negotiation complete (success or failure) — proceed with service discovery.
+            // A post-discovery MTU result (state CONNECTED) needs no action; onServicesDiscovered handles it.
             if (noke.connectionState == NokeDefines.NOKE_STATE_CONNECTING) {
-                if (discoveringMacs.add(noke.getMac())) {
-                    boolean started = noke.gatt.discoverServices();
-                    Log.i(TAG, "Starting service discovery from onMtuChanged: " + started);
-                    if (!started) {
-                        discoveringMacs.remove(noke.getMac());
-                    }
-                } else {
-                    Log.w(TAG, "onMtuChanged: discovery already started for " + noke.getMac() + ", skipping duplicate call");
-                }
+                startServiceDiscovery(noke);
             }
         }
 
@@ -1266,18 +1367,55 @@ public class NokeDeviceManagerService extends Service {
                 if (gatt.getDevice().getName().contains("NOKE_FW") || gatt.getDevice().getName().contains("NFOB_FW") || gatt.getDevice().getName().contains("N3P_FW")) {
                     enableFirmwareTXNotification(noke);
                 } else {
-                    // Discover ION-2 characteristics if this is an ION-2 lock
-                    discoverIon2Characteristics(gatt);
-                    
-                    readStateCharacteristic(noke);
+                    // Cache ION-2 characteristics and check whether the signing service exists.
+                    // discoverIon2Characteristics returns the service if found, null otherwise.
+                    // This avoids a redundant GATT service lookup.
+                    BluetoothGattService signingService = discoverIon2Characteristics(gatt);
+
+                    // ION-2 devices expose the signing service but NOT the classic RX_SERVICE_UUID.
+                    // Calling readStateCharacteristic() on them fires error 304 and blocks connection.
+                    // When the signing service is found, transition directly to CONNECTED.
+                    // Classic (non-ION-2) devices fall through to the normal state-read path.
+                    if (signingService != null) {
+                        noke.connectionState = NokeDefines.NOKE_STATE_CONNECTED;
+
+                        // On Android <= 12 the pre-discovery MTU request is skipped (onMtuChanged may never
+                        // fire), so negotiate here after discovery; this is safe on every Android version.
+                        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S && noke.gatt != null) {
+                            final NokeDevice connectedNoke = noke;
+                            try {
+                                if (noke.gatt.requestMtu(REQUESTED_MTU)) {
+                                    // Proceed after the timeout regardless so unlock is never blocked.
+                                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                                        if (connectedNoke.connectionState == NokeDefines.NOKE_STATE_CONNECTED) {
+                                            mGlobalNokeListener.onNokeConnected(connectedNoke);
+                                        }
+                                    }, POST_DISCOVERY_MTU_WAIT_MS);
+                                    return;
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "onServicesDiscovered: post-discovery MTU request exception", e);
+                            }
+                        }
+                        mGlobalNokeListener.onNokeConnected(noke);
+                    } else {
+                        readStateCharacteristic(noke);
+                    }
                 }
+            } else {
+                Log.e(TAG, "onServicesDiscovered: GATT service discovery failed for " + noke.getMac() + " with status " + status);
+                mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_BLUETOOTH_GATT, "Service discovery failed with status " + status);
+                disconnectNoke(noke);
             }
         }
         
         /**
          * Discover and cache ION-2 characteristics from the connected device.
+         *
+         * @param gatt The connected GATT instance
+         * @return The ION-2 signing {@link BluetoothGattService} if present, {@code null} for classic devices
          */
-        private void discoverIon2Characteristics(BluetoothGatt gatt) {
+        private BluetoothGattService discoverIon2Characteristics(BluetoothGatt gatt) {
             try {
                 BluetoothGattService signingService = gatt.getService(SigningDeviceCharacteristicType.getServiceUuid());
                 if (signingService != null) {
@@ -1295,8 +1433,10 @@ public class NokeDeviceManagerService extends Service {
                     
                     Log.d(TAG, "ION-2 characteristics cached successfully");
                 }
+                return signingService;
             } catch (Exception e) {
                 Log.e(TAG, "Error discovering ION-2 characteristics", e);
+                return null;
             }
         }
 
@@ -1312,7 +1452,18 @@ public class NokeDeviceManagerService extends Service {
                     noke.setSession(characteristic.getValue());
                     enableTXNotification(noke);
                 }
-                
+            }
+
+            // Dispatch to the in-flight signing GattRequest (if any) so ION-2 STATUS/COMMAND_ID
+            // reads are actually processed — GattRequest.doRead() only kicks off the BLE read;
+            // it relies on this dispatch to deliver the result to its readCallback.
+            GattRequest req = pendingSigningReadRequest.getAndSet(null);
+            if (req != null) {
+                req.dispatchOnCharacteristicRead(characteristic, status);
+            }
+
+            // A failed signing read must still release the queue, otherwise it stalls until its timeout.
+            if (status == BluetoothGatt.GATT_SUCCESS || req != null) {
                 // Notify BLE operation queue that read is complete
                 if (bleOperationQueue != null) {
                     bleOperationQueue.notifyOperationComplete();
@@ -1348,6 +1499,13 @@ public class NokeDeviceManagerService extends Service {
         @Override
         public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
             super.onCharacteristicWrite(gatt, characteristic, status);
+
+            // Dispatch to the in-flight signing GattRequest (if any) so write failures are
+            // surfaced via its ErrorReporter instead of being silently swallowed.
+            GattRequest req = pendingSigningWriteRequest.getAndSet(null);
+            if (req != null) {
+                req.dispatchOnCharacteristicWrite(characteristic, status);
+            }
 
             // Notify BLE operation queue that write is complete
             if (bleOperationQueue != null) {
@@ -1790,6 +1948,8 @@ public class NokeDeviceManagerService extends Service {
 
         // Clear BLE operation queue immediately to prevent further operations
         bleOperationQueue.clear();
+        pendingSigningReadRequest.set(null);
+        pendingSigningWriteRequest.set(null);
 
         disconnectHandler.post(() -> {
             if (noke.gatt != null) {
@@ -2107,30 +2267,40 @@ public class NokeDeviceManagerService extends Service {
             String baseUrl;
             switch (libraryMode) {
                 case NokeDefines.NOKE_LIBRARY_SANDBOX:
-                    baseUrl = "https://router.smartentry-sandbox.noke.com/";
+                    baseUrl = "https://api-gateway.smartentry.noke.dev/";
                     break;
                 case NokeDefines.NOKE_LIBRARY_PRODUCTION:
-                    baseUrl = "https://router.smartentry.noke.com/";
+                    baseUrl = "https://api-gateway.smartentry.noke.com/";
                     break;
                 case NokeDefines.NOKE_LIBRARY_DEVELOP:
-                    baseUrl = "https://router.smartentry-dev.noke.com/";
+                    baseUrl = "https://api-gateway.smartentry.noke.dev/";
                     break;
                 default:
-                    baseUrl = "https://router.smartentry.noke.com/";
+                    baseUrl = "https://api-gateway.smartentry.noke.com/";
                     Log.w(TAG, "Unknown library mode, defaulting to production");
                     break;
             }
             
-            // Create SecurityService implementation
+            // Create SecurityService implementation.
+            // Gateway authenticates Phone Key requests via "Authorization: ApiKey <phoneKeyApiKey>".
             final SharedPreferences finalPref = pref;
+            final Context appContext = getApplicationContext();
             com.noke.nokemobilelibrary.phonekey.internal.SecurityService securityService = 
                 new com.noke.nokemobilelibrary.phonekey.internal.SecurityServiceImpl(
-                    getApplicationContext(),
+                    appContext,
                     baseUrl,
-                    () -> finalPref.getString("accesstoken", ""),
+                    () -> resolvePhoneKeyApiKey(finalPref),
                     () -> finalPref.getString(PREF_USER_UUID, ""),
                     1,
-                    3000
+                    3000,
+                    "ApiKey",
+                    () -> {
+                        java.util.Map<String, String> headers = new java.util.HashMap<>();
+                        headers.put("Email", finalPref.getString(PREF_EMAIL, ""));
+                        headers.put("CompanyId", finalPref.getString(PREF_COMPANY_ID, ""));
+                        headers.put("SiteId", finalPref.getString(PREF_SITE_ID, ""));
+                        return headers;
+                    }
                 );
             phoneKeyManager = PhoneKeyManager.getInstance(
                 getApplicationContext(), 
@@ -2141,6 +2311,39 @@ public class NokeDeviceManagerService extends Service {
         }
         
         return phoneKeyManager;
+    }
+
+    /** Encrypted key set via {@link #setPhoneKeyApiKey(String)} wins over the legacy plaintext "apikey" pref. */
+    private String resolvePhoneKeyApiKey(SharedPreferences pref) {
+        String encrypted = PhoneKeyCredentialStore.getApiKey(getApplicationContext());
+        return encrypted != null ? encrypted : pref.getString(PREF_API_KEY, "");
+    }
+
+    /**
+     * Stores the Phone Key gateway API key in encrypted storage and removes any plaintext copy from
+     * the library preferences. Pass null or empty to clear it.
+     *
+     * @throws IllegalStateException if the key cannot be persisted
+     */
+    public void setPhoneKeyApiKey(String apiKey) {
+        PhoneKeyCredentialStore.setApiKey(getApplicationContext(), apiKey);
+        getSharedPreferences(NokeDefines.PREFS_NAME, MODE_PRIVATE).edit().remove(PREF_API_KEY).apply();
+    }
+
+    /**
+     * Returns true if a valid Phone Key ACL is locally cached for the given device MAC.
+     *
+     * Allows the UI to determine whether offline (Phone Key) unlock is available for an
+     * ION-2 device without making a network call. Returns false if the Phone Key manager
+     * is not initialised or the device has not been provisioned.
+     *
+     * @param mac The MAC address of the ION-2 device
+     * @return true if a cached ACL envelope is available, false otherwise
+     */
+    public boolean hasAclForDevice(String mac) {
+        PhoneKeyManager manager = getPhoneKeyManager();
+        if (manager == null || !manager.isProvisioned()) return false;
+        return manager.getAclEnvelope(mac) != null;
     }
 
     /**
@@ -2304,13 +2507,14 @@ public class NokeDeviceManagerService extends Service {
                     convertedUserId,
                     noke.getMac(),
                     convertedKeyId,
-                    success -> {
+                    (success, exception) -> {
                         if (success != null && success) {
                             Log.d(TAG, "ACL refetch successful - retrying unlock (counter=" + noke.signingRetryCount + ")");
                             // Retry unlock with new ACL - DON'T reset counter (already incremented)
                             retryUnlockAfterAclFetch(noke);
                         } else {
-                            Log.e(TAG, "ACL refetch failed - notifying failure: " + finalError.getDescription());
+                            String detail = exception != null ? exception.getMessage() : finalError.getDescription();
+                            Log.e(TAG, "ACL refetch failed - notifying failure: " + detail);
                             if (mGlobalNokeListener != null) {
                                 mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, finalError.getDescription());
                             }
@@ -2436,6 +2640,7 @@ public class NokeDeviceManagerService extends Service {
                     Log.e(TAG, "ACL retry limit exhausted for " + noke.getMac());
                     noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
                     mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, NokeDeviceSigningError.ACL_REJECTED.getDescription());
+                    disconnectNoke(noke);
                     mGlobalNokeListener.onNokeDisconnected(noke);
                 }
                 break;
@@ -2450,6 +2655,22 @@ public class NokeDeviceManagerService extends Service {
                     Log.e(TAG, "ACL retry limit exhausted for " + noke.getMac());
                     noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
                     mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, NokeDeviceSigningError.ACL_REJECTED.getDescription());
+                    disconnectNoke(noke);
+                    mGlobalNokeListener.onNokeDisconnected(noke);
+                }
+                break;
+
+            case ACL_TIME_INVALID:
+                Log.d(TAG, "ACL TIME INVALID on lock " + noke.getMac());
+                if (noke.isEligibleForSigningRetry()) {
+                    noke.incrementSigningRetry();
+                    Log.d(TAG, "Attempting ACL refetch (retry " + noke.signingRetryCount + "/" + (MAX_SIGNING_RETRIES + 1) + ")");
+                    refetchAcl(noke, NokeDeviceSigningError.ACL_TIME_INVALID);
+                } else {
+                    Log.e(TAG, "ACL retry limit exhausted for " + noke.getMac());
+                    noke.connectionState = NokeDefines.NOKE_STATE_DISCONNECTED;
+                    mGlobalNokeListener.onError(noke, NokeMobileError.ERROR_SIGNING, NokeDeviceSigningError.ACL_TIME_INVALID.getDescription());
+                    disconnectNoke(noke);
                     mGlobalNokeListener.onNokeDisconnected(noke);
                 }
                 break;
@@ -2590,48 +2811,23 @@ public class NokeDeviceManagerService extends Service {
         }
 
         try {
-            // Convert hex byte to status string
-            String statusHex = bytesToHex(statusBytes);
-            Log.d(TAG, "Status hex: " + statusHex);
+            // Firmware reports status as an ASCII string (e.g. "TIME_SYNCED"), not a numeric code.
+            String statusText = new String(statusBytes, java.nio.charset.StandardCharsets.US_ASCII).trim();
+            Log.d(TAG, "Status text: " + statusText);
 
-            // Parse status from first byte
-            NokeDeviceSigningStatus status = parseStatus(statusBytes[0]);
+            NokeDeviceSigningStatus status = NokeDeviceSigningStatus.fromValue(statusText);
             if (status != null) {
                 handleAclStatus(noke, status);
             } else {
-                Log.w(TAG, "Unknown status byte: 0x" + String.format("%02X", statusBytes[0]));
+                Log.w(TAG, "Unknown status string: " + statusText);
             }
         } catch (Exception e) {
             Log.e(TAG, "Error parsing status", e);
         }
     }
 
-    /**
-     * Parse status byte to NokeDeviceSigningStatus enum.
-     */
-    private NokeDeviceSigningStatus parseStatus(byte statusByte) {
-        // Map status bytes to enum values (these match the lock firmware spec)
-        switch (statusByte) {
-            case 0x00: return NokeDeviceSigningStatus.TIME_SYNCED;
-            case 0x01: return NokeDeviceSigningStatus.ACL_RECEIVED;
-            case 0x02: return NokeDeviceSigningStatus.ACL_VALIDATED;
-            case 0x03: return NokeDeviceSigningStatus.ACLSIG_VERIFIED;
-            case 0x04: return NokeDeviceSigningStatus.CMD_RECEIVED;
-            case 0x05: return NokeDeviceSigningStatus.UNLOCK_EXECUTED;
-            case (byte) 0xF0: return NokeDeviceSigningStatus.ACL_REJECTED;
-            case (byte) 0xF1: return NokeDeviceSigningStatus.ACL_TIME_EXPIRED;
-            case (byte) 0xF2: return NokeDeviceSigningStatus.ACLSIG_VERIFY_FAIL;
-            case (byte) 0xF3: return NokeDeviceSigningStatus.UNLOCK_DENIED;
-            case (byte) 0xF4: return NokeDeviceSigningStatus.ACL_SETUP_ERR;
-            case (byte) 0xF5: return NokeDeviceSigningStatus.ACL_SCHEDULE_BLOCKED;
-            case (byte) 0xF6: return NokeDeviceSigningStatus.UNLOCK_OVERLOCKED;
-            case (byte) 0xF7: return NokeDeviceSigningStatus.LOCK_ALREADY_UNLOCKED;
-            case (byte) 0xF8: return NokeDeviceSigningStatus.LOCK_LOCKED;
-            default: return null;
-        }
-    }
-
     // ==================== BLE Characteristic Write/Read Methods ====================
+
 
     void writeTimeCharacteristic(final NokeDevice noke, byte[] bytes) {
         writeSigningCharacteristic(noke, SigningWriteCharacteristicType.TIME, bytes);
@@ -2673,6 +2869,7 @@ public class NokeDeviceManagerService extends Service {
                     bleOperationQueue
             );
 
+            request.setOnExecute(() -> pendingSigningWriteRequest.set(request));
             request.execute();
 
         } catch (NullPointerException e) {
@@ -2722,6 +2919,7 @@ public class NokeDeviceManagerService extends Service {
                     bleOperationQueue
             );
 
+            request.setOnExecute(() -> pendingSigningReadRequest.set(request));
             request.execute();
 
         } catch (NullPointerException e) {
