@@ -296,9 +296,23 @@ interface PhoneKeyPersistence {
 
 ## Required Implementation
 
-### Step 1: Implement PhoneKeyCoreClient
+### Step 1: Choose a PhoneKeyCoreClient
 
-This is the **only required implementation**. Create a class that implements `PhoneKeyCoreClient` using your app's networking layer and backend integration.
+**Using the Noke backend?** Use the built-in `DefaultPhoneKeyCoreClient`; no implementation is needed:
+
+```kotlin
+val client = DefaultPhoneKeyCoreClient(
+    context = applicationContext,
+    baseUrl = "https://api-gateway.smartentry.noke.com/",
+    tokenScheme = "ApiKey",
+    authToken = { sessionManager.getApiKey() },
+    extraHeaders = { mapOf("Email" to email, "CompanyId" to companyId, "SiteId" to siteId) },
+)
+client.prewarm(userId)   // once the user id is known
+PhoneKeyAccessService.setSharedClient(client, applicationContext)
+```
+
+**Using your own backend?** Implement `PhoneKeyCoreClient` as described below. This is the only custom implementation required. Create a class that implements `PhoneKeyCoreClient` using your app's networking layer and backend integration.
 
 See `TEMPLATE_PhoneKeyCoreClient.kt` at the root of the repository for a full annotated example.
 
